@@ -2,8 +2,12 @@ package postgres
 
 import (
 	"context"
-	"github.com/caxqueiroz/facts_engine/model"
+	"math"
 	"time"
+
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
+	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (t *transaction) StageTimeline(_ context.Context, record string, entries []model.Acceptance) error {
@@ -25,14 +29,17 @@ func (t *transaction) StageSnapshot(_ context.Context, s model.FactSnapshot) err
 }
 func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 	if t.pendingTimeline != nil {
-		_, err := t.tx.Exec(ctx, `INSERT INTO timeline_generations VALUES($1,$2,$3)`, t.tenant, t.pendingRecord, e.LedgerRevision)
+		err := ledgerdb.New(t.tx).InsertTimelineGeneration(ctx, ledgerdb.InsertTimelineGenerationParams{TenantID: t.tenant, RecordID: t.pendingRecord, LedgerRevision: e.LedgerRevision})
 		if err != nil {
 			return err
 		}
-		if _, err = t.tx.Exec(ctx, `DELETE FROM accepted_intervals WHERE tenant_id=$1 AND record_id=$2`, t.tenant, t.pendingRecord); err != nil {
+		if err = ledgerdb.New(t.tx).DeleteCurrentTimeline(ctx, ledgerdb.DeleteCurrentTimelineParams{TenantID: t.tenant, RecordID: t.pendingRecord}); err != nil {
 			return err
 		}
 		for i, a := range t.pendingTimeline {
+			if i > math.MaxInt32 {
+				return model.ErrInvalid
+			}
 			if a.LedgerRevision == 0 {
 				a.LedgerRevision = e.LedgerRevision
 			}
@@ -40,16 +47,16 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 			if err != nil {
 				return err
 			}
-			if _, err = t.tx.Exec(ctx, `INSERT INTO timeline_history VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, t.pendingRecord, e.LedgerRevision, i, a.VersionID, b); err != nil {
+			if err = ledgerdb.New(t.tx).InsertTimelineEntry(ctx, ledgerdb.InsertTimelineEntryParams{TenantID: t.tenant, RecordID: t.pendingRecord, LedgerRevision: e.LedgerRevision, Ordinal: int32(i), VersionID: a.VersionID, Payload: b}); err != nil {
 				return err
 			}
-			if _, err = t.tx.Exec(ctx, `INSERT INTO accepted_intervals(tenant_id,record_id,version_id,valid_from,valid_to,ledger_revision,payload) VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, t.pendingRecord, a.VersionID, a.Valid.From, a.Valid.To, e.LedgerRevision, b); err != nil {
+			if err = ledgerdb.New(t.tx).InsertAcceptedInterval(ctx, ledgerdb.InsertAcceptedIntervalParams{TenantID: t.tenant, RecordID: t.pendingRecord, VersionID: a.VersionID, ValidFrom: nullableTime(a.Valid.From), ValidTo: nullableTime(a.Valid.To), LedgerRevision: pgtype.Int8{Int64: e.LedgerRevision, Valid: true}, Payload: b}); err != nil {
 				return err
 			}
 		}
 	}
 	if t.pendingRejection != "" {
-		if _, err := t.tx.Exec(ctx, `INSERT INTO rejected_versions VALUES($1,$2,$3,$4)`, t.tenant, t.pendingRecord, t.pendingRejection, e.LedgerRevision); err != nil {
+		if err := ledgerdb.New(t.tx).InsertFactRejection(ctx, ledgerdb.InsertFactRejectionParams{TenantID: t.tenant, RecordID: t.pendingRecord, VersionID: t.pendingRejection, LedgerRevision: e.LedgerRevision}); err != nil {
 			return err
 		}
 	}
@@ -61,12 +68,12 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if _, err := t.tx.Exec(ctx, `INSERT INTO attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,payload,ledger_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, t.tenant, a.ID, a.Scope, a.RecordID, a.VersionID, a.EvidenceID, b, e.LedgerRevision); err != nil {
+		if err := ledgerdb.New(t.tx).InsertFactAttestation(ctx, ledgerdb.InsertFactAttestationParams{TenantID: t.tenant, ID: a.ID, ScopeID: a.Scope, RecordID: a.RecordID, VersionID: a.VersionID, EvidenceID: a.EvidenceID, Payload: b, LedgerRevision: pgtype.Int8{Int64: e.LedgerRevision, Valid: true}}); err != nil {
 			return err
 		}
 	}
 	if t.pendingWithdrawal != "" {
-		if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_events(tenant_id,attestation_id,actor,ledger_revision) VALUES($1,$2,$3,$4)`, t.tenant, t.pendingWithdrawal, e.Caller.Principal, e.LedgerRevision); err != nil {
+		if err := ledgerdb.New(t.tx).InsertFactWithdrawal(ctx, ledgerdb.InsertFactWithdrawalParams{TenantID: t.tenant, AttestationID: t.pendingWithdrawal, Actor: e.Caller.Principal, LedgerRevision: pgtype.Int8{Int64: e.LedgerRevision, Valid: true}}); err != nil {
 			return err
 		}
 	}
@@ -78,10 +85,13 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO fact_snapshots VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, s.ID, s.SelectionRevision, s.CreationRevision, s.Digest, b); err != nil {
+		if err = ledgerdb.New(t.tx).InsertFactSnapshot(ctx, ledgerdb.InsertFactSnapshotParams{TenantID: t.tenant, ID: s.ID, SelectionRevision: s.SelectionRevision, CreationRevision: s.CreationRevision, Digest: s.Digest, Payload: b}); err != nil {
 			return err
 		}
 		for i, item := range s.Items {
+			if i > math.MaxInt32 {
+				return model.ErrInvalid
+			}
 			var record, version *string
 			if item.Resolution.RecordID != "" {
 				v := item.Resolution.RecordID
@@ -91,7 +101,7 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 				v := item.Resolution.VersionID
 				version = &v
 			}
-			if _, err = t.tx.Exec(ctx, `INSERT INTO fact_snapshot_items VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, s.ID, i, item.Selector.Scope, model.Digest(item.Selector), record, version); err != nil {
+			if err = ledgerdb.New(t.tx).InsertFactSnapshotItem(ctx, ledgerdb.InsertFactSnapshotItemParams{TenantID: t.tenant, SnapshotID: s.ID, Ordinal: int32(i), ScopeID: item.Selector.Scope, SelectorDigest: model.Digest(item.Selector), RecordID: nullableText(record), VersionID: nullableText(version)}); err != nil {
 				return err
 			}
 		}
@@ -99,10 +109,10 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 	return nil
 }
 func (t *transaction) Acceptances(ctx context.Context, record string, revision int64) ([]model.Acceptance, error) {
-	query := `SELECT payload FROM accepted_intervals WHERE tenant_id=$1 AND record_id=$2 ORDER BY valid_from,segment_id`
+	query := ledgerdb.ListCurrentAcceptances
 	args := []any{t.tenant, record}
 	if revision > 0 {
-		query = `SELECT payload FROM timeline_history WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision=(SELECT max(ledger_revision) FROM timeline_generations WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision<=$3) ORDER BY ordinal`
+		query = ledgerdb.ListHistoricalAcceptances
 		args = append(args, revision)
 	}
 	rows, err := t.tx.Query(ctx, query, args...)
@@ -128,17 +138,15 @@ func (t *transaction) Acceptances(ctx context.Context, record string, revision i
 	return out, rows.Err()
 }
 func (t *transaction) Rejected(ctx context.Context, record, version string, revision int64) (bool, error) {
-	var yes bool
-	err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM rejected_versions WHERE tenant_id=$1 AND record_id=$2 AND version_id=$3 AND ($4::bigint=0 OR ledger_revision<=$4))`, t.tenant, record, version, revision).Scan(&yes)
+	yes, err := ledgerdb.New(t.tx).FactRejected(ctx, ledgerdb.FactRejectedParams{TenantID: t.tenant, RecordID: record, VersionID: version, Revision: revision})
 	return yes, err
 }
 func (t *transaction) HasAcceptance(ctx context.Context, record, version string) (bool, error) {
-	var yes bool
-	err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM timeline_history WHERE tenant_id=$1 AND record_id=$2 AND version_id=$3)`, t.tenant, record, version).Scan(&yes)
+	yes, err := ledgerdb.New(t.tx).FactHasAcceptance(ctx, ledgerdb.FactHasAcceptanceParams{TenantID: t.tenant, RecordID: record, VersionID: version})
 	return yes, err
 }
 func (t *transaction) Versions(ctx context.Context, record string, revision int64) ([]model.Version, error) {
-	rows, err := t.tx.Query(ctx, `SELECT v.payload FROM record_versions v JOIN record_events r ON r.tenant_id=v.tenant_id AND r.record_id=v.record_id AND r.version_id=v.id JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id WHERE v.tenant_id=$1 AND v.record_id=$2 AND e.event_type='propose_fact' AND e.ledger_revision<=$3 ORDER BY e.ledger_revision`, t.tenant, record, revision)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListFactVersionPayloads, t.tenant, record, revision)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +167,14 @@ func (t *transaction) Versions(ctx context.Context, record string, revision int6
 }
 func (t *transaction) HistoricalAttestations(ctx context.Context, version string, revision int64) ([]model.Attestation, error) {
 	// Fail explicitly when upgrading a ledger that cannot place old attestations in revision order.
-	var gap bool
-	err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM attestations a WHERE tenant_id=$1 AND version_id=$2 AND (ledger_revision IS NULL OR EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision IS NULL)))`, t.tenant, version).Scan(&gap)
+	gap, err := ledgerdb.New(t.tx).HasUnorderedAttestations(ctx, ledgerdb.HasUnorderedAttestationsParams{TenantID: t.tenant, VersionID: version})
 	if err != nil {
 		return nil, err
 	}
 	if gap {
 		return nil, model.ErrPrecondition
 	}
-	rows, err := t.tx.Query(ctx, `SELECT a.payload FROM attestations a WHERE a.tenant_id=$1 AND a.version_id=$2 AND a.ledger_revision<=$3 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision<=$3) ORDER BY a.id`, t.tenant, version, revision)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListHistoricalAttestationPayloads, t.tenant, version, revision)
 	if err != nil {
 		return nil, err
 	}
@@ -187,22 +194,30 @@ func (t *transaction) HistoricalAttestations(ctx context.Context, version string
 	return out, rows.Err()
 }
 func (t *transaction) RevisionTime(ctx context.Context, rev int64) (time.Time, error) {
-	var at time.Time
-	err := t.tx.QueryRow(ctx, `SELECT recorded_at FROM ledger_events WHERE tenant_id=$1 AND ledger_revision=$2`, t.tenant, rev).Scan(&at)
-	return at, translate(err)
+	at, err := ledgerdb.New(t.tx).GetRevisionTime(ctx, ledgerdb.GetRevisionTimeParams{TenantID: t.tenant, LedgerRevision: rev})
+	if err != nil {
+		return time.Time{}, translate(err)
+	}
+	if !at.Valid || at.InfinityModifier != pgtype.Finite {
+		return time.Time{}, model.ErrPrecondition
+	}
+	return at.Time, nil
 }
 func (t *transaction) StreamRevisionAt(ctx context.Context, record string, revision int64) (int64, error) {
-	var rev int64
-	err := t.tx.QueryRow(ctx, `SELECT coalesce(max(r.stream_revision),0) FROM record_events r JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id WHERE r.tenant_id=$1 AND r.record_id=$2 AND e.ledger_revision<=$3`, t.tenant, record, revision).Scan(&rev)
+	rev, err := ledgerdb.New(t.tx).GetFactStreamRevisionAt(ctx, ledgerdb.GetFactStreamRevisionAtParams{TenantID: t.tenant, RecordID: record, LedgerRevision: revision})
 	return rev, err
 }
 func (t *transaction) Snapshot(ctx context.Context, id string) (model.FactSnapshot, error) {
 	var s model.FactSnapshot
-	err := t.read(ctx, &s, `SELECT payload FROM fact_snapshots WHERE tenant_id=$1 AND id=$2`, t.tenant, id)
+	payload, err := ledgerdb.New(t.tx).GetSnapshotPayload(ctx, ledgerdb.GetSnapshotPayloadParams{TenantID: t.tenant, ID: id})
+	if err != nil {
+		return s, translate(err)
+	}
+	err = t.decode(payload, &s)
 	return s, err
 }
 func (t *transaction) History(ctx context.Context, record string) ([]model.Event, error) {
-	rows, err := t.tx.Query(ctx, `SELECT e.payload,e.recorded_at FROM ledger_events e JOIN record_events r ON r.tenant_id=e.tenant_id AND r.event_id=e.id WHERE e.tenant_id=$1 AND r.record_id=$2 ORDER BY e.ledger_revision LIMIT 1001`, t.tenant, record)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListFactHistoryPayloads, t.tenant, record)
 	if err != nil {
 		return nil, err
 	}

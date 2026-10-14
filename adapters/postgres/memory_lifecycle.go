@@ -2,11 +2,14 @@ package postgres
 
 import (
 	"context"
+	"math"
+
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 func (t *transaction) MemoryTimeline(ctx context.Context, record string, revision int64) ([]model.Acceptance, error) {
-	rows, err := t.tx.Query(ctx, `SELECT payload FROM memory_timeline_history WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision=(SELECT max(ledger_revision) FROM memory_timeline_generations WHERE tenant_id=$1 AND record_id=$2 AND ($3::bigint=0 OR ledger_revision<=$3)) ORDER BY ordinal`, t.tenant, record, revision)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListMemoryTimelinePayloads, t.tenant, record, revision)
 	if err != nil {
 		return nil, err
 	}
@@ -36,18 +39,15 @@ func (t *transaction) StageMemoryRejection(_ context.Context, record, version st
 	return nil
 }
 func (t *transaction) MemoryRejected(ctx context.Context, record, version string, revision int64) (bool, error) {
-	var yes bool
-	err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memory_rejections WHERE tenant_id=$1 AND record_id=$2 AND version_id=$3 AND ($4::bigint=0 OR ledger_revision<=$4))`, t.tenant, record, version, revision).Scan(&yes)
+	yes, err := ledgerdb.New(t.tx).MemoryRejected(ctx, ledgerdb.MemoryRejectedParams{TenantID: t.tenant, RecordID: record, VersionID: version, Revision: revision})
 	return yes, err
 }
 func (t *transaction) MemoryHasAcceptance(ctx context.Context, record, version string) (bool, error) {
-	var yes bool
-	err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM memory_timeline_history WHERE tenant_id=$1 AND record_id=$2 AND version_id=$3)`, t.tenant, record, version).Scan(&yes)
+	yes, err := ledgerdb.New(t.tx).MemoryHasAcceptance(ctx, ledgerdb.MemoryHasAcceptanceParams{TenantID: t.tenant, RecordID: record, VersionID: version})
 	return yes, err
 }
 func (t *transaction) MemoryStreamRevisionAt(ctx context.Context, record string, revision int64) (int64, error) {
-	var stream int64
-	err := t.tx.QueryRow(ctx, `SELECT coalesce(max(r.stream_revision),0) FROM memory_record_events r JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id WHERE r.tenant_id=$1 AND r.record_id=$2 AND e.ledger_revision<=$3`, t.tenant, record, revision).Scan(&stream)
+	stream, err := ledgerdb.New(t.tx).GetMemoryStreamRevisionAt(ctx, ledgerdb.GetMemoryStreamRevisionAtParams{TenantID: t.tenant, RecordID: record, LedgerRevision: revision})
 	return stream, err
 }
 func (t *transaction) flushMemoryLifecycle(ctx context.Context, e model.Event) error {
@@ -55,10 +55,13 @@ func (t *transaction) flushMemoryLifecycle(ctx context.Context, e model.Event) e
 		return err
 	}
 	if t.pendingMemoryTimeline != nil {
-		if _, err := t.tx.Exec(ctx, `INSERT INTO memory_timeline_generations VALUES($1,$2,$3)`, t.tenant, t.pendingMemoryRecord, e.LedgerRevision); err != nil {
+		if err := ledgerdb.New(t.tx).InsertMemoryTimelineGeneration(ctx, ledgerdb.InsertMemoryTimelineGenerationParams{TenantID: t.tenant, RecordID: t.pendingMemoryRecord, LedgerRevision: e.LedgerRevision}); err != nil {
 			return err
 		}
 		for ordinal, entry := range t.pendingMemoryTimeline {
+			if ordinal > math.MaxInt32 {
+				return model.ErrInvalid
+			}
 			if entry.LedgerRevision == 0 {
 				entry.LedgerRevision = e.LedgerRevision
 			}
@@ -66,13 +69,13 @@ func (t *transaction) flushMemoryLifecycle(ctx context.Context, e model.Event) e
 			if err != nil {
 				return err
 			}
-			if _, err = t.tx.Exec(ctx, `INSERT INTO memory_timeline_history VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, t.tenant, t.pendingMemoryRecord, e.LedgerRevision, ordinal, entry.VersionID, entry.Valid.From, entry.Valid.To, payload); err != nil {
+			if err = ledgerdb.New(t.tx).InsertMemoryTimelineEntry(ctx, ledgerdb.InsertMemoryTimelineEntryParams{TenantID: t.tenant, RecordID: t.pendingMemoryRecord, LedgerRevision: e.LedgerRevision, Ordinal: int32(ordinal), VersionID: entry.VersionID, ValidFrom: nullableTime(entry.Valid.From), ValidTo: nullableTime(entry.Valid.To), Payload: payload}); err != nil {
 				return err
 			}
 		}
 	}
 	if t.pendingMemoryRejection != "" {
-		if _, err := t.tx.Exec(ctx, `INSERT INTO memory_rejections VALUES($1,$2,$3,$4)`, t.tenant, t.pendingMemoryRecord, t.pendingMemoryRejection, e.LedgerRevision); err != nil {
+		if err := ledgerdb.New(t.tx).InsertMemoryRejection(ctx, ledgerdb.InsertMemoryRejectionParams{TenantID: t.tenant, RecordID: t.pendingMemoryRecord, VersionID: t.pendingMemoryRejection, LedgerRevision: e.LedgerRevision}); err != nil {
 			return err
 		}
 	}
