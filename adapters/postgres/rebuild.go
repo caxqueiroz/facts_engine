@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"sort"
@@ -14,12 +15,15 @@ func validGeneration(k model.GenerationKey) bool {
 }
 func (t *transaction) generation(ctx context.Context, k model.GenerationKey) (model.RebuildStatus, error) {
 	s := model.RebuildStatus{Key: k}
-	err := t.tx.QueryRow(ctx, `SELECT state,fence,through_revision,base_epoch,previous_generation,entry_count,digest,verification_version FROM projection_generations WHERE tenant_id=$1 AND generation=$2`, k.Tenant, k.Generation).Scan(&s.State, &s.Fence, &s.ThroughRevision, &s.BaseEpoch, &s.PreviousGeneration, &s.Count, &s.Digest, &s.VerificationVersion)
+	row, err := ledgerdb.New(t.tx).GetProjectionGeneration(ctx, ledgerdb.GetProjectionGenerationParams{TenantID: k.Tenant, Generation: k.Generation})
+	s.State, s.Fence, s.ThroughRevision, s.BaseEpoch = row.State, row.Fence, row.ThroughRevision, row.BaseEpoch
+	s.PreviousGeneration, s.Count, s.Digest, s.VerificationVersion = row.PreviousGeneration, int(row.EntryCount), row.Digest, row.VerificationVersion
 	return s, err
 }
 func (t *transaction) activeProjection(ctx context.Context) (model.ActiveProjection, error) {
 	var a model.ActiveProjection
-	err := t.tx.QueryRow(ctx, `SELECT generation,epoch FROM active_projections WHERE tenant_id=$1`, t.tenant).Scan(&a.Generation, &a.Epoch)
+	row, err := ledgerdb.New(t.tx).GetActiveProjection(ctx, t.tenant)
+	a.Generation, a.Epoch = row.Generation, row.Epoch
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, nil
 	}
@@ -45,7 +49,7 @@ func (l *Ledger) rebuild(ctx context.Context, k model.GenerationKey, a model.Reb
 	}
 	err := l.Transact(ctx, k.Tenant, func(tx model.Tx) error {
 		t := tx.(*transaction)
-		if _, err := t.tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, model.Digest([]string{k.Tenant, "projection-management"})); err != nil {
+		if err := ledgerdb.New(t.tx).LockProjectionManagement(ctx, model.Digest([]string{k.Tenant, "projection-management"})); err != nil {
 			return err
 		}
 		var err error
@@ -55,7 +59,7 @@ func (l *Ledger) rebuild(ctx context.Context, k model.GenerationKey, a model.Reb
 	return s, err
 }
 func (t *transaction) saveGeneration(ctx context.Context, s model.RebuildStatus, a model.RebuildActor, operation string) error {
-	if _, err := t.tx.Exec(ctx, `UPDATE projection_generations SET state=$3,fence=$4,through_revision=$5,base_epoch=$6,previous_generation=$7,entry_count=$8,digest=$9,verification_version=$10 WHERE tenant_id=$1 AND generation=$2`, s.Key.Tenant, s.Key.Generation, s.State, s.Fence, s.ThroughRevision, s.BaseEpoch, s.PreviousGeneration, s.Count, s.Digest, s.VerificationVersion); err != nil {
+	if _, err := t.tx.Exec(ctx, ledgerdb.UpdateProjectionGeneration, s.Key.Tenant, s.Key.Generation, s.State, s.Fence, s.ThroughRevision, s.BaseEpoch, s.PreviousGeneration, s.Count, s.Digest, s.VerificationVersion); err != nil {
 		return err
 	}
 	b, err := t.encode(struct {
@@ -65,7 +69,7 @@ func (t *transaction) saveGeneration(ctx context.Context, s model.RebuildStatus,
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO projection_rebuild_events(tenant_id,generation,fence,operation,payload) VALUES($1,$2,$3,$4,$5)`, s.Key.Tenant, s.Key.Generation, s.Fence, operation, b)
+	_, err = t.tx.Exec(ctx, ledgerdb.InsertProjectionRebuildEvent, s.Key.Tenant, s.Key.Generation, s.Fence, operation, b)
 	return err
 }
 func (l *Ledger) StartRebuild(ctx context.Context, k model.GenerationKey, a model.RebuildActor, maxAttempts int) (model.RebuildStatus, error) {
@@ -76,7 +80,7 @@ func (l *Ledger) StartRebuild(ctx context.Context, k model.GenerationKey, a mode
 		s, err := t.generation(ctx, k)
 		if err == nil {
 			var configured int
-			if err = t.tx.QueryRow(ctx, `SELECT max_attempts FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id=$2`, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&configured); err != nil {
+			if err = t.tx.QueryRow(ctx, ledgerdb.GetConsumerMaxAttempts, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&configured); err != nil {
 				return s, err
 			}
 			if configured != maxAttempts {
@@ -87,7 +91,7 @@ func (l *Ledger) StartRebuild(ctx context.Context, k model.GenerationKey, a mode
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return s, err
 		}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO tenant_revisions(tenant_id) VALUES($1) ON CONFLICT DO NOTHING`, k.Tenant); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.EnsureProjectionTenant, k.Tenant); err != nil {
 			return s, err
 		}
 		active, err := t.activeProjection(ctx)
@@ -95,17 +99,17 @@ func (l *Ledger) StartRebuild(ctx context.Context, k model.GenerationKey, a mode
 			return s, err
 		}
 		s = model.RebuildStatus{Key: k, State: "building", Fence: 1, BaseEpoch: active.Epoch, PreviousGeneration: active.Generation}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO consumer_offsets(tenant_id,consumer_id,max_attempts) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, k.Tenant, model.ProjectionConsumer(k.Generation), maxAttempts); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.RegisterConsumer, k.Tenant, model.ProjectionConsumer(k.Generation), maxAttempts); err != nil {
 			return s, err
 		}
 		var configured int
-		if err = t.tx.QueryRow(ctx, `SELECT max_attempts FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id=$2`, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&configured); err != nil {
+		if err = t.tx.QueryRow(ctx, ledgerdb.GetConsumerMaxAttempts, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&configured); err != nil {
 			return s, err
 		}
 		if configured != maxAttempts {
 			return s, model.ErrConflict
 		}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO projection_generations(tenant_id,generation,state,fence,base_epoch,previous_generation) VALUES($1,$2,'building',1,$3,$4)`, k.Tenant, k.Generation, s.BaseEpoch, s.PreviousGeneration); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.InsertProjectionGeneration, k.Tenant, k.Generation, s.BaseEpoch, s.PreviousGeneration); err != nil {
 			return s, err
 		}
 		return s, t.saveGeneration(ctx, s, a, "start")
@@ -125,17 +129,17 @@ func (l *Ledger) FreezeRebuild(ctx context.Context, k model.GenerationKey, a mod
 		}
 		var state string
 		var revision int64
-		if err = t.tx.QueryRow(ctx, `SELECT state,acknowledged_revision FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id=$2 FOR UPDATE`, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&state, &revision); err != nil {
+		if err = t.tx.QueryRow(ctx, ledgerdb.LockProjectionConsumer, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&state, &revision); err != nil {
 			return s, err
 		}
 		var current int64
-		if err = t.tx.QueryRow(ctx, `SELECT revision FROM tenant_revisions WHERE tenant_id=$1 FOR UPDATE`, k.Tenant).Scan(&current); err != nil {
+		if err = t.tx.QueryRow(ctx, ledgerdb.LockTenantRevision, k.Tenant).Scan(&current); err != nil {
 			return s, err
 		}
 		if state != "pending" || revision != current {
 			return s, model.ErrPrecondition
 		}
-		if _, err = t.tx.Exec(ctx, `UPDATE consumer_offsets SET state='paused',fence=fence+1,lease_until=NULL WHERE tenant_id=$1 AND consumer_id=$2`, k.Tenant, model.ProjectionConsumer(k.Generation)); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.PauseProjectionConsumer, k.Tenant, model.ProjectionConsumer(k.Generation)); err != nil {
 			return s, err
 		}
 		s.State = "paused"
@@ -217,7 +221,7 @@ func (l *Ledger) finishRebuild(ctx context.Context, k model.GenerationKey, a mod
 		if s.State != from {
 			return s, model.ErrPrecondition
 		}
-		tag, err := t.tx.Exec(ctx, `UPDATE consumer_offsets SET state='pending',available_at=clock_timestamp() WHERE tenant_id=$1 AND consumer_id=$2 AND state='paused'`, k.Tenant, model.ProjectionConsumer(k.Generation))
+		tag, err := t.tx.Exec(ctx, ledgerdb.ResumeProjectionConsumer, k.Tenant, model.ProjectionConsumer(k.Generation))
 		if err != nil {
 			return s, err
 		}
@@ -247,7 +251,7 @@ func (l *Ledger) ActivateRebuild(ctx context.Context, k model.GenerationKey, a m
 		// No external calls occur while this ordering barrier is held. A concurrent
 		// business commit either precedes this check (and rejects cutover) or follows it.
 		var current int64
-		if err = t.tx.QueryRow(ctx, `SELECT revision FROM tenant_revisions WHERE tenant_id=$1 FOR UPDATE`, k.Tenant).Scan(&current); err != nil {
+		if err = t.tx.QueryRow(ctx, ledgerdb.LockTenantRevision, k.Tenant).Scan(&current); err != nil {
 			return s, err
 		}
 		if current != s.ThroughRevision {
@@ -255,7 +259,7 @@ func (l *Ledger) ActivateRebuild(ctx context.Context, k model.GenerationKey, a m
 		}
 		var state string
 		var offset int64
-		if err = t.tx.QueryRow(ctx, `SELECT state,acknowledged_revision FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id=$2 FOR UPDATE`, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&state, &offset); err != nil {
+		if err = t.tx.QueryRow(ctx, ledgerdb.LockProjectionConsumer, k.Tenant, model.ProjectionConsumer(k.Generation)).Scan(&state, &offset); err != nil {
 			return s, err
 		}
 		if state != "paused" || offset != current {
@@ -268,14 +272,14 @@ func (l *Ledger) ActivateRebuild(ctx context.Context, k model.GenerationKey, a m
 			}
 			old.State = "retired"
 			old.Fence++
-			if _, err = t.tx.Exec(ctx, `UPDATE consumer_offsets SET state='paused',fence=fence+1,lease_until=NULL WHERE tenant_id=$1 AND consumer_id=$2`, k.Tenant, model.ProjectionConsumer(active.Generation)); err != nil {
+			if _, err = t.tx.Exec(ctx, ledgerdb.PauseProjectionConsumer, k.Tenant, model.ProjectionConsumer(active.Generation)); err != nil {
 				return s, err
 			}
 			if err = t.saveGeneration(ctx, old, a, "retire"); err != nil {
 				return s, err
 			}
 		}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO active_projections VALUES($1,$2,$3) ON CONFLICT(tenant_id) DO UPDATE SET generation=EXCLUDED.generation,epoch=EXCLUDED.epoch`, k.Tenant, k.Generation, active.Epoch+1); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.SetActiveProjection, k.Tenant, k.Generation, active.Epoch+1); err != nil {
 			return s, err
 		}
 		s.State = "activating"
@@ -294,7 +298,7 @@ func (l *Ledger) ProjectionDocuments(ctx context.Context, k model.GenerationKey,
 	err := l.Transact(ctx, k.Tenant, func(tx model.Tx) error {
 		events = nil
 		t := tx.(*transaction)
-		rows, err := t.tx.Query(ctx, `SELECT DISTINCT ON (r.kind,r.version_id) e.payload FROM ledger_events e JOIN (SELECT tenant_id,event_id,version_id,'fact' AS kind FROM record_events UNION ALL SELECT tenant_id,event_id,version_id,'memory' AS kind FROM memory_record_events) r ON r.tenant_id=e.tenant_id AND r.event_id=e.id WHERE e.tenant_id=$1 AND e.ledger_revision<=$2 AND e.event_type IN ('approve_fact','accept_fact','supersede_fact','approve_memory','accept_memory','supersede_memory') ORDER BY r.kind,r.version_id,e.ledger_revision LIMIT 10001`, k.Tenant, through)
+		rows, err := t.tx.Query(ctx, ledgerdb.ListLegacyProjectionEvents, k.Tenant, through)
 		if err != nil {
 			return err
 		}
@@ -362,7 +366,7 @@ func (l *Ledger) AbandonRebuild(ctx context.Context, k model.GenerationKey, a mo
 		if s.State == "active" || s.State == "activating" || s.State == "retired" || s.State == "abandoned" {
 			return s, model.ErrPrecondition
 		}
-		if _, err = t.tx.Exec(ctx, `UPDATE consumer_offsets SET state='paused',fence=fence+1,lease_until=NULL WHERE tenant_id=$1 AND consumer_id=$2`, k.Tenant, model.ProjectionConsumer(k.Generation)); err != nil {
+		if _, err = t.tx.Exec(ctx, ledgerdb.PauseProjectionConsumer, k.Tenant, model.ProjectionConsumer(k.Generation)); err != nil {
 			return s, err
 		}
 		s.State = "abandoned"
