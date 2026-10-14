@@ -52,6 +52,11 @@ func (t *transaction) flushExtraction(ctx context.Context, e model.Event) error 
 		if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,payload,memory_record_id,memory_version_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, t.tenant, j.ID, j.Request.Scope, nullableID(j.Request.ConversationID), j.Profile.ID, j.ProfileDigest, e.LedgerRevision, b, memoryRecord, memoryVersion); err != nil {
 			return err
 		}
+		if j.Request.RefreshTrigger != nil {
+			if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_refresh_triggers VALUES($1,$2,$3)`, t.tenant, j.ID, j.Request.RefreshTrigger.EventID); err != nil {
+				return err
+			}
+		}
 		if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_job_state(tenant_id,id,max_attempts) VALUES($1,$2,$3)`, t.tenant, j.ID, j.Profile.MaxAttempts); err != nil {
 			return err
 		}

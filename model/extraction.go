@@ -41,7 +41,8 @@ type ExtractionRequest struct {
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
 	Predicates                       []PredicateBinding
-	Refresh                          *VersionReference `json:",omitempty"`
+	Refresh                          *VersionReference     `json:",omitempty"`
+	RefreshTrigger                   *MemoryRefreshTrigger `json:",omitempty"`
 }
 type ExtractionJob struct {
 	ID, Tenant, ProfileDigest string
@@ -172,6 +173,7 @@ func ExtractionConsumer(stream string) string { return "extraction-" + Digest(st
 // MemoryRefreshRequest binds an asynchronous replacement proposal to an exact
 // accepted memory version. The job never accepts or supersedes it automatically.
 type MemoryRefreshRequest struct {
+	Trigger *MemoryRefreshTrigger `json:",omitempty"`
 	Command
 	Scope, RecordID, VersionID, ProfileID string
 }

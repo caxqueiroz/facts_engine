@@ -43,7 +43,7 @@ func extractionTx(tx model.Tx) (model.ExtractionTx, error) {
 	return t, nil
 }
 func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.ExtractionRequest) (model.JobStatus, error) {
-	if r.Refresh != nil || !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) || len(r.Subjects) == 0 || len(r.Subjects) > 64 || len(r.Predicates) == 0 || len(r.Predicates) > 64 {
+	if r.Refresh != nil || r.RefreshTrigger != nil || !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) || len(r.Subjects) == 0 || len(r.Subjects) > 64 || len(r.Predicates) == 0 || len(r.Predicates) > 64 {
 		return model.JobStatus{}, model.ErrInvalid
 	}
 	subjects := map[string]bool{}

@@ -336,3 +336,7 @@ func (e *Engine) StartMemoryRefresh(ctx context.Context, c Caller, r model.Memor
 }
 
 type MemoryRefreshRequest = model.MemoryRefreshRequest
+
+func (e *Engine) ScanMemoryRefresh(ctx context.Context, c Caller, q model.MemoryRefreshScan) (model.MemoryRefreshScanResult, error) {
+	return e.service.ScanMemoryRefresh(ctx, c, q)
+}

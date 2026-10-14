@@ -15,7 +15,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/workers"
 )
 
-func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres, c model.Caller) {
+func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres, queue model.Outbox, c model.Caller) {
 	t.Helper()
 	base, err := facts.New(l, allow{}, store)
 	if err != nil {
@@ -120,13 +120,9 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if err != nil || tinyResult.State != "failed" || tinyResult.LastFailureCode != "input_limit" || calls != 0 {
 		t.Fatal("oversized refresh did not fail before provider", tinyResult, err)
 	}
-	job, err := engine.StartMemoryRefresh(ctx, c, request)
-	if err != nil || job.Kind != "memory_refresh" || job.State != "pending" {
-		t.Fatal(job, err)
-	}
-	duplicate, err := engine.StartMemoryRefresh(ctx, c, request)
-	if err != nil || duplicate.ID != job.ID || calls != 0 {
-		t.Fatal("refresh start not durable/idempotent", duplicate, err)
+	job := testAutomaticMemoryRefresh(t, ctx, engine, l, store, queue, worker, request, original)
+	if calls != 0 {
+		t.Fatal("scheduler invoked model")
 	}
 	handler, err := workers.NewExtraction(engine, worker, "refresh-test")
 	if err != nil {

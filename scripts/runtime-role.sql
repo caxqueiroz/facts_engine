@@ -77,3 +77,6 @@ GRANT SELECT ON context_memory_items,decision_memory_items TO facts_archiver;
 
 GRANT SELECT,INSERT ON extraction_memory_proposals TO facts_runtime;
 GRANT SELECT ON extraction_memory_proposals TO facts_archiver;
+
+GRANT SELECT,INSERT ON extraction_refresh_triggers TO facts_runtime;
+GRANT SELECT ON extraction_refresh_triggers TO facts_archiver;

@@ -28,7 +28,22 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 		return model.JobStatus{}, err
 	}
 	if len(original.Proposal.Dependencies) == 0 {
-		return model.JobStatus{}, model.ErrPrecondition
+		return model.JobStatus{}, model.ErrRefreshNotNeeded
+	}
+	if r.Trigger != nil {
+		event, err := s.memoryRefreshEvent(ctx, c, *r.Trigger, r.Purpose)
+		if err != nil {
+			return model.JobStatus{}, err
+		}
+		relevant := false
+		for _, dependency := range original.Proposal.Dependencies {
+			if dependency.RecordID == event.RecordID && dependency.Scope == event.Scope {
+				relevant = true
+			}
+		}
+		if !relevant || original.LedgerRevision > event.LedgerRevision {
+			return model.JobStatus{}, model.ErrInvalid
+		}
 	}
 	scopes := []string{r.Scope}
 	for _, d := range original.Proposal.Dependencies {
@@ -36,7 +51,7 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 	}
 	slices.Sort(scopes)
 	scopes = slices.Compact(scopes)
-	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: model.ExtractionRequest{Command: r.Command, Scope: r.Scope, ProfileID: r.ProfileID, Refresh: &model.VersionReference{RecordID: r.RecordID, VersionID: r.VersionID}}, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), RefreshScopes: scopes}
+	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: model.ExtractionRequest{Command: r.Command, Scope: r.Scope, ProfileID: r.ProfileID, RefreshTrigger: r.Trigger, Refresh: &model.VersionReference{RecordID: r.RecordID, VersionID: r.VersionID}}, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), RefreshScopes: scopes}
 	job.Authorization, err = s.extractionAuthorizations(ctx, c, job)
 	if err != nil {
 		return model.JobStatus{}, err
@@ -61,14 +76,14 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 			}
 		}
 		if !active {
-			return model.ErrPrecondition
+			return model.ErrRefreshNotNeeded
 		}
 		eligible, err := s.memoryDependencies(ctx, t, original, revision, at, false)
 		if err != nil {
 			return err
 		}
 		if eligible {
-			return model.ErrPrecondition
+			return model.ErrRefreshNotNeeded
 		}
 		et, err := extractionTx(tx)
 		if err != nil {

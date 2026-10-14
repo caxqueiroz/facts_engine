@@ -323,6 +323,12 @@ type ExtractionQuotum struct {
 	Epoch          int64
 }
 
+type ExtractionRefreshTrigger struct {
+	TenantID string
+	JobID    string
+	EventID  string
+}
+
 type ExtractionResult struct {
 	TenantID       string
 	AttemptID      string
