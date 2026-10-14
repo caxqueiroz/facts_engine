@@ -18,6 +18,7 @@ func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, c
 	if err != nil || len(result.Items) != 1 || result.Items[0].Key.ID != "memory-auto" || result.Items[0].Memory.Body != "Customer discussed a preference for tea." {
 		t.Fatal("canonical memory recall", result, err)
 	}
+	testRemoteRecall(t, ctx, engine, caller, query, 0)
 	selected := result.Items[0]
 	factsResult, err := engine.Recall(ctx, caller, query)
 	if err != nil {
@@ -39,7 +40,9 @@ func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, c
 	if err != nil || len(stale.Items) != 0 || !stale.Incomplete {
 		t.Fatal("stale memory index disclosed body", stale, err)
 	}
+	testRemoteRecall(t, ctx, engine, caller, query, 0)
 	query.KnowledgeRevision = result.LedgerRevision
+	testRemoteRecall(t, ctx, engine, caller, query, 0)
 	historical, err := engine.RecallMemories(ctx, caller, query)
 	if err != nil || len(historical.Items) != 1 || historical.Items[0].Memory.Body != selected.Memory.Body {
 		t.Fatal("historical memory recall", historical, err)

@@ -1,0 +1,93 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+import "memory/v1/memories.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service RetrievalService {
+  rpc Recall(RecallRequest) returns (RecallResponse);
+  rpc RecallMemories(RecallMemoriesRequest) returns (RecallMemoriesResponse);
+  rpc WaitForProjection(WaitForProjectionRequest) returns (WaitForProjectionResponse);
+}
+message RecallQuery {
+  repeated string scopes = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 8
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  string query = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 4096
+  }];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  google.protobuf.Timestamp valid_at = 4 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 5 [(buf.validate.field).int64.gte = 0];
+  int64 require_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string require_generation = 7 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  int32 limit = 8 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 20
+  }];
+}
+message RecallRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  RecallQuery query = 2 [(buf.validate.field).required = true];
+}
+message RecallMemoriesRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  RecallQuery query = 2 [(buf.validate.field).required = true];
+}
+message RecallResponse {
+  repeated RecallItem items = 1;
+  string generation = 2;
+  int64 ledger_revision = 3;
+  int64 indexed_revision = 4;
+  bool incomplete = 5;
+}
+message RecallMemoriesResponse {
+  repeated MemoryRecallItem items = 1;
+  string generation = 2;
+  int64 ledger_revision = 3;
+  int64 indexed_revision = 4;
+  bool incomplete = 5;
+}
+message RecallItem {
+  FactKey key = 1;
+  FactResult fact = 2;
+  double score = 3;
+}
+message MemoryRecallItem {
+  MemoryKey key = 1;
+  MemoryResult memory = 2;
+  double score = 3;
+}
+message WaitForProjectionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated string scopes = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 8
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  string generation = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int64 revision = 5 [(buf.validate.field).int64.gte = 1];
+}
+message WaitForProjectionResponse {
+  string generation = 1;
+  int64 indexed_revision = 2;
+}

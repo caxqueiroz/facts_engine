@@ -20,6 +20,7 @@ type Engine interface {
 	ExtractionEngine
 	CalculationEngine
 	AuditEngine
+	RetrievalEngine
 }
 
 type SnapshotEngine interface {

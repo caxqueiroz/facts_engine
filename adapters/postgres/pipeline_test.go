@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"bytes"
+	"connectrpc.com/connect/v2"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -137,6 +138,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if _, err := engine.Recall(ctx, c, wrongGeneration); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("generation requirement bypassed", err)
 	}
+	testRemoteRecall(t, ctx, engine, c, wrongGeneration, connect.CodeUnavailable)
 	query.RequireGeneration = "g1"
 	result, err := engine.Recall(ctx, c, query)
 	if err != nil || result.Incomplete || len(result.Items) == 0 {
@@ -146,6 +148,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil {
 		t.Fatal(err)
 	}
+	testRemoteRecall(t, ctx, engine, c, query, 0)
 	testMemoryRecall(t, ctx, lexicalEngine, c, query)
 	lexicalManifest, err := lexicalEngine.PrepareContext(ctx, c, model.ContextRequest{Command: model.Command{Key: "lexical-context", Purpose: query.Purpose}, Scope: "case1", Query: query})
 	if err != nil || len(lexicalManifest.Items) == 0 || lexicalManifest.Retrieval.EmbeddingID != "none" || lexicalManifest.Retrieval.Dimensions != 0 {
@@ -222,10 +225,12 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if _, err := denied.Recall(ctx, c, query); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("unauthorized recall", err)
 	}
+	testRemoteRecall(t, ctx, denied, c, query, connect.CodePermissionDenied)
 	query.RequireRevision = result.LedgerRevision + 1
 	if _, err := engine.Recall(ctx, c, query); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("future coverage accepted", err)
 	}
+	testRemoteRecall(t, ctx, engine, c, query, connect.CodeUnavailable)
 	query.RequireRevision = 0
 	end := query.ValidAt.Add(24 * time.Hour)
 	change, err := engine.RetractFact(ctx, c, model.LifecycleChange{Approval: model.Approval{Command: model.Command{Key: "pipeline-retraction", Purpose: "review"}, Scope: "case1", RecordID: expected.RecordID, VersionID: expected.VersionID, ExpectedRevision: expected.StreamRevision}, Valid: model.Interval{From: &query.ValidAt, To: &end}, Reason: "review_correction"})
@@ -241,6 +246,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 			t.Fatal("retracted version disclosed from stale index")
 		}
 	}
+	testRemoteRecall(t, ctx, engine, c, query, 0)
 	query.KnowledgeRevision = result.LedgerRevision
 	historical, err := engine.Recall(ctx, c, query)
 	if err != nil {
@@ -255,6 +261,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if !found {
 		t.Fatal("retained historical version missing")
 	}
+	testRemoteRecall(t, ctx, engine, c, query, 0)
 	noHistory, _ := facts.NewWithRetrieval(l, denyPermission{permission: "can_read_history"}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
 	if _, err := noHistory.Recall(ctx, c, query); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("historical recall permission bypassed", err)

@@ -106,7 +106,7 @@ func (s *memoryService) GetMemory(ctx context.Context, r *v1.GetMemoryRequest) (
 	if err != nil {
 		return nil, err
 	}
-	return &v1.GetMemoryResponse{Result: &v1.MemoryResult{State: out.State, RecordId: out.RecordID, VersionId: out.VersionID, Body: out.Body, StreamRevision: out.StreamRevision, LedgerRevision: out.LedgerRevision, Dependencies: dependenciesToProto(out.Dependencies)}}, nil
+	return &v1.GetMemoryResponse{Result: memoryResult(out)}, nil
 }
 func (s *memoryService) GetMemoryVersion(ctx context.Context, r *v1.GetMemoryVersionRequest) (*v1.GetMemoryVersionResponse, error) {
 	out, err := s.engine.GetMemoryVersion(ctx, callerFrom(ctx), model.MemoryVersionQuery{Scope: r.Scope, RecordID: r.RecordId, VersionID: r.VersionId, Purpose: r.Purpose})

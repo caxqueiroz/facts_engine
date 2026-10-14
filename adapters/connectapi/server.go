@@ -42,6 +42,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.RecallRequest{}, &v1.RecallMemoriesRequest{}, &v1.WaitForProjectionRequest{},
 		&v1.RecordCalculationRequest{}, &v1.GetCalculationReceiptRequest{}, &v1.ListChangesRequest{}, &v1.StartAuditExportRequest{}, &v1.GetAuditExportRequest{},
 		&v1.IngestConversationRequest{}, &v1.GetConversationRequest{}, &v1.StartExtractionRequest{}, &v1.PlanExtractionChunksRequest{}, &v1.GetJobRequest{}, &v1.RetryJobRequest{}, &v1.GetExtractionRunRequest{}, &v1.StartMemoryRefreshRequest{},
 		&v1.RegisterMemoryTypeRequest{}, &v1.GetMemoryRequest{}, &v1.ProposeMemoryRequest{}, &v1.ApproveMemoryRequest{}, &v1.AcceptMemoryRequest{}, &v1.RejectMemoryRequest{}, &v1.RetractMemoryRequest{}, &v1.DisputeMemoryRequest{}, &v1.ResolveMemoryDisputeRequest{}, &v1.SupersedeMemoryRequest{}, &v1.GetMemoryVersionRequest{}, &v1.GetMemoryHistoryRequest{},
@@ -91,6 +92,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterExtractionServiceHandler(server, &extractionService{engine: engine})
 	memoryv1connect.RegisterCalculationServiceHandler(server, &calculationService{engine: engine})
 	memoryv1connect.RegisterAuditServiceHandler(server, &auditService{engine: engine})
+	memoryv1connect.RegisterRetrievalServiceHandler(server, &retrievalService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil

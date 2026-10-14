@@ -411,3 +411,28 @@ func TestCalculationAndAuditValidation(t *testing.T) {
 		t.Fatalf("audit tenant: %v", err)
 	}
 }
+
+func TestRetrievalValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewRetrievalServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	query := &v1.RecallQuery{Scopes: []string{"scope", "scope"}, Query: "query", Purpose: "review", ValidAt: validQuery().ValidAt, Limit: 20}
+	if _, err := client.Recall(context.Background(), &v1.RecallRequest{Tenant: "tenant", Query: query}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("duplicate scopes: %v", err)
+	}
+	query.Scopes = []string{"scope"}
+	query.Limit = 21
+	if _, err := client.RecallMemories(context.Background(), &v1.RecallMemoriesRequest{Tenant: "tenant", Query: query}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("recall limit: %v", err)
+	}
+	query.Limit = 20
+	query.Query = strings.Repeat("x", 4097)
+	if _, err := client.Recall(context.Background(), &v1.RecallRequest{Tenant: "tenant", Query: query}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("query size: %v", err)
+	}
+	if _, err := client.WaitForProjection(context.Background(), &v1.WaitForProjectionRequest{Tenant: "tenant", Scopes: []string{"scope"}, Generation: "g1", Purpose: "review"}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("zero revision: %v", err)
+	}
+	if _, err := client.Recall(context.Background(), &v1.RecallRequest{Tenant: "other", Query: query}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("recall tenant: %v", err)
+	}
+}
