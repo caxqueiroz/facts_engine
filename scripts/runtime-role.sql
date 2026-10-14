@@ -10,3 +10,5 @@ GRANT SELECT,INSERT,UPDATE ON active_predicates TO facts_runtime;
 GRANT SELECT,INSERT ON timeline_generations,timeline_history,rejected_versions,fact_snapshots,fact_snapshot_items TO facts_runtime;
 GRANT DELETE ON accepted_intervals TO facts_runtime;
 GRANT USAGE ON SEQUENCE accepted_intervals_segment_id_seq TO facts_runtime;
+GRANT SELECT,INSERT ON calculation_receipts,calculation_snapshots,calculation_artifacts,audit_export_requests,audit_export_jobs,audit_exports TO facts_runtime;
+GRANT UPDATE ON audit_export_jobs TO facts_runtime;

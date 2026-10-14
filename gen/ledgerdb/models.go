@@ -45,6 +45,55 @@ type AttestationEvent struct {
 	LedgerRevision pgtype.Int8
 }
 
+type AuditExport struct {
+	TenantID       string
+	ID             string
+	LedgerRevision int64
+	Digest         string
+	Payload        []byte
+}
+
+type AuditExportJob struct {
+	TenantID   string
+	ID         string
+	State      string
+	Fence      int64
+	LeaseUntil pgtype.Timestamptz
+}
+
+type AuditExportRequest struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type CalculationArtifact struct {
+	TenantID      string
+	CalculationID string
+	EvidenceID    string
+	Role          string
+}
+
+type CalculationReceipt struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	SnapshotID     string
+	ApplicationID  string
+	ExternalRunID  string
+	RequestDigest  string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type CalculationSnapshot struct {
+	TenantID      string
+	CalculationID string
+	SnapshotID    string
+}
+
 type CommandReceipt struct {
 	TenantID   string
 	Principal  string

@@ -14,13 +14,14 @@ type Service struct {
 	ledger   model.Ledger
 	auth     model.Authorizer
 	evidence model.EvidenceStore
+	audit    model.AuditOptions
 }
 
 func New(l model.Ledger, a model.Authorizer, e model.EvidenceStore) (*Service, error) {
 	if l == nil || a == nil || e == nil {
 		return nil, model.ErrInvalid
 	}
-	return &Service{l, a, e}, nil
+	return &Service{ledger: l, auth: a, evidence: e}, nil
 }
 func id() string {
 	var b [16]byte
@@ -389,4 +390,13 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		out.StreamRevision = rec.Revision + 1
 		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
 	})
+}
+
+func NewWithAudit(l model.Ledger, a model.Authorizer, e model.EvidenceStore, options model.AuditOptions) (*Service, error) {
+	s, err := New(l, a, e)
+	if err != nil {
+		return nil, err
+	}
+	s.audit = options
+	return s, nil
 }

@@ -106,3 +106,35 @@ type HistoryResult = model.HistoryResult
 type FactSnapshotRequest = model.FactSnapshotRequest
 type FactSnapshot = model.FactSnapshot
 type SnapshotQuery = model.SnapshotQuery
+
+// NewWithAudit injects the bank-owned signer. Export jobs run only on explicit calls.
+func NewWithAudit(ledger Ledger, auth Authorizer, evidence EvidenceStore, options model.AuditOptions) (*Engine, error) {
+	s, err := services.NewWithAudit(ledger, auth, evidence, options)
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{s}, nil
+}
+func (e *Engine) RecordCalculation(ctx context.Context, c Caller, r CalculationReceipt) (CalculationRecord, error) {
+	return e.service.RecordCalculation(ctx, c, r)
+}
+func (e *Engine) GetCalculationReceipt(ctx context.Context, c Caller, r CalculationQuery) (CalculationRecord, error) {
+	return e.service.GetCalculationReceipt(ctx, c, r)
+}
+func (e *Engine) StartAuditExport(ctx context.Context, c Caller, r AuditExportRequest) (AuditExportResult, error) {
+	return e.service.StartAuditExport(ctx, c, r)
+}
+func (e *Engine) RunAuditExport(ctx context.Context, c Caller, r AuditExportQuery) (AuditExportResult, error) {
+	return e.service.RunAuditExport(ctx, c, r)
+}
+func (e *Engine) GetAuditExport(ctx context.Context, c Caller, r AuditExportQuery) (AuditExportResult, error) {
+	return e.service.GetAuditExport(ctx, c, r)
+}
+
+type CalculationReceipt = model.CalculationReceipt
+type CalculationRecord = model.CalculationRecord
+type CalculationQuery = model.CalculationQuery
+type AuditExportRequest = model.AuditExportRequest
+type AuditExportResult = model.AuditExportResult
+type AuditExportQuery = model.AuditExportQuery
+type AuditOptions = model.AuditOptions

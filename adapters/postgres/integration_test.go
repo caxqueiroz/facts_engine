@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}
@@ -423,6 +423,7 @@ func TestPostgresLedger(t *testing.T) {
 		if len(snap.Items) != 2 || snap.Items[0].Resolution.VersionID != a.VersionID || snap.Items[1].Resolution.State != "missing" || snap.SelectionRevision >= snap.CreationRevision {
 			t.Fatal(snap)
 		}
+		calc := recordCalculationFixture(t, ctx, engine, store, caller, snap)
 		b := propose("timeline-b", "B", model.Interval{From: &feb1}, 2)
 		replacement := model.Supersession{Approval: model.Approval{Command: cmd("replace-b"), Scope: "case1", RecordID: b.RecordID, VersionID: b.VersionID, ExpectedRevision: 3}, ReplacedVersionIDs: []string{a.VersionID}, Valid: model.Interval{From: &feb1}, Reason: "updated_evidence"}
 		acceptedB, err := engine.SupersedeFact(ctx, reviewer, replacement)
@@ -478,6 +479,10 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 		read(jan15, 0, "resolved", "D")
+		oldCalc, err := engine.GetCalculationReceipt(ctx, caller, model.CalculationQuery{ID: calc.ID, Purpose: "audit"})
+		if err != nil || oldCalc.SnapshotDigest != snap.Digest || oldCalc.Receipt.SnapshotID != snap.ID {
+			t.Fatal(oldCalc, err)
+		}
 		stored, err := engine.GetFactSnapshot(ctx, reviewer, model.SnapshotQuery{ID: snap.ID, Purpose: "integration"})
 		if err != nil || stored.Digest != snap.Digest || *stored.Items[0].Resolution.Value.Text != "A" {
 			t.Fatal(stored, err)
@@ -610,6 +615,8 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal("encrypted historical payload changed")
 		}
 	})
+
+	t.Run("signed audit export and recovery", func(t *testing.T) { testAuditExports(t, ctx, ledger, store, reviewer, admin) })
 
 	t.Run("atomic ordering", func(t *testing.T) {
 		var count, maxRev int64

@@ -1,6 +1,6 @@
 # Facts engine
 
-An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, and immutable fact snapshots**. The complete v0.2 specification and production banking release remain in progress.
+An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, and signed audit exports**. The complete v0.2 specification and production banking release remain in progress.
 
 The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. Constructors do not run migrations, start workers/listeners, or change global logging. The host owns the PostgreSQL pools, authentication boundary, encryption keys, OpenFGA provisioning, and shutdown.
 
@@ -14,6 +14,8 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 - Current and revision-bound historical fact reads with explicit missing, unknown, unresolved, disputed, retracted, resolved, and ineligible outcomes. Unknown interval starts cannot be accepted. Effective boundaries use PostgreSQL microsecond precision; finer boundaries are rejected rather than rounded.
 - Partial-interval supersession, future-effective replacements, backdated corrections, rejection, dispute/resolution, and retraction. Complete overlap sets and expected stream revisions are mandatory. Immutable timeline generations preserve every earlier knowledge view.
 - Immutable fact snapshots over ordered explicit selectors, with one PostgreSQL selection view, per-item outcomes, exact values and provenance, canonical content digests, separate selection/creation revisions, and current authorization on reads. Retries retain the original selection even after facts change.
+- External calculation receipts bind an application/run identity to immutable snapshots, executable/configuration digests, normalization version, and verified input/output evidence. Concurrent retries converge; changed run content conflicts. Reads recheck snapshot and artifact permissions.
+- Durable, leased audit exports with fenced completion, revision-bound scope contents, signed entry manifests, explicit coverage gaps, and trusted-key verification.
 - Bounded authorized record event history, including actor/check receipts, correction intervals, reason codes, and replaced versions. Histories exceeding 1,000 events fail explicitly pending paginated history support.
 - Transactional tenant ordering, stream revisions, bounded transaction retries, command receipts, encrypted ledger events, and atomic outbox insertion. Identical authorized retries return the committed result; changed commands conflict.
 - Tenant-qualified foreign keys, forced row-level security, transaction-local tenant context, and a runtime role without mutation privileges on immutable tables.
@@ -83,6 +85,20 @@ Historical eligibility evaluates retained attestations at the recorded time of t
 
 Snapshot canonical version `fact-snapshot-v1` hashes the ordered selection, normalized UTC timestamps, explicit nulls and resolution states, typed values, provenance, caller, purpose, and selection revision. Creation revision and authorization receipts are retained separately from that content digest. Snapshot selection and persistence may be separate transactions; the selected immutable content stays fixed and the later creation event receives its own revision. No model ranking or default substitution participates in selection.
 
+## Calculation receipts and audit exports
+
+Apply migration `00005_calculations_audit.sql` and reapply `scripts/runtime-role.sql` before using these APIs. `RecordCalculation` records externally produced results; it never runs business calculations. Register input/output evidence first and provide their exact digests plus the immutable snapshot ID. The external run identity is unique per tenant and application. `GetCalculationReceipt` preserves the original snapshot binding after corrections.
+
+Compose `factsengine.NewWithAudit(ledger, authorizer, evidenceStore, model.AuditOptions{Signer: signer})`. The signer implements `model.AuditSigner`; `adapters/audit.NewEd25519` supplies a development implementation. The host owns signing keys and key rotation.
+
+Call `StartAuditExport` with a scope, command key, purpose, and `IncludeEvidence`, then explicitly call `RunAuditExport` with the returned ID, scope, purpose, and original authenticated caller. `GetAuditExport` returns job state or the persisted bundle and its content-addressed artifact reference. Constructors start no workers. Attempts have a two-minute deadline and a three-minute lease; failed attempts can be retried after lease expiration. Stale workers cannot commit. A general worker scheduler, failure history, and backoff remain future work.
+
+Exports select one consistent ledger revision. Collection is bounded to 10,000 stored entries and 64 MiB of entry payloads; included evidence also counts against the payload limit. Oversized exports fail explicitly. Metadata exports omit evidence bytes and source quotes. Cross-scope snapshots and their dependent receipts are withheld with explicit gaps. Missing or corrupt evidence also produces a gap. Fact values remain in metadata exports, so these still require fact-read and history permissions.
+
+Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, where `trustedKeys` is a separately provisioned map of signing key IDs to Ed25519 public keys. Verification checks the signed manifest, ordered entry identities, counts, and payload digests. Preserve the original payload bytes for verification. The encrypted bundle resides in PostgreSQL; its digest does not establish an independently controlled immutable archive or prove coverage beyond the stated scope and revision. Manifests explicitly report unimplemented extraction, context, decision, retention, and archive-chain coverage.
+
+Integration tests cover external-run races and conflicts, preserved snapshot lineage, current authorization, tenant isolation, cross-scope exclusion, signature/content tampering, metadata redaction, live-lease exclusion, stale completion rollback, and expired-lease recovery.
+
 ## Remaining delivery work
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
@@ -91,9 +107,9 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, integrity-protected pagination, and known-at timestamp convenience queries. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Implement leased/fenced workers, outbox delivery/offsets, the pinned CortexDB adapter, per-tenant databases, projection status, rebuilds, and retrieval revalidation. The outbox is persisted but has no consumer yet.
 4. Add conversation ingestion, extraction adapters, retained provider artifacts, and bank-approved extraction evaluations.
-5. Add context manifests, calculation/decision receipts, audit export/signatures, retention/legal holds, archive coverage, and recovery drills.
+5. Add context manifests, decision receipts, retention/legal holds, independent archive coverage, and recovery drills. Calculation receipts and signed PostgreSQL audit bundles are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
 
-The first complete end-to-end scenario in the spec (including external calculations and audit export) is **not yet delivered**. No CortexDB, remote engine API, extraction model, archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
+The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. No CortexDB, remote engine API, extraction model, archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
 
 Production acceptance also requires the named domain, security, retention, and operational owners described in the spec, plus workload benchmarks and restore drills. Database roles protect normal runtime operations; they do not protect against a malicious database owner. Retained digests are integrity metadata, not anonymization.
