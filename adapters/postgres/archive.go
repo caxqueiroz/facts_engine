@@ -39,7 +39,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		scopes := map[string]bool{e.Scope: true}
 		// Every event contains its complete retained envelope. Referenced fact
 		// versions include exact evidence locators, schemas and policy versions.
-		if e.RecordID != "" && e.VersionID != "" {
+		if e.RecordKind != "memory" && e.RecordID != "" && e.VersionID != "" {
 			v, err := tx.Version(ctx, e.RecordID, e.VersionID)
 			if err != nil {
 				return err
@@ -76,6 +76,43 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				}
 			}
 		}
+		if e.RecordKind == "memory" {
+			memory, err := t.MemoryVersion(ctx, e.RecordID, e.VersionID)
+			if err != nil {
+				return err
+			}
+			definition, err := t.MemoryType(ctx, e.Scope, memory.Proposal.Subtype, memory.Proposal.SchemaVersion)
+			if err != nil {
+				return err
+			}
+			if err = add("memory_type", definition.Subtype+"/"+definition.Version, definition); err != nil {
+				return err
+			}
+			policy, err := tx.Policy(ctx, e.Scope, memory.PolicyID)
+			if err != nil {
+				return err
+			}
+			if err = add("policy", policy.ID, policy); err != nil {
+				return err
+			}
+			for _, dependency := range memory.Proposal.Dependencies {
+				scopes[dependency.Scope] = true
+			}
+			seen := map[string]bool{}
+			for _, span := range memory.Proposal.Sources {
+				if seen[span.EvidenceID] {
+					continue
+				}
+				seen[span.EvidenceID] = true
+				evidence, err := tx.Evidence(ctx, span.EvidenceID)
+				if err != nil {
+					return err
+				}
+				if err = add("evidence", evidence.ID, evidence); err != nil {
+					return err
+				}
+			}
+		}
 		switch e.Type {
 		case "register_policy":
 			v, err := tx.Policy(ctx, e.Scope, e.EntityID)
@@ -107,6 +144,8 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
+			{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND ledger_revision=$2`},
+			{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"extraction_attempt", `SELECT id,payload FROM extraction_attempts WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"extraction_result", `SELECT attempt_id,payload FROM extraction_results WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"extraction_job", `SELECT id,payload FROM extraction_jobs WHERE tenant_id=$1 AND ledger_revision=$2`},

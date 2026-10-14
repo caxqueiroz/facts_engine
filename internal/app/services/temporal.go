@@ -464,6 +464,9 @@ func (s *Service) GetFactHistory(ctx context.Context, c model.Caller, q model.Hi
 		if err != nil {
 			return err
 		}
+		if rec.Kind == "memory" {
+			return model.ErrPrecondition
+		}
 		if rec.Key.Scope != q.Scope {
 			return model.ErrDenied
 		}

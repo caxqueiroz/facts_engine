@@ -27,6 +27,8 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 		return nil
 	}
 	queries := []struct{ kind, query string }{
+		{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
+		{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
 		{"context", `SELECT c.id,c.payload FROM context_manifests c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM context_scopes s WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
 		{"decision", `SELECT c.id,c.payload FROM decision_receipts c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM decision_scopes s WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
 		{"extraction_attempt", `SELECT id,payload FROM extraction_attempts WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
@@ -73,13 +75,13 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 			return nil, nil, err
 		}
 	}
-	rows, err := t.tx.Query(ctx, `SELECT id,subject_id,predicate,discriminator,stream_revision FROM records WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001`, t.tenant, scope)
+	rows, err := t.tx.Query(ctx, `SELECT id,subject_id,predicate,discriminator,stream_revision,kind FROM records WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001`, t.tenant, scope)
 	if err != nil {
 		return nil, nil, err
 	}
 	for rows.Next() {
 		r := model.Record{Key: model.FactKey{Scope: scope}}
-		if err := rows.Scan(&r.ID, &r.Key.Subject, &r.Key.Predicate, &r.Key.Discriminator, &r.Revision); err != nil {
+		if err := rows.Scan(&r.ID, &r.Key.Subject, &r.Key.Predicate, &r.Key.Discriminator, &r.Revision, &r.Kind); err != nil {
 			rows.Close()
 			return nil, nil, err
 		}

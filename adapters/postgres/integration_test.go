@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql", "00014_memory_proposals.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}
@@ -732,6 +732,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
+	t.Run("immutable memory proposals", func(t *testing.T) { testMemoryProposals(t, ctx, ledger, store, caller, q, proposal) })
 	t.Run("signed audit export and recovery", func(t *testing.T) { testAuditExports(t, ctx, ledger, store, reviewer, admin) })
 
 	t.Run("projection and archive consumers", func(t *testing.T) { testPipeline(t, ctx, ledger, store, admin) })

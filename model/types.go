@@ -37,6 +37,7 @@ func (c Caller) Human() string {
 
 type Command struct{ Key, Purpose, CorrelationID string }
 type CommitResult struct {
+	RecordKind                     string `json:",omitempty"`
 	ContentDigest                  string
 	ID, RecordID, VersionID        string
 	StreamRevision, LedgerRevision int64
@@ -222,6 +223,7 @@ type Version struct {
 	PolicyID             string
 }
 type Record struct {
+	Kind     string `json:",omitempty"`
 	ID       string
 	Key      FactKey
 	Revision int64
@@ -266,6 +268,7 @@ type FactResult struct {
 	LedgerRevision, StreamRevision int64
 }
 type Event struct {
+	RecordKind                           string `json:",omitempty"`
 	DefinitionPredicate                  string `json:",omitempty"`
 	EntityID, Reason                     string
 	Affected                             *Interval

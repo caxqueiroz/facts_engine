@@ -59,3 +59,7 @@ GRANT SELECT ON extraction_attempts,extraction_results,extraction_proposals TO f
 
 GRANT SELECT,INSERT ON predicate_migrations TO facts_runtime;
 GRANT SELECT ON predicate_migrations TO facts_archiver;
+
+GRANT SELECT,INSERT ON memory_types,active_memory_types,memory_versions,memory_evidence,memory_dependencies,memory_record_events TO facts_runtime;
+GRANT UPDATE ON active_memory_types TO facts_runtime;
+GRANT SELECT ON memory_types,memory_versions,memory_evidence,memory_dependencies,memory_record_events TO facts_archiver;

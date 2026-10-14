@@ -95,6 +95,7 @@ func (t *transaction) RetentionStatus(ctx context.Context, scope, id string) (mo
 	}
 	checks := []struct{ reason, query string }{
 		{"conversation_messages", `SELECT EXISTS(SELECT 1 FROM conversation_messages WHERE tenant_id=$1 AND evidence_id=$2)`},
+		{"memory_versions", `SELECT EXISTS(SELECT 1 FROM memory_evidence WHERE tenant_id=$1 AND evidence_id=$2)`},
 		{"fact_versions", `SELECT EXISTS(SELECT 1 FROM version_evidence WHERE tenant_id=$1 AND evidence_id=$2)`},
 		{"attestations", `SELECT EXISTS(SELECT 1 FROM attestations WHERE tenant_id=$1 AND evidence_id=$2)`},
 		{"calculation_artifacts", `SELECT EXISTS(SELECT 1 FROM calculation_artifacts WHERE tenant_id=$1 AND evidence_id=$2)`},

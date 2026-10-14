@@ -82,7 +82,7 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		if time.Since(auth.CheckedAt) > 30*time.Second {
 			return model.ErrUnavailable
 		}
-		eventInput := model.Event{ID: id(), EntityID: result.ID, Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth}
+		eventInput := model.Event{RecordKind: result.RecordKind, ID: id(), EntityID: result.ID, Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth}
 		switch request := input.(type) {
 		case model.PredicateRequest:
 			eventInput.DefinitionPredicate = request.Definition.Predicate

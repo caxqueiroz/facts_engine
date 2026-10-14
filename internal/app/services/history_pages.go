@@ -49,6 +49,9 @@ func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.H
 		if err != nil {
 			return err
 		}
+		if record.Kind == "memory" {
+			return model.ErrPrecondition
+		}
 		if record.Key.Scope != q.Scope {
 			return model.ErrDenied
 		}

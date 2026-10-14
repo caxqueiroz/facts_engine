@@ -19,6 +19,13 @@ type AcceptedInterval struct {
 	SegmentID      pgtype.Int8
 }
 
+type ActiveMemoryType struct {
+	TenantID string
+	ScopeID  string
+	Subtype  string
+	Version  string
+}
+
 type ActivePredicate struct {
 	TenantID  string
 	ScopeID   string
@@ -337,6 +344,52 @@ type LegalHoldRelease struct {
 	ID       string
 }
 
+type MemoryDependency struct {
+	TenantID        string
+	MemoryVersionID string
+	ScopeID         string
+	RecordID        string
+	VersionID       string
+}
+
+type MemoryEvidence struct {
+	TenantID   string
+	ScopeID    string
+	VersionID  string
+	EvidenceID string
+}
+
+type MemoryRecordEvent struct {
+	TenantID       string
+	EventID        string
+	RecordID       string
+	VersionID      string
+	StreamRevision int64
+}
+
+type MemoryType struct {
+	TenantID       string
+	ScopeID        string
+	Subtype        string
+	Version        string
+	PolicyID       string
+	FromVersion    pgtype.Text
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type MemoryVersion struct {
+	TenantID       string
+	ID             string
+	RecordID       string
+	ScopeID        string
+	Subtype        string
+	SchemaVersion  string
+	LedgerRevision int64
+	Payload        []byte
+	Kind           string
+}
+
 type Outbox struct {
 	TenantID       string
 	EventID        string
@@ -397,6 +450,7 @@ type Record struct {
 	Predicate      string
 	Discriminator  string
 	StreamRevision int64
+	Kind           string
 }
 
 type RecordEvent struct {
@@ -416,6 +470,7 @@ type RecordVersion struct {
 	SchemaVersion string
 	Digest        string
 	Payload       []byte
+	Kind          string
 }
 
 type RejectedVersion struct {

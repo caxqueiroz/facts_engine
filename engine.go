@@ -275,3 +275,20 @@ func (e *Engine) ListFactHistory(ctx context.Context, c Caller, q model.HistoryP
 
 type HistoryPageQuery = model.HistoryPageQuery
 type HistoryPage = model.HistoryPage
+
+func (e *Engine) RegisterMemoryType(ctx context.Context, c Caller, r model.MemoryTypeRequest) (CommitResult, error) {
+	return e.service.RegisterMemoryType(ctx, c, r)
+}
+func (e *Engine) ProposeMemory(ctx context.Context, c Caller, r model.MemoryProposal) (CommitResult, error) {
+	return e.service.ProposeMemory(ctx, c, r)
+}
+func (e *Engine) GetMemoryVersion(ctx context.Context, c Caller, q model.MemoryVersionQuery) (model.MemoryVersion, error) {
+	return e.service.GetMemoryVersion(ctx, c, q)
+}
+
+type MemoryKey = model.MemoryKey
+type MemoryType = model.MemoryType
+type MemoryTypeRequest = model.MemoryTypeRequest
+type MemoryProposal = model.MemoryProposal
+type MemoryVersion = model.MemoryVersion
+type MemoryVersionQuery = model.MemoryVersionQuery

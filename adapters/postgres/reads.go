@@ -12,7 +12,7 @@ func (t *transaction) RevisionAt(ctx context.Context, knownAt time.Time) (int64,
 	return revision, err
 }
 func (t *transaction) FactRecords(ctx context.Context, q model.FactsQuery, revision int64, after string, limit int) ([]model.Record, error) {
-	rows, err := t.tx.Query(ctx, `SELECT r.id,r.scope_id,r.subject_id,r.predicate,r.discriminator FROM records r WHERE r.tenant_id=$1 AND r.scope_id=$2 AND ($3='' OR r.subject_id=$3) AND ($4='' OR r.predicate=$4) AND r.id>$5 AND EXISTS(SELECT 1 FROM record_events re JOIN ledger_events e ON e.tenant_id=re.tenant_id AND e.id=re.event_id WHERE re.tenant_id=r.tenant_id AND re.record_id=r.id AND e.ledger_revision<=$6) ORDER BY r.id LIMIT $7`, t.tenant, q.Scope, q.Subject, q.Predicate, after, revision, limit)
+	rows, err := t.tx.Query(ctx, `SELECT r.id,r.scope_id,r.subject_id,r.predicate,r.discriminator FROM records r WHERE r.kind='fact' AND r.tenant_id=$1 AND r.scope_id=$2 AND ($3='' OR r.subject_id=$3) AND ($4='' OR r.predicate=$4) AND r.id>$5 AND EXISTS(SELECT 1 FROM record_events re JOIN ledger_events e ON e.tenant_id=re.tenant_id AND e.id=re.event_id WHERE re.tenant_id=r.tenant_id AND re.record_id=r.id AND e.ledger_revision<=$6) ORDER BY r.id LIMIT $7`, t.tenant, q.Scope, q.Subject, q.Predicate, after, revision, limit)
 	if err != nil {
 		return nil, err
 	}

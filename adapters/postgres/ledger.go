@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,8 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingMemoryType        *model.MemoryType
+	pendingMemoryVersion     *model.MemoryVersion
 	pendingExtractionAttempt *model.ExtractionAttempt
 	pendingExtractionResult  *model.ExtractionResult
 	pendingExtraction        *model.ExtractionJob
@@ -252,12 +254,12 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 }
 func (t *transaction) Record(ctx context.Context, id string) (model.Record, error) {
 	var r model.Record
-	err := t.tx.QueryRow(ctx, `SELECT id,scope_id,subject_id,predicate,discriminator,stream_revision FROM records WHERE tenant_id=$1 AND id=$2`, t.tenant, id).Scan(&r.ID, &r.Key.Scope, &r.Key.Subject, &r.Key.Predicate, &r.Key.Discriminator, &r.Revision)
+	err := t.tx.QueryRow(ctx, `SELECT id,scope_id,subject_id,predicate,discriminator,stream_revision,kind FROM records WHERE tenant_id=$1 AND id=$2`, t.tenant, id).Scan(&r.ID, &r.Key.Scope, &r.Key.Subject, &r.Key.Predicate, &r.Key.Discriminator, &r.Revision, &r.Kind)
 	return r, translate(err)
 }
 func (t *transaction) LockRecord(ctx context.Context, k model.FactKey) (model.Record, error) {
 	id := model.Digest(k)
-	_, err := t.tx.Exec(ctx, `INSERT INTO records VALUES($1,$2,$3,$4,$5,$6,0) ON CONFLICT DO NOTHING`, t.tenant, id, k.Scope, k.Subject, k.Predicate, k.Discriminator)
+	_, err := t.tx.Exec(ctx, `INSERT INTO records(tenant_id,id,scope_id,subject_id,predicate,discriminator,stream_revision) VALUES($1,$2,$3,$4,$5,$6,0) ON CONFLICT DO NOTHING`, t.tenant, id, k.Scope, k.Subject, k.Predicate, k.Discriminator)
 	if err != nil {
 		return model.Record{}, err
 	}
@@ -382,7 +384,15 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	if err != nil {
 		return e, err
 	}
-	if e.RecordID != "" {
+	if err = t.flushMemory(ctx, e); err != nil {
+		return e, err
+	}
+	if e.RecordKind == "memory" {
+		_, err = t.tx.Exec(ctx, `INSERT INTO memory_record_events VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
+		if err != nil {
+			return e, err
+		}
+	} else if e.RecordID != "" {
 		_, err = t.tx.Exec(ctx, `INSERT INTO record_events VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
 		if err != nil {
 			return e, err
