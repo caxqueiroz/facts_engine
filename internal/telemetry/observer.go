@@ -18,10 +18,11 @@ import (
 )
 
 type Observer struct {
-	tracer   trace.Tracer
-	count    metric.Int64Counter
-	duration metric.Float64Histogram
-	logger   *slog.Logger
+	extractionResults, extractionProposals, extractionIssues, extractionRejected metric.Int64Counter
+	tracer                                                                       trace.Tracer
+	count                                                                        metric.Int64Counter
+	duration                                                                     metric.Float64Histogram
+	logger                                                                       *slog.Logger
 }
 
 func New(o model.TelemetryOptions) (*Observer, error) {
@@ -43,7 +44,23 @@ func New(o model.TelemetryOptions) (*Observer, error) {
 	if err != nil {
 		return nil, model.ErrInvalid
 	}
-	return &Observer{o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count, duration, o.Logger}, nil
+	results, err := meter.Int64Counter("facts.extraction.results")
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	proposals, err := meter.Int64Counter("facts.extraction.proposals")
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	issues, err := meter.Int64Counter("facts.extraction.issues")
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	rejected, err := meter.Int64Counter("facts.extraction.rejected_jobs")
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	return &Observer{tracer: o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count: count, duration: duration, logger: o.Logger, extractionResults: results, extractionProposals: proposals, extractionIssues: issues, extractionRejected: rejected}, nil
 }
 
 type Operation struct {

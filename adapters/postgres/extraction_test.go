@@ -13,6 +13,8 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/caxqueiroz/facts_engine/workers"
 	"github.com/jackc/pgx/v5/pgxpool"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -83,9 +85,30 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		body, _ := json.Marshal(model.ExtractionOutput{Candidates: []model.ExtractionCandidate{good, unknown, assistant, negated}})
 		return model.ExtractionResponse{ModelIdentity: "fixture-reported-alias", Body: body, InputTokens: 100, OutputTokens: 50}, nil
 	})
+	reader := sdkmetric.NewManualReader()
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	defer func() { _ = meterProvider.Shutdown(context.Background()) }()
+	metricTotals := func() map[string]int64 {
+		t.Helper()
+		var data metricdata.ResourceMetrics
+		if err := reader.Collect(ctx, &data); err != nil {
+			t.Fatal(err)
+		}
+		totals := map[string]int64{}
+		for _, scope := range data.ScopeMetrics {
+			for _, m := range scope.Metrics {
+				if sum, ok := m.Data.(metricdata.Sum[int64]); ok {
+					for _, point := range sum.DataPoints {
+						totals[m.Name] += point.Value
+					}
+				}
+			}
+		}
+		return totals
+	}
 	configured := func(provider model.ExtractionProvider, p model.ExtractionProfile, budget int64) *facts.Engine {
 		t.Helper()
-		e, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: p, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: budget}})
+		e, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Telemetry: model.TelemetryOptions{MeterProvider: meterProvider}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: p, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: budget}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,6 +148,10 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	if err != nil || retained.Result == nil || len(retained.Result.Proposals) != 1 || len(retained.Result.Issues) != 3 {
 		t.Fatal(retained, err)
 	}
+	totals := metricTotals()
+	if totals["facts.extraction.results"] != 1 || totals["facts.extraction.proposals"] != 1 || totals["facts.extraction.issues"] != 3 {
+		t.Fatal("committed extraction metrics", totals)
+	}
 	if retained.Attempt.Caller.Initiator != c.Human() || retained.Result.ModelIdentity != "fixture-reported-alias" || retained.Attempt.OwnerNonce != "" {
 		t.Fatal("actor/model provenance", retained)
 	}
@@ -154,6 +181,9 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	}
 	if _, err = run(engine, job, "extract-run"); err != nil || calls.Load() != 2 {
 		t.Fatal("completed job reexecuted", calls.Load(), err)
+	}
+	if totals := metricTotals(); totals["facts.extraction.results"] != 2 || totals["facts.extraction.proposals"] != 1 {
+		t.Fatal("terminal replay counted as new result", totals)
 	}
 	other := worker
 	other.Tenant = "other-bank"

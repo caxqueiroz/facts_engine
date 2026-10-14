@@ -169,6 +169,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		if err != nil {
 			return model.JobStatus{}, err
 		}
+		s.telemetry.ExtractionRejected(ctx, status.Kind)
 		return s.GetJob(ctx, c, model.JobQuery{ID: job.ID, Scope: r.Scope, Purpose: r.Purpose})
 	}
 	attempt.RequestDigest = model.BytesDigest(attempt.RequestBytes)
@@ -322,6 +323,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	if err != nil {
 		return model.JobStatus{}, err
 	}
+	s.telemetry.ExtractionResult(ctx, status.Kind, result.Outcome, len(result.Proposals), len(result.Issues))
 	return s.GetJob(ctx, c, model.JobQuery{ID: job.ID, Scope: r.Scope, Purpose: r.Purpose})
 }
 func (s *Service) appendExtractedProposals(ctx context.Context, t model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.ExtractionInput, output model.ExtractionOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) error {
@@ -535,5 +537,6 @@ func (s *Service) expireExtraction(ctx context.Context, c model.Caller, r model.
 	if err != nil {
 		return model.JobStatus{}, err
 	}
+	s.telemetry.ExtractionResult(ctx, status.Kind, "lease_exhausted_response_unavailable", 0, 0)
 	return s.GetJob(ctx, c, model.JobQuery{ID: r.ID, Scope: r.Scope, Purpose: r.Purpose})
 }
