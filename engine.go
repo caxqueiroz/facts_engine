@@ -292,3 +292,31 @@ type MemoryTypeRequest = model.MemoryTypeRequest
 type MemoryProposal = model.MemoryProposal
 type MemoryVersion = model.MemoryVersion
 type MemoryVersionQuery = model.MemoryVersionQuery
+
+func (e *Engine) ApproveMemory(ctx context.Context, c Caller, r Approval) (CommitResult, error) {
+	return e.service.ApproveMemory(ctx, c, r)
+}
+func (e *Engine) AcceptMemory(ctx context.Context, c Caller, r Approval) (CommitResult, error) {
+	return e.service.AcceptMemory(ctx, c, r)
+}
+func (e *Engine) SupersedeMemory(ctx context.Context, c Caller, r Supersession) (CommitResult, error) {
+	return e.service.SupersedeMemory(ctx, c, r)
+}
+func (e *Engine) RejectMemory(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.RejectMemory(ctx, c, r)
+}
+func (e *Engine) DisputeMemory(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.DisputeMemory(ctx, c, r)
+}
+func (e *Engine) ResolveMemoryDispute(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.ResolveMemoryDispute(ctx, c, r)
+}
+func (e *Engine) RetractMemory(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.RetractMemory(ctx, c, r)
+}
+func (e *Engine) GetMemory(ctx context.Context, c Caller, q model.MemoryQuery) (model.MemoryResult, error) {
+	return e.service.GetMemory(ctx, c, q)
+}
+
+type MemoryQuery = model.MemoryQuery
+type MemoryResult = model.MemoryResult

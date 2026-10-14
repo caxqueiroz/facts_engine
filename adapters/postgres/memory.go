@@ -32,10 +32,7 @@ func (t *transaction) StageMemoryType(ctx context.Context, d model.MemoryType) e
 	return nil
 }
 func (t *transaction) LockMemory(ctx context.Context, k model.MemoryKey) (model.Record, error) {
-	id := model.Digest(struct {
-		Kind string
-		Key  model.MemoryKey
-	}{"memory", k})
+	id := model.MemoryRecordID(k)
 	_, err := t.tx.Exec(ctx, `INSERT INTO records(tenant_id,id,scope_id,subject_id,predicate,discriminator,kind) VALUES($1,$2,$3,'','',$4,'memory') ON CONFLICT DO NOTHING`, t.tenant, id, k.Scope, k.ID)
 	if err != nil {
 		return model.Record{}, err

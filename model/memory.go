@@ -1,6 +1,9 @@
 package model
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // MemoryKey is an explicit application-issued identity, independent of fact keys.
 type MemoryKey struct{ Scope, ID string }
@@ -52,4 +55,34 @@ func MemoryDigest(p MemoryProposal) string {
 		Sources                      []SourceSpan
 		Dependencies                 []MemoryDependency
 	}{p.Key, p.Subtype, p.SchemaVersion, p.Body, p.Valid, p.Sources, p.Dependencies})
+}
+
+type MemoryQuery struct {
+	Key               MemoryKey
+	Purpose           string
+	ValidAt           time.Time
+	KnowledgeRevision int64
+	KnownAt           *time.Time
+}
+type MemoryResult struct {
+	State, RecordID, VersionID, Body string
+	StreamRevision, LedgerRevision   int64
+	Dependencies                     []MemoryDependency
+}
+type MemoryLifecycleTx interface {
+	MemoryTx
+	TemporalTx
+	MemoryTimeline(context.Context, string, int64) ([]Acceptance, error)
+	StageMemoryTimeline(context.Context, string, []Acceptance) error
+	MemoryRejected(context.Context, string, string, int64) (bool, error)
+	MemoryHasAcceptance(context.Context, string, string) (bool, error)
+	StageMemoryRejection(context.Context, string, string) error
+	MemoryStreamRevisionAt(context.Context, string, int64) (int64, error)
+}
+
+func MemoryRecordID(k MemoryKey) string {
+	return Digest(struct {
+		Kind string
+		Key  MemoryKey
+	}{"memory", k})
 }

@@ -92,7 +92,7 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 			eventInput.ReplacedVersionIDs = request.ReplacedVersionIDs
 		case model.LifecycleChange:
 			eventInput.Reason = request.Reason
-			if op != "reject_fact" {
+			if op != "reject_fact" && op != "reject_memory" {
 				eventInput.Affected = &request.Valid
 			}
 		}

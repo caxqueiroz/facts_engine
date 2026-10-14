@@ -151,7 +151,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	}
 	gaps = append(gaps, extra...)
 	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"memory_lifecycle", "coordinated_derivative_disposal"} {
+	for _, kind := range []string{"memory_attestations", "memory_retrieval", "coordinated_derivative_disposal"} {
 		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
 	}
 	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
@@ -277,6 +277,16 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 	for _, entry := range entries {
 		include := true
 		switch entry.Kind {
+		case "memory_timeline":
+			var entryTimeline model.Acceptance
+			if err := json.Unmarshal(entry.Payload, &entryTimeline); err != nil {
+				return nil, nil, err
+			}
+			for _, check := range entryTimeline.DependencyAuthorization {
+				if check.Request.Scope != r.Scope {
+					include = false
+				}
+			}
 		case "memory_version":
 			var memory model.MemoryVersion
 			if err := json.Unmarshal(entry.Payload, &memory); err != nil {

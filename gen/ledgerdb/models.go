@@ -367,6 +367,30 @@ type MemoryRecordEvent struct {
 	StreamRevision int64
 }
 
+type MemoryRejection struct {
+	TenantID       string
+	RecordID       string
+	VersionID      string
+	LedgerRevision int64
+}
+
+type MemoryTimelineGeneration struct {
+	TenantID       string
+	RecordID       string
+	LedgerRevision int64
+}
+
+type MemoryTimelineHistory struct {
+	TenantID       string
+	RecordID       string
+	LedgerRevision int64
+	Ordinal        int32
+	VersionID      string
+	ValidFrom      pgtype.Timestamptz
+	ValidTo        pgtype.Timestamptz
+	Payload        []byte
+}
+
 type MemoryType struct {
 	TenantID       string
 	ScopeID        string

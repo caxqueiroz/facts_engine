@@ -81,6 +81,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			if err != nil {
 				return err
 			}
+			if e.Type != "propose_memory" {
+				if err = add("memory_version", memory.ID, memory); err != nil {
+					return err
+				}
+			}
 			definition, err := t.MemoryType(ctx, e.Scope, memory.Proposal.Subtype, memory.Proposal.SchemaVersion)
 			if err != nil {
 				return err
@@ -144,6 +149,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
+			{"memory_timeline", `SELECT record_id||'/'||ordinal::text,payload FROM memory_timeline_history WHERE tenant_id=$1 AND ledger_revision=$2 ORDER BY record_id,ordinal`},
 			{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"extraction_attempt", `SELECT id,payload FROM extraction_attempts WHERE tenant_id=$1 AND ledger_revision=$2`},

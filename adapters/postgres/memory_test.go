@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	facts "github.com/caxqueiroz/facts_engine"
 	"github.com/caxqueiroz/facts_engine/adapters/audit"
@@ -89,6 +90,143 @@ func testMemoryProposals(t *testing.T, ctx context.Context, l model.Ledger, stor
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+	reviewer := c
+	reviewer.Principal = "memory-reviewer"
+	approval := model.Approval{Command: cmd("memory-approval"), Scope: query.Scope, RecordID: result.RecordID, VersionID: result.VersionID, ExpectedRevision: 2}
+	if _, err = engine.ApproveMemory(ctx, c, approval); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("self approval", err)
+	}
+	accepted, err := engine.ApproveMemory(ctx, reviewer, approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := model.MemoryQuery{Key: request.Key, Purpose: "memory-review", ValidAt: *source.Valid.From}
+	current, err := engine.GetMemory(ctx, reviewer, read)
+	if err != nil || current.State != "resolved" || current.Body != request.Body {
+		t.Fatal(current, err)
+	}
+	later := source.Valid.From.Add(time.Hour)
+	factNow, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: source.Key, ValidAt: *source.Valid.From})
+	if err != nil {
+		t.Fatal(err)
+	}
+	factChange := model.LifecycleChange{Approval: model.Approval{Command: cmd("memory-dependency-dispute"), Scope: source.Key.Scope, RecordID: fact.RecordID, VersionID: fact.VersionID, ExpectedRevision: factNow.StreamRevision}, Valid: model.Interval{From: &later}, Reason: "dependency_review"}
+	disputed, err := engine.DisputeFact(ctx, reviewer, factChange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, err := engine.GetMemory(ctx, reviewer, read)
+	if err != nil || stale.State != "stale" || stale.Body != "" {
+		t.Fatal("dependency change outside query instant ignored", stale, err)
+	}
+	historicalQuery := read
+	historicalQuery.KnowledgeRevision = accepted.LedgerRevision
+	historical, err := engine.GetMemory(ctx, reviewer, historicalQuery)
+	if err != nil || historical.State != "resolved" || historical.Body != request.Body {
+		t.Fatal("historical memory changed", historical, err)
+	}
+	factChange.Command = cmd("memory-dependency-resolve")
+	factChange.ExpectedRevision = disputed.StreamRevision
+	if _, err = engine.ResolveDispute(ctx, reviewer, factChange); err != nil {
+		t.Fatal(err)
+	}
+	change := model.LifecycleChange{Approval: approval, Valid: model.Interval{From: &later}, Reason: "memory_review"}
+	change.Command = cmd("memory-dispute")
+	change.ExpectedRevision = 3
+	if _, err = engine.DisputeMemory(ctx, reviewer, change); err != nil {
+		t.Fatal(err)
+	}
+	laterQuery := read
+	laterQuery.ValidAt = later
+	current, err = engine.GetMemory(ctx, reviewer, laterQuery)
+	if err != nil || current.State != "disputed" || current.Body != "" {
+		t.Fatal(current, err)
+	}
+	change.Command = cmd("memory-resolve")
+	change.ExpectedRevision = 4
+	if _, err = engine.ResolveMemoryDispute(ctx, reviewer, change); err != nil {
+		t.Fatal(err)
+	}
+	replacement := model.Supersession{Approval: model.Approval{Command: cmd("memory-supersede"), Scope: query.Scope, RecordID: result.RecordID, VersionID: next.VersionID, ExpectedRevision: 5}, Valid: request.Valid, ReplacedVersionIDs: []string{result.VersionID}, Reason: "memory_correction"}
+	if _, err = engine.ApproveMemory(ctx, reviewer, replacement.Approval); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("overlap accepted", err)
+	}
+	if _, err = engine.SupersedeMemory(ctx, reviewer, replacement); err != nil {
+		t.Fatal(err)
+	}
+	current, err = engine.GetMemory(ctx, reviewer, read)
+	if err != nil || current.Body != "second proposal" {
+		t.Fatal(current, err)
+	}
+	change.Approval = replacement.Approval
+	change.Command = cmd("memory-retract")
+	change.ExpectedRevision = 6
+	change.Valid = request.Valid
+	if _, err = engine.RetractMemory(ctx, reviewer, change); err != nil {
+		t.Fatal(err)
+	}
+	current, err = engine.GetMemory(ctx, reviewer, read)
+	if err != nil || current.State != "retracted" || current.Body != "" {
+		t.Fatal(current, err)
+	}
+	changed.Command = cmd("memory-rejected-proposal")
+	changed.ExpectedRevision = 7
+	unaccepted, err := engine.ProposeMemory(ctx, c, changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change.Command = cmd("memory-reject")
+	change.VersionID = unaccepted.VersionID
+	change.ExpectedRevision = 8
+	if _, err = engine.RejectMemory(ctx, reviewer, change); err != nil {
+		t.Fatal(err)
+	}
+	change.Command = cmd("memory-accept-rejected")
+	change.ExpectedRevision = 9
+	if _, err = engine.ApproveMemory(ctx, reviewer, change.Approval); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("rejected memory accepted", err)
+	}
+	for _, required := range []bool{false, true} {
+		policyID := "memory-auto"
+		if required {
+			policyID = "memory-auto-required"
+		}
+		policy := model.AcceptancePolicy{Scope: query.Scope, ID: policyID, Mode: "automated", AcceptingServices: []string{"memory-service"}, SourceClasses: []string{"customer"}}
+		if required {
+			policy.Required = []model.AttestationRequirement{{Kind: "application_validation", Principals: []string{c.Principal}}}
+		}
+		if _, err = engine.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: cmd(policyID), Policy: policy}); err != nil {
+			t.Fatal(err)
+		}
+		autoType := definition
+		autoType.Subtype = policyID
+		autoType.PolicyID = policyID
+		if _, err = engine.RegisterMemoryType(ctx, c, model.MemoryTypeRequest{Command: cmd(policyID + "-type"), Definition: autoType}); err != nil {
+			t.Fatal(err)
+		}
+		autoRequest := request
+		autoRequest.Command = cmd(policyID + "-proposal")
+		autoRequest.Key.ID = policyID
+		autoRequest.Subtype = policyID
+		autoRequest.Dependencies = nil
+		autoVersion, err := engine.ProposeMemory(ctx, c, autoRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		autoApproval := model.Approval{Command: cmd(policyID + "-accept"), Scope: query.Scope, RecordID: autoVersion.RecordID, VersionID: autoVersion.VersionID, ExpectedRevision: 1}
+		if _, err = engine.ApproveMemory(ctx, reviewer, autoApproval); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("automated policy accepted manually", err)
+		}
+		service := model.Caller{Tenant: c.Tenant, Principal: "memory-service", Service: true}
+		_, err = engine.AcceptMemory(ctx, service, autoApproval)
+		if required {
+			if !errors.Is(err, model.ErrPrecondition) {
+				t.Fatal("memory prerequisites bypassed", err)
+			}
+		} else if err != nil {
+			t.Fatal("configured automatic acceptance failed", err)
+		}
 	}
 	status, err := engine.GetRetentionStatus(ctx, c, model.RetentionStatusQuery{Scope: request.Key.Scope, EvidenceID: source.Sources[0].EvidenceID, Purpose: "memory-review"})
 	if err != nil || !slices.Contains(status.Blockers, "memory_versions") {

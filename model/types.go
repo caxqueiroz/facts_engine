@@ -247,12 +247,13 @@ type Withdrawal struct {
 	Scope, AttestationID string
 }
 type Acceptance struct {
-	State          string
-	VersionID      string
-	Valid          Interval
-	PolicyID       string
-	AttestationIDs []string
-	LedgerRevision int64
+	DependencyAuthorization []AuthorizationDecision `json:",omitempty"`
+	State                   string
+	VersionID               string
+	Valid                   Interval
+	PolicyID                string
+	AttestationIDs          []string
+	LedgerRevision          int64
 }
 type FactQuery struct {
 	KnownAt           *time.Time
