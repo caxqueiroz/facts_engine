@@ -53,6 +53,7 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 		t.Fatal(err)
 	}
 	memoryRequest := model.MemoryProposal{Command: cmd("refresh-memory"), Key: model.MemoryKey{Scope: scope, ID: "summary"}, Subtype: "summary", SchemaVersion: "v1", Body: "Customer prefers tea.", Valid: proposal.Valid, Sources: proposal.Sources, Dependencies: []model.MemoryDependency{{Scope: scope, RecordID: fact.RecordID, VersionID: fact.VersionID, ContentDigest: fact.ContentDigest, Label: "assertion"}}}
+	memoryRequest.Sources = append(append([]model.SourceSpan(nil), memoryRequest.Sources...), model.SourceSpan{EvidenceID: "refresh-evidence", Start: 0, End: 12, Quote: "I prefer tea"})
 	original, err := base.ProposeMemory(ctx, c, memoryRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +73,9 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 		}
 		if input.Refresh == nil || input.Refresh.Original.ID != original.VersionID || len(input.Refresh.Dependencies) != 1 || len(input.Refresh.Dependencies[0].Versions) != 1 {
 			return model.ExtractionResponse{}, errors.New("missing refresh provenance")
+		}
+		if len(input.Refresh.Original.Proposal.Sources) != 2 || len(input.Refresh.Evidence) != 1 || input.Refresh.Evidence[0].EvidenceID != "refresh-evidence" || input.Refresh.Evidence[0].Content != source {
+			return model.ExtractionResponse{}, errors.New("duplicate refresh evidence or lost citations")
 		}
 		retained, err := engine.GetExtractionRun(ctx, worker, model.ExtractionRunQuery{ID: input.AttemptID, Scope: scope, Purpose: "refresh-review"})
 		if err != nil || !bytes.Equal(retained.Attempt.RequestBytes, raw) {

@@ -192,9 +192,19 @@ func (s *Service) buildMemoryRefresh(ctx context.Context, c model.Caller, j mode
 	if err != nil {
 		return nil, err
 	}
-	var evidenceSize int64
+	// Preserve first-citation order while loading each evidence body once.
+	// Citation spans remain intact on Original; Evidence contains unique bodies.
+	evidenceIDs := []string{}
+	seenEvidence := map[string]bool{}
 	for _, span := range original.Proposal.Sources {
-		metadata, err := s.GetEvidenceMetadata(ctx, c, model.EvidenceQuery{ID: span.EvidenceID, Scope: j.Request.Scope, Purpose: j.Request.Purpose})
+		if !seenEvidence[span.EvidenceID] {
+			seenEvidence[span.EvidenceID] = true
+			evidenceIDs = append(evidenceIDs, span.EvidenceID)
+		}
+	}
+	var evidenceSize int64
+	for _, evidenceID := range evidenceIDs {
+		metadata, err := s.GetEvidenceMetadata(ctx, c, model.EvidenceQuery{ID: evidenceID, Scope: j.Request.Scope, Purpose: j.Request.Purpose})
 		if err != nil {
 			return nil, err
 		}
@@ -203,12 +213,12 @@ func (s *Service) buildMemoryRefresh(ctx context.Context, c model.Caller, j mode
 			return nil, errRefreshInputLimit
 		}
 	}
-	for _, span := range original.Proposal.Sources {
-		e, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: span.EvidenceID, Scope: j.Request.Scope, Purpose: j.Request.Purpose})
+	for _, evidenceID := range evidenceIDs {
+		e, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: evidenceID, Scope: j.Request.Scope, Purpose: j.Request.Purpose})
 		if err != nil {
 			return nil, err
 		}
-		input.Evidence = append(input.Evidence, model.ExtractionInputMessage{EvidenceID: span.EvidenceID, Content: string(e.Bytes)})
+		input.Evidence = append(input.Evidence, model.ExtractionInputMessage{EvidenceID: evidenceID, Content: string(e.Bytes)})
 	}
 	// Fact payloads can contain source quotes. Recheck dependency evidence access
 	// before the retained request is exposed to the approved provider.
