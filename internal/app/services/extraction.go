@@ -109,6 +109,11 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 		if err != nil {
 			return err
 		}
+		for _, subject := range r.Subjects {
+			if err := tx.RequireSubject(ctx, r.Scope, subject); err != nil {
+				return err
+			}
+		}
 		job.Predicates = nil
 		for _, binding := range r.Predicates {
 			active, err := tx.ActivePredicate(ctx, r.Scope, binding.Predicate)

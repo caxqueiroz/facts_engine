@@ -93,6 +93,12 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	}
 	engine = configured(valid, profile, 100000)
 	request := model.ExtractionRequest{Command: cmd("extract-start"), Scope: scope, ConversationID: conversation.ID, ProfileID: profile.ID, Subjects: []string{"extract-customer", "assistant-claim", "negated-claim"}, Predicates: []model.PredicateBinding{{Predicate: "extract-preference", SchemaVersion: "v1"}}}
+	unknown := request
+	unknown.Command = cmd("unknown-extraction-subject")
+	unknown.Subjects = []string{"not-registered"}
+	if _, err = engine.StartExtraction(ctx, c, unknown); !errors.Is(err, model.ErrPrecondition) || calls.Load() != 0 {
+		t.Fatal("unregistered extraction subject", err, calls.Load())
+	}
 	start := func(e *facts.Engine, key string) model.JobStatus {
 		t.Helper()
 		r := request

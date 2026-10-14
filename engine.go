@@ -361,3 +361,13 @@ func (e *Engine) GetSubject(ctx context.Context, c Caller, q model.IdentityQuery
 func (e *Engine) LookupSubject(ctx context.Context, c Caller, q model.SubjectLookupQuery) (model.SubjectVersion, error) {
 	return e.service.LookupSubject(ctx, c, q)
 }
+
+type ScopeDefinition = model.ScopeDefinition
+type SubjectDefinition = model.SubjectDefinition
+type ScopeRequest = model.ScopeRequest
+type SubjectRequest = model.SubjectRequest
+type ScopeVersion = model.ScopeVersion
+type SubjectVersion = model.SubjectVersion
+type IdentityQuery = model.IdentityQuery
+type SubjectLookupQuery = model.SubjectLookupQuery
+type IdentityTx = model.IdentityTx

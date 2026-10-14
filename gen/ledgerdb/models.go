@@ -364,6 +364,13 @@ type ExtractionRetryEvent struct {
 	Payload        []byte
 }
 
+type ExtractionSubject struct {
+	TenantID  string
+	JobID     string
+	ScopeID   string
+	SubjectID string
+}
+
 type FactSnapshot struct {
 	TenantID          string
 	ID                string
@@ -547,14 +554,15 @@ type ProjectionRebuildEvent struct {
 }
 
 type Record struct {
-	TenantID       string
-	ID             string
-	ScopeID        string
-	SubjectID      string
-	Predicate      string
-	Discriminator  string
-	StreamRevision int64
-	Kind           string
+	TenantID            string
+	ID                  string
+	ScopeID             string
+	SubjectID           string
+	Predicate           string
+	Discriminator       string
+	StreamRevision      int64
+	Kind                string
+	RegisteredSubjectID pgtype.Text
 }
 
 type RecordEvent struct {

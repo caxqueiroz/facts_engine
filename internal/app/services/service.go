@@ -76,6 +76,11 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 			result = *previous
 			return nil
 		}
+		if op != "put_scope" {
+			if err := tx.RequireScope(ctx, scope); err != nil {
+				return err
+			}
+		}
 		if err := fn(tx, &result); err != nil {
 			return err
 		}
@@ -246,6 +251,9 @@ func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactP
 	return s.mutate(ctx, c, r.Key.Scope, "propose_fact", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error { return s.stageFactProposal(ctx, tx, c, r, "", out) })
 }
 func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Caller, r model.FactProposal, attemptID string, out *model.CommitResult) error {
+	if err := tx.RequireSubject(ctx, r.Key.Scope, r.Key.Subject); err != nil {
+		return err
+	}
 	active, err := tx.ActivePredicate(ctx, r.Key.Scope, r.Key.Predicate)
 	if err != nil {
 		return err
@@ -311,6 +319,9 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 		}
 		if record.Kind == "memory" {
 			return s.recordMemoryAttestation(ctx, tx, c, r, out)
+		}
+		if err := tx.RequireSubject(ctx, record.Key.Scope, record.Key.Subject); err != nil {
+			return err
 		}
 		v, err := tx.Version(ctx, a.RecordID, a.VersionID)
 		if err != nil {

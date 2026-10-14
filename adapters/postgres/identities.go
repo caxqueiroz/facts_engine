@@ -109,3 +109,24 @@ func (t *transaction) flushIdentities(ctx context.Context, e model.Event) error 
 	t.pendingSubject = nil
 	return nil
 }
+
+func (t *transaction) RequireScope(ctx context.Context, scope string) error {
+	var exists bool
+	if err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM scopes WHERE tenant_id=$1 AND id=$2 AND current_revision>0)`, t.tenant, scope).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return model.ErrPrecondition
+	}
+	return nil
+}
+func (t *transaction) RequireSubject(ctx context.Context, scope, id string) error {
+	var exists bool
+	if err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM subjects WHERE tenant_id=$1 AND scope_id=$2 AND id=$3 AND current_revision>0)`, t.tenant, scope, id).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return model.ErrPrecondition
+	}
+	return nil
+}

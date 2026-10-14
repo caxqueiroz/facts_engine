@@ -88,3 +88,6 @@ GRANT SELECT,INSERT ON scopes,subjects,scope_versions,subject_versions TO facts_
 GRANT UPDATE(current_revision) ON scopes,subjects TO facts_runtime;
 GRANT SELECT,INSERT,DELETE ON subject_lookup TO facts_runtime;
 GRANT SELECT ON scopes,subjects,scope_versions,subject_versions,subject_lookup TO facts_archiver;
+
+GRANT SELECT,INSERT ON extraction_subjects TO facts_runtime;
+GRANT SELECT ON extraction_subjects TO facts_archiver;

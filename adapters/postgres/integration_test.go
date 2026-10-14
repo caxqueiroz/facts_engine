@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql", "00014_memory_proposals.sql", "00015_memory_lifecycle.sql", "00016_memory_attestations.sql", "00017_memory_context.sql", "00018_memory_refresh.sql", "00019_refresh_triggers.sql", "00020_memory_extraction.sql", "00021_identities.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql", "00014_memory_proposals.sql", "00015_memory_lifecycle.sql", "00016_memory_attestations.sql", "00017_memory_context.sql", "00018_memory_refresh.sql", "00019_refresh_triggers.sql", "00020_memory_extraction.sql", "00021_identities.sql", "00022_identity_enforcement.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}
@@ -82,6 +82,21 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("legacy identity adoption", func(t *testing.T) { testIdentityAdoption(t, ctx, ledger, store, admin) })
+	for _, fixture := range []struct {
+		tenant, scope string
+		subjects      []string
+	}{
+		{"bank1", "case1", []string{"subject1", "subject2", "subject-race", "subject-new", "temporal-subject", "missing-subject", "created-during-snapshot", "absent"}},
+		{"bank1", "case2", []string{"absent"}},
+		{"bank1", "extraction-case", []string{"extract-customer", "assistant-claim", "negated-claim"}},
+		{"bank1", "refresh-case", []string{"customer"}},
+		{"listing-bank", "case", []string{"one", "two", "three"}},
+		{"retention-bank", "case", []string{"subject"}},
+		{"retention-bank", "other-scope", nil},
+	} {
+		registerTestIdentities(t, ctx, engine, fixture.tenant, fixture.scope, fixture.subjects)
+	}
 	t.Run("identity administration", func(t *testing.T) { testIdentities(t, ctx, ledger, store) })
 	t.Run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
 	t.Run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })
@@ -110,6 +125,14 @@ func TestPostgresLedger(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	value := "tea"
 	q := model.FactProposal{Command: cmd("proposal"), Key: model.FactKey{Scope: "case1", Subject: "subject1", Predicate: "preference"}, SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &now}, Sources: []model.SourceSpan{{EvidenceID: "ev1", Start: 9, End: 12, Quote: "tea"}}}
+	t.Run("unregistered fact subject", func(t *testing.T) {
+		missing := q
+		missing.Command = cmd("unknown-subject-proposal")
+		missing.Key.Subject = "not-registered"
+		if _, err := engine.ProposeFact(ctx, caller, missing); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("unregistered subject accepted", err)
+		}
+	})
 	t.Run("predicate value constraints", func(t *testing.T) {
 		maximum := 3
 		restricted := def

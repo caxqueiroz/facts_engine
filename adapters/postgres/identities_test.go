@@ -55,7 +55,7 @@ func testIdentities(t *testing.T, ctx context.Context, l *postgres.Ledger, store
 	bad := subject
 	bad.Command = cmd("unregistered-scope")
 	bad.Definition.Scope = "unknown"
-	if _, err = e.PutSubject(ctx, c, bad); !errors.Is(err, model.ErrNotFound) {
+	if _, err = e.PutSubject(ctx, c, bad); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("parent scope", err)
 	}
 	first, err := e.PutSubject(ctx, c, subject)

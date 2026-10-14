@@ -81,6 +81,11 @@ func (s *Service) CreateFactSnapshot(ctx context.Context, c model.Caller, r mode
 	}
 	snapshot.Digest = model.SnapshotDigest(snapshot)
 	result, err := s.mutate(ctx, c, r.Selectors[0].Scope, "create_fact_snapshot", "can_snapshot", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		for _, key := range r.Selectors {
+			if err := tx.RequireSubject(ctx, key.Scope, key.Subject); err != nil {
+				return err
+			}
+		}
 		for _, receipt := range receipts {
 			if time.Since(receipt.CheckedAt) > 30*time.Second {
 				return model.ErrUnavailable

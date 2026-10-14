@@ -89,6 +89,20 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	if status.State == "running" && status.Attempts >= status.MaxAttempts && status.LeaseUntil != nil && !status.LeaseUntil.After(time.Now()) {
 		return s.expireExtraction(ctx, c, r, status, receipts)
 	}
+	// Also gate pre-registry queued jobs before disclosing input to a provider.
+	if err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		if err := tx.RequireScope(ctx, job.Request.Scope); err != nil {
+			return err
+		}
+		for _, subject := range job.Request.Subjects {
+			if err := tx.RequireSubject(ctx, job.Request.Scope, subject); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return model.JobStatus{}, err
+	}
 	attempt := model.ExtractionAttempt{ContentScopes: job.ContentScopes, RefreshScopes: job.RefreshScopes, ID: id(), Tenant: c.Tenant, Scope: r.Scope, JobID: job.ID, OwnerNonce: id(), ProfileDigest: job.ProfileDigest, Caller: c, Authorization: receipts}
 	var input model.ExtractionInput
 	inputLimit := false

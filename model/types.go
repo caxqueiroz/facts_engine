@@ -306,6 +306,9 @@ type Ledger interface {
 	Transact(context.Context, string, func(Tx) error) error
 }
 type Tx interface {
+	// RequireScope and RequireSubject reject unregistered write identities.
+	RequireScope(context.Context, string) error
+	RequireSubject(context.Context, string, string) error
 	Receipt(context.Context, Caller, string, string, string) (*CommitResult, error)
 	SaveReceipt(context.Context, Caller, string, string, string, CommitResult) error
 	Policy(context.Context, string, string) (AcceptancePolicy, error)
@@ -315,6 +318,7 @@ type Tx interface {
 	ActivePredicate(context.Context, string, string) (string, error)
 	Evidence(context.Context, string) (Evidence, error)
 	InsertEvidence(context.Context, Evidence) (string, error)
+	// LockRecord must require a registered subject before locking or creating a record.
 	LockRecord(context.Context, FactKey) (Record, error)
 	Record(context.Context, string) (Record, error)
 	SetRevision(context.Context, string, int64) error

@@ -18,7 +18,14 @@ func testOutbox(t *testing.T, ctx context.Context, l *postgres.Ledger, admin *pg
 	tenant := "outbox-bank"
 	for _, id := range []string{"event-a", "event-b", "event-c"} {
 		err := l.Transact(ctx, tenant, func(tx model.Tx) error {
-			_, err := tx.Append(ctx, model.Event{ID: id, Type: "test", Scope: "scope1", Caller: model.Caller{Tenant: tenant, Principal: "operator"}})
+			eventType := "test"
+			if id == "event-a" {
+				eventType = "put_scope"
+				if err := tx.(model.IdentityTx).StageScope(ctx, model.ScopeVersion{Definition: model.ScopeDefinition{ID: "scope1", Label: "Outbox test"}, Revision: 1, Caller: model.Caller{Tenant: tenant, Principal: "operator"}, Reason: "Test fixture"}, 0); err != nil {
+					return err
+				}
+			}
+			_, err := tx.Append(ctx, model.Event{ID: id, Type: eventType, Scope: "scope1", Caller: model.Caller{Tenant: tenant, Principal: "operator"}})
 			return err
 		})
 		if err != nil {
