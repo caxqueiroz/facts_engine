@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql", "00014_memory_proposals.sql", "00015_memory_lifecycle.sql", "00016_memory_attestations.sql", "00017_memory_context.sql", "00018_memory_refresh.sql", "00019_refresh_triggers.sql", "00020_memory_extraction.sql", "00021_identities.sql", "00022_identity_enforcement.sql", "00023_confirmation_artifacts.sql", "00024_attestation_delegation.sql", "00025_extraction_cost.sql", "00026_evidence_derivations.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql", "00014_memory_proposals.sql", "00015_memory_lifecycle.sql", "00016_memory_attestations.sql", "00017_memory_context.sql", "00018_memory_refresh.sql", "00019_refresh_triggers.sql", "00020_memory_extraction.sql", "00021_identities.sql", "00022_identity_enforcement.sql", "00023_confirmation_artifacts.sql", "00024_attestation_delegation.sql", "00025_extraction_cost.sql", "00026_evidence_derivations.sql", "00027_extraction_redactions.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}
@@ -98,6 +98,7 @@ func TestPostgresLedger(t *testing.T) {
 		registerTestIdentities(t, ctx, engine, fixture.tenant, fixture.scope, fixture.subjects)
 	}
 	t.Run("identity administration", func(t *testing.T) { testIdentities(t, ctx, ledger, store) })
+	t.Run("redacted extraction", func(t *testing.T) { testExtractionRedaction(t, ctx, ledger, store) })
 	t.Run("redacted evidence", func(t *testing.T) { testEvidenceDerivation(t, ctx, ledger, store) })
 	t.Run("extraction cost budget", func(t *testing.T) { testExtractionCost(t, ctx, ledger, store, admin) })
 	t.Run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })

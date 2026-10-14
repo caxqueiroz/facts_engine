@@ -372,6 +372,13 @@ type ExtractionQuotum struct {
 	ReservedCostUnits int64
 }
 
+type ExtractionRedaction struct {
+	TenantID   string
+	JobID      string
+	ScopeID    string
+	EvidenceID string
+}
+
 type ExtractionRefreshTrigger struct {
 	TenantID string
 	JobID    string

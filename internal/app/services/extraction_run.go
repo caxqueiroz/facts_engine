@@ -134,29 +134,17 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 				}
 			}
 		}
-		ranges, excluded, _, err := planExtractionRanges(conversation, job.Request.InputRanges, job.Profile.InputSelectionVersion)
+		messages, excluded, _, err := s.prepareExtractionMessages(ctx, c, conversation, job.Request, job.Profile)
 		if err != nil {
 			return model.JobStatus{}, err
 		}
-		if len(job.Request.InputRanges) > 0 {
+		input.Messages = messages
+		if len(job.Request.InputRanges) > 0 || job.Profile.RedactionPolicyVersion != "" {
 			input.InputSelectionVersion = job.Profile.InputSelectionVersion
 			input.ExcludedRanges = excluded
 		}
-		for i, m := range conversation.Request.Messages {
-			if len(ranges[i]) == 0 {
-				continue
-			}
-			content, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: conversation.EvidenceIDs[i], Scope: r.Scope, Purpose: r.Purpose})
-			if err != nil {
-				return model.JobStatus{}, err
-			}
-			for _, selected := range ranges[i] {
-				message, err := extractionRangeMessage(m, selected, content.Bytes)
-				if err != nil {
-					return model.JobStatus{}, err
-				}
-				input.Messages = append(input.Messages, message)
-			}
+		if job.Profile.RedactionPolicyVersion != "" {
+			input.RedactionVersion = "utf8-omit-v1"
 		}
 
 	}

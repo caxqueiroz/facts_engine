@@ -260,6 +260,22 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 					}
 				}
 			case "extraction_job", "extraction_attempt", "extraction_result":
+				if entry.Kind == "extraction_job" {
+					var job model.ExtractionJob
+					if err := json.Unmarshal(entry.Payload, &job); err != nil {
+						return err
+					}
+					for _, id := range job.Request.RedactedEvidenceIDs {
+						evidence, err := tx.Evidence(ctx, id)
+						if err != nil {
+							return err
+						}
+						if err := add("evidence", id, evidence); err != nil {
+							return err
+						}
+						scopes[evidence.Scope] = true
+					}
+				}
 				var artifact struct{ RefreshScopes, ContentScopes []string }
 				if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
 					return err

@@ -12,6 +12,18 @@ func (t *transaction) StageExtractionJob(ctx context.Context, j model.Extraction
 	if err := t.lockRetentionScope(ctx, j.Request.Scope); err != nil {
 		return err
 	}
+	for _, evidenceID := range j.Request.RedactedEvidenceIDs {
+		evidence, err := t.Evidence(ctx, evidenceID)
+		if err != nil {
+			return err
+		}
+		if evidence.Scope != j.Request.Scope || evidence.Derivation == nil {
+			return model.ErrPrecondition
+		}
+		if err := t.guardEvidenceReference(ctx, evidenceID); err != nil {
+			return err
+		}
+	}
 	t.pendingExtraction = &j
 	return nil
 }
@@ -51,6 +63,11 @@ func (t *transaction) flushExtraction(ctx context.Context, e model.Event) error 
 		}
 		if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,payload,memory_record_id,memory_version_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, t.tenant, j.ID, j.Request.Scope, nullableID(j.Request.ConversationID), j.Profile.ID, j.ProfileDigest, e.LedgerRevision, b, memoryRecord, memoryVersion); err != nil {
 			return err
+		}
+		for _, evidenceID := range j.Request.RedactedEvidenceIDs {
+			if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_redactions(tenant_id,job_id,scope_id,evidence_id) VALUES($1,$2,$3,$4)`, t.tenant, j.ID, j.Request.Scope, evidenceID); err != nil {
+				return err
+			}
 		}
 		for _, subject := range j.Request.Subjects {
 			if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_subjects VALUES($1,$2,$3,$4)`, t.tenant, j.ID, j.Request.Scope, subject); err != nil {

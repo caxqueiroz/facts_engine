@@ -18,6 +18,7 @@ type ExtractionResponse struct {
 	InputTokens, OutputTokens int64
 }
 type ExtractionProfile struct {
+	RedactionPolicyVersion                                                                       string `json:",omitempty"`
 	InputSelectionVersion                                                                        string `json:",omitempty"`
 	CostUnit                                                                                     string `json:",omitempty"`
 	MaxCostUnitsPerAttempt                                                                       int64  `json:",omitempty"`
@@ -42,6 +43,7 @@ type ExtractionOptions struct {
 }
 type PredicateBinding struct{ Predicate, SchemaVersion string }
 type ExtractionRequest struct {
+	RedactedEvidenceIDs   []string               `json:",omitempty"`
 	ExpectedProfileDigest string                 `json:",omitempty"`
 	InputRanges           []ExtractionInputRange `json:",omitempty"`
 	Command
@@ -95,7 +97,9 @@ type ExtractionInputRange struct {
 }
 
 type ExtractionInputMessage struct {
-	SourceStart                                   int `json:",omitempty"`
+	DerivativeEvidenceID, DerivativeDigest        string `json:",omitempty"`
+	DerivativeStart                               int    `json:",omitempty"`
+	SourceStart                                   int    `json:",omitempty"`
 	EvidenceID, Speaker, SpeakerRole, SourceClass string
 	SourceTime                                    time.Time
 	Content                                       string

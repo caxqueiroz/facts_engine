@@ -24,6 +24,9 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	s.extractors = map[string]model.ApprovedExtractor{}
 	for _, approved := range o.Profiles {
 		p := approved.Profile
+		if p.RedactionPolicyVersion != "" && (!s.redactionPolicies[p.RedactionPolicyVersion] || p.InputSelectionVersion != "original-ranges-v1" || p.ParserVersion == "memory-refresh-json-v1") {
+			return model.ErrInvalid
+		}
 		if p.InputSelectionVersion != "" && (p.InputSelectionVersion != "original-ranges-v1" || p.ParserVersion == "memory-refresh-json-v1") {
 			return model.ErrInvalid
 		}
@@ -97,28 +100,12 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 	if err != nil {
 		return model.JobStatus{}, err
 	}
-	ranges, _, inputSize, err := planExtractionRanges(conversation, r.InputRanges, approved.Profile.InputSelectionVersion)
+	_, _, inputSize, err := s.prepareExtractionMessages(ctx, c, conversation, r, approved.Profile)
 	if err != nil {
 		return model.JobStatus{}, err
 	}
-	if inputSize > int64(approved.Profile.MaxInputBytes) {
+	if inputSize > int64(approved.Profile.MaxInputBytes) || (approved.Profile.RedactionPolicyVersion != "" && inputSize == 0) {
 		return model.JobStatus{}, model.ErrPrecondition
-	}
-	if len(r.InputRanges) > 0 {
-		for i, selected := range ranges {
-			if len(selected) == 0 {
-				continue
-			}
-			content, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: conversation.EvidenceIDs[i], Scope: r.Scope, Purpose: r.Purpose})
-			if err != nil {
-				return model.JobStatus{}, err
-			}
-			for _, part := range selected {
-				if _, err := extractionRangeMessage(conversation.Request.Messages[i], part, content.Bytes); err != nil {
-					return model.JobStatus{}, err
-				}
-			}
-		}
 	}
 	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: r, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), Authorization: []model.AuthorizationDecision{receipt, evidenceAuth}}
 	if memoryMode {

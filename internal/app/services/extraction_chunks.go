@@ -27,26 +27,14 @@ func (s *Service) PlanExtractionChunks(ctx context.Context, c model.Caller, q mo
 	if _, err := s.authorize(ctx, c, q.Scope, "can_read_evidence", model.Command{Purpose: q.Purpose}); err != nil {
 		return empty, err
 	}
-	ranges, excluded, _, err := planExtractionRanges(conversation, q.InputRanges, approved.Profile.InputSelectionVersion)
+	messages, excluded, _, err := s.prepareExtractionMessages(ctx, c, conversation, model.ExtractionRequest{Command: model.Command{Purpose: q.Purpose}, Scope: q.Scope, InputRanges: q.InputRanges, RedactedEvidenceIDs: q.RedactedEvidenceIDs}, approved.Profile)
 	if err != nil {
 		return empty, err
 	}
-	plan := model.ExtractionChunkPlan{Version: "original-chunks-v1", Tenant: c.Tenant, Scope: q.Scope, ConversationID: conversation.ID, ConversationDigest: conversation.Digest, ProfileID: approved.Profile.ID, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), MaxSourceBytes: q.MaxSourceBytes, Chunks: []model.ExtractionChunk{}, ExcludedRanges: excluded}
-	for i, selected := range ranges {
-		if len(selected) == 0 {
-			continue
-		}
-		content, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: conversation.EvidenceIDs[i], Scope: q.Scope, Purpose: q.Purpose})
-		if err != nil {
+	plan := model.ExtractionChunkPlan{Version: "original-chunks-v1", Tenant: c.Tenant, Scope: q.Scope, ConversationID: conversation.ID, ConversationDigest: conversation.Digest, ProfileID: approved.Profile.ID, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), MaxSourceBytes: q.MaxSourceBytes, Chunks: []model.ExtractionChunk{}, ExcludedRanges: excluded, RedactedEvidenceIDs: append([]string(nil), q.RedactedEvidenceIDs...)}
+	for _, message := range messages {
+		if err := appendExtractionChunkSegment(&plan.Chunks, message.EvidenceID, message.SourceStart, []byte(message.Content), q.MaxSourceBytes); err != nil {
 			return empty, err
-		}
-		for _, r := range selected {
-			if _, err := extractionRangeMessage(conversation.Request.Messages[i], r, content.Bytes); err != nil {
-				return empty, err
-			}
-			if err := appendExtractionChunks(&plan.Chunks, r, content.Bytes, q.MaxSourceBytes); err != nil {
-				return empty, err
-			}
 		}
 	}
 	// Planning can involve multiple evidence reads. Recheck permissions before
@@ -67,7 +55,14 @@ func appendExtractionChunks(chunks *[]model.ExtractionChunk, r model.ExtractionI
 	if maximum < utf8.UTFMax || r.Start < 0 || r.End < r.Start || r.End > len(original) || !utf8.Valid(original[r.Start:r.End]) {
 		return model.ErrInvalid
 	}
-	for start := r.Start; start < r.End; {
+	return appendExtractionChunkSegment(chunks, r.EvidenceID, r.Start, original[r.Start:r.End], maximum)
+}
+
+func appendExtractionChunkSegment(chunks *[]model.ExtractionChunk, evidenceID string, sourceStart int, content []byte, maximum int) error {
+	if maximum < utf8.UTFMax || sourceStart < 0 || !utf8.Valid(content) {
+		return model.ErrInvalid
+	}
+	for start := 0; start < len(content); {
 		if len(*chunks) == 0 || (*chunks)[len(*chunks)-1].SourceBytes == maximum || len((*chunks)[len(*chunks)-1].InputRanges) == 256 {
 			if len(*chunks) >= maximumExtractionChunks {
 				return model.ErrPrecondition
@@ -75,8 +70,8 @@ func appendExtractionChunks(chunks *[]model.ExtractionChunk, r model.ExtractionI
 			*chunks = append(*chunks, model.ExtractionChunk{})
 		}
 		chunk := &(*chunks)[len(*chunks)-1]
-		end := start + min(maximum-chunk.SourceBytes, r.End-start)
-		for end < r.End && end > start && !utf8.RuneStart(original[end]) {
+		end := start + min(maximum-chunk.SourceBytes, len(content)-start)
+		for end < len(content) && end > start && !utf8.RuneStart(content[end]) {
 			end--
 		}
 		if end == start {
@@ -86,7 +81,7 @@ func appendExtractionChunks(chunks *[]model.ExtractionChunk, r model.ExtractionI
 			*chunks = append(*chunks, model.ExtractionChunk{})
 			continue
 		}
-		chunk.InputRanges = append(chunk.InputRanges, model.ExtractionInputRange{EvidenceID: r.EvidenceID, Start: start, End: end})
+		chunk.InputRanges = append(chunk.InputRanges, model.ExtractionInputRange{EvidenceID: evidenceID, Start: sourceStart + start, End: sourceStart + end})
 		chunk.SourceBytes += end - start
 		start = end
 	}
