@@ -14,6 +14,7 @@ type ContextArchivePolicy struct {
 }
 
 type Config struct {
+	AttestationIdentity *runtimeconfig.AttestationIdentity  `json:"attestation_identity,omitempty"`
 	Gateways            []mtlsidentity.GatewayBinding       `json:"gateways,omitempty"`
 	Telemetry           *runtimeconfig.Telemetry            `json:"telemetry,omitempty"`
 	ContextArchive      *ContextArchivePolicy               `json:"context_archive,omitempty"`
@@ -48,6 +49,9 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
+	if c.AttestationIdentity.Validate() != nil {
+		return model.ErrInvalid
+	}
 	if c.Telemetry.Validate() != nil {
 		return model.ErrInvalid
 	}

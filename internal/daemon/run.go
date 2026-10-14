@@ -103,6 +103,12 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		return errors.New("invalid authorization configuration")
 	}
 	options := model.EngineOptions{Telemetry: telemetry.Options, Reads: model.ReadOptions{PaginationKey: paginationKey}}
+	identityOptions, closeIdentity, err := c.AttestationIdentity.Open()
+	if err != nil {
+		return err
+	}
+	defer closeIdentity()
+	options.AttestationIdentity = identityOptions
 	if c.ContextArchive != nil {
 		options.ContextArchive = &model.ContextArchiveOptions{Stream: c.ContextArchive.Stream, MaxPendingRevisions: c.ContextArchive.MaxPendingRevisions, Progress: ledger}
 	}

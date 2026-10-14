@@ -71,3 +71,14 @@ func TestGatewayExample(t *testing.T) {
 		t.Fatal("ambiguous gateway/workload certificate accepted")
 	}
 }
+
+func TestAttestationIdentityExample(t *testing.T) {
+	c, err := LoadConfig("../../examples/memoryd-attestation.json")
+	if err != nil || c.AttestationIdentity == nil {
+		t.Fatal("invalid identity authority example", err)
+	}
+	c.AttestationIdentity.TimeoutSeconds = 31
+	if c.Validate() == nil {
+		t.Fatal("unbounded identity authority timeout")
+	}
+}

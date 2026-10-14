@@ -3,12 +3,18 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	facts "github.com/caxqueiroz/facts_engine"
+	"github.com/caxqueiroz/facts_engine/adapters/attestationhttp"
 	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,21 +63,48 @@ func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Le
 	if err != nil {
 		t.Fatal(err)
 	}
-	approved := map[string]string{}
-	calls := 0
+	var approved sync.Map
+	var calls atomic.Int64
 	verifier := identityVerifierFunc(func(ctx context.Context, r model.AttestationIdentityRequest) (model.AttestationIdentityReceipt, error) {
-		calls++
+		calls.Add(1)
 		if _, ok := ctx.Deadline(); !ok {
 			t.Fatal("unbounded verifier call")
 		}
 		digest := model.AttestationIdentityDigest(r)
-		if approved[r.Request.GrantID] != digest {
+		expected, _ := approved.Load(r.Request.GrantID)
+		if expected != digest {
 			return model.AttestationIdentityReceipt{}, model.ErrDenied
 		}
 		now := time.Now().UTC()
 		return model.AttestationIdentityReceipt{Authority: "trusted-idp", BindingID: r.Request.GrantID, RequestDigest: digest, Attestor: client, AuthenticatedAt: now.Add(-time.Minute), VerifiedAt: now, ExpiresAt: now.Add(time.Minute)}, nil
 	})
-	options := model.EngineOptions{AttestationIdentity: model.AttestationIdentityOptions{Verifier: verifier, Authority: "trusted-idp"}}
+	authority := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer fixture-authority-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		var envelope attestationhttp.Request
+		if json.NewDecoder(r.Body).Decode(&envelope) != nil || envelope.RequestDigest != model.AttestationIdentityDigest(envelope.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		bounded, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
+		receipt, err := verifier.VerifyAttestationIdentity(bounded, envelope.Request)
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(receipt)
+	}))
+	defer authority.Close()
+	httpVerifier, err := attestationhttp.New(attestationhttp.Config{URL: authority.URL, Authority: "trusted-idp", Token: "fixture-authority-token", Timeout: time.Second, RootCAPEM: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: authority.Certificate().Raw})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer httpVerifier.Close()
+	options := model.EngineOptions{AttestationIdentity: model.AttestationIdentityOptions{Verifier: httpVerifier, Authority: "trusted-idp"}}
 	e, err := facts.NewWithOptions(l, allow{}, store, options)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +116,7 @@ func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Le
 		}
 		artifacts := testConfirmationArtifacts(t, ctx, base, store, client, "case", kind, v)
 		request := model.DelegatedAttestationRequest{AttestationRequest: model.AttestationRequest{Command: cmd(kind + "-record"), Attestation: model.Attestation{ID: kind + "-confirmation", Scope: "case", RecordID: v.RecordID, VersionID: v.VersionID, ContentDigest: v.ContentDigest, Kind: "client_confirmation", EvidenceID: artifacts.Response.EvidenceID, Attestor: client, Confirmation: artifacts}}, GrantID: kind + "-grant"}
-		approved[request.GrantID] = model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: request})
+		approved.Store(request.GrantID, model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: request}))
 		if _, err = base.RecordDelegatedAttestation(ctx, recorder, request); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal("implicit verifier", err)
 		}
@@ -97,8 +130,8 @@ func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Le
 		}
 		for _, denial := range []denyIdentityCaller{{recorder.Principal, "can_record_delegated_attestation"}, {client.Principal, "can_attest"}, {client.Principal, "can_read_evidence"}} {
 			denied, _ := facts.NewWithOptions(l, denial, store, options)
-			before := calls
-			if _, err = denied.RecordDelegatedAttestation(ctx, recorder, request); !errors.Is(err, model.ErrDenied) || calls != before {
+			before := calls.Load()
+			if _, err = denied.RecordDelegatedAttestation(ctx, recorder, request); !errors.Is(err, model.ErrDenied) || calls.Load() != before {
 				t.Fatal("authorization before identity provider", err)
 			}
 		}
@@ -153,11 +186,11 @@ func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Le
 		replay.Attestation.ID = kind + "-replayed-attestation"
 		replay.Attestation.Confirmation = testConfirmationArtifacts(t, ctx, base, store, client, "case", kind+"-replay", v)
 		replay.Attestation.EvidenceID = replay.Attestation.Confirmation.Response.EvidenceID
-		approved[replay.GrantID] = model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: replay})
+		approved.Store(replay.GrantID, model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: replay}))
 		if _, err = e.RecordDelegatedAttestation(ctx, recorder, replay); !errors.Is(err, model.ErrConflict) {
 			t.Fatal("identity grant replay", err)
 		}
-		approved[request.GrantID] = model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: request})
+		approved.Store(request.GrantID, model.AttestationIdentityDigest(model.AttestationIdentityRequest{Recorder: recorder, Request: request}))
 		page, err := e.ListChanges(ctx, client, model.ChangesQuery{Scope: "case", Purpose: "audit", AfterRevision: committed.LedgerRevision - 1, Limit: 1})
 		if err != nil || len(page.Events) != 1 {
 			t.Fatal(page, err)
