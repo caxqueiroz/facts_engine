@@ -96,3 +96,13 @@ func CalculationDigest(r CalculationReceipt) string {
 	r.CompletedAt = r.CompletedAt.UTC()
 	return Digest(r)
 }
+
+// AuditExportLease outlasts the bounded export attempt. Delivery retries must
+// wait at least this long after an attempt that may have claimed the job.
+const AuditExportLease = 3 * time.Minute
+
+type AuditExportRunner interface {
+	RunAuditExport(context.Context, Caller, AuditExportQuery) (AuditExportResult, error)
+}
+
+func AuditExportConsumer(stream string) string { return "audit-export-" + Digest(stream) }

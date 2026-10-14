@@ -118,7 +118,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 		if err != nil {
 			return err
 		}
-		job, err = t.ClaimAuditJob(ctx, q.ID, 3*time.Minute)
+		job, err = t.ClaimAuditJob(ctx, q.ID, model.AuditExportLease)
 		return err
 	})
 	if errors.Is(err, model.ErrNotFound) {

@@ -5,7 +5,13 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
+type AuditConfig struct {
+	Tenant string `json:"tenant"`
+	Stream string `json:"stream"`
+	KeyID  string `json:"key_id"`
+}
 type Config struct {
+	Audit                  AuditConfig                `json:"audit"`
 	Mode                   string                     `json:"mode"`
 	Principal              string                     `json:"principal"`
 	Projection             runtimeconfig.LexicalRoute `json:"projection"`
@@ -29,7 +35,19 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
-	if c.Mode != "projection" || !model.ValidID(c.Principal) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
+	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
+		return model.ErrInvalid
+	}
+	switch c.Mode {
+	case "projection":
+		if c.Audit != (AuditConfig{}) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil {
+			return model.ErrInvalid
+		}
+	case "audit":
+		if c.Projection != (runtimeconfig.LexicalRoute{}) || !model.ValidID(c.Audit.Tenant) || !model.ValidID(c.Audit.Stream) || !model.ValidID(c.Audit.KeyID) {
+			return model.ErrInvalid
+		}
+	default:
 		return model.ErrInvalid
 	}
 	return nil

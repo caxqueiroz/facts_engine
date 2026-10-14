@@ -1,0 +1,19 @@
+{
+  "mode": "audit",
+  "principal": "facts-audit-worker",
+  "audit": {
+    "tenant": "bank1",
+    "stream": "exports-v1",
+    "key_id": "audit-development-v1"
+  },
+  "openfga_url": "http://127.0.0.1:8080",
+  "openfga_store": "replace-with-store-id",
+  "openfga_model": "replace-with-model-id",
+  "max_connections": 8,
+  "max_attempts": 5,
+  "lease_seconds": 30,
+  "poll_milliseconds": 250,
+  "min_backoff_milliseconds": 1000,
+  "max_backoff_seconds": 60,
+  "delivery_timeout_seconds": 120
+}

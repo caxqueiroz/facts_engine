@@ -2,7 +2,11 @@ package workerdaemon
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
+	facts "github.com/caxqueiroz/facts_engine"
+	"github.com/caxqueiroz/facts_engine/adapters/audit"
+	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/adapters/openfga"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/internal/runtimeconfig"
@@ -14,7 +18,7 @@ import (
 	"time"
 )
 
-// Run owns its pools and runs one explicitly configured tenant/generation. It
+// Run owns its pools and runs one explicitly configured tenant and worker mode. It
 // cancels in-flight delivery on shutdown; unacknowledged leases remain retryable.
 func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if c.Validate() != nil || logger == nil {
@@ -49,21 +53,68 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if err != nil {
 		return errors.New("worker schema or role check failed")
 	}
-	index, closeIndex, err := runtimeconfig.OpenLexical(startup, []runtimeconfig.LexicalRoute{c.Projection})
-	if err != nil {
-		return err
-	}
-	defer closeIndex()
 	auth, err := openfga.New(openfga.Config{URL: c.OpenFGAURL, StoreID: c.OpenFGAStore, ModelID: c.OpenFGAModel, Token: os.Getenv("MEMORY_OPENFGA_TOKEN")})
 	if err != nil {
 		return errors.New("invalid authorization configuration")
 	}
-	caller := model.Caller{Tenant: c.Projection.Tenant, Principal: c.Principal, Service: true}
-	handler, err := workers.NewProjection(ledger, index, auth, caller, c.Projection.Generation)
-	if err != nil {
-		return errors.New("cannot initialize projection handler")
+	var handler workers.Handler
+	var consumer model.ConsumerKey
+	switch c.Mode {
+	case "projection":
+		index, closeIndex, err := runtimeconfig.OpenLexical(startup, []runtimeconfig.LexicalRoute{c.Projection})
+		if err != nil {
+			return err
+		}
+		defer closeIndex()
+		caller := model.Caller{Tenant: c.Projection.Tenant, Principal: c.Principal, Service: true}
+		handler, err = workers.NewProjection(ledger, index, auth, caller, c.Projection.Generation)
+		if err != nil {
+			return errors.New("cannot initialize projection handler")
+		}
+		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ProjectionConsumer(c.Projection.Generation)}
+	case "audit":
+		signingKey, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
+		if err != nil {
+			return err
+		}
+		signer, err := audit.NewEd25519(c.Audit.KeyID, signingKey)
+		if err != nil {
+			return errors.New("invalid audit signing key")
+		}
+		dsn := os.Getenv("MEMORY_DATABASE_URL")
+		if dsn == "" {
+			return errors.New("missing audit engine database configuration")
+		}
+		engineConfig, err := pgxpool.ParseConfig(dsn)
+		if err != nil {
+			return errors.New("invalid audit engine database configuration")
+		}
+		engineConfig.MaxConns = c.MaxConnections
+		engineConfig.ConnConfig.ConnectTimeout = 5 * time.Second
+		enginePool, err := pgxpool.NewWithConfig(startup, engineConfig)
+		if err != nil {
+			return errors.New("cannot create audit engine pool")
+		}
+		defer enginePool.Close()
+		engineLedger, err := postgres.New(startup, enginePool, cipher)
+		if err != nil {
+			return errors.New("audit engine schema or role check failed")
+		}
+		store, err := evidence.NewPostgres(enginePool, cipher)
+		if err != nil {
+			return errors.New("cannot initialize audit evidence store")
+		}
+		engine, err := facts.NewWithAudit(engineLedger, auth, store, model.AuditOptions{Signer: signer})
+		if err != nil {
+			return errors.New("cannot initialize audit engine")
+		}
+		caller := model.Caller{Tenant: c.Audit.Tenant, Principal: c.Principal, Service: true}
+		handler, err = workers.NewAuditExport(engine, auth, caller, c.Audit.Stream)
+		if err != nil {
+			return errors.New("cannot initialize audit handler")
+		}
+		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.AuditExportConsumer(c.Audit.Stream)}
 	}
-	consumer := model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ProjectionConsumer(c.Projection.Generation)}
 	if err := ledger.RegisterConsumer(startup, consumer, c.MaxAttempts); err != nil {
 		return errors.New("cannot register configured consumer")
 	}

@@ -5,7 +5,10 @@ import (
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/caxqueiroz/facts_engine/adapters/mtlsidentity"
 	"github.com/caxqueiroz/facts_engine/adapters/openfga"
@@ -84,6 +87,13 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	}
 	adminTuple := tuple(service, "administrator", scopeObject)
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(tenantObject, "tenant", scopeObject), tuple(service, "member", tenantObject), tuple(service, "reader", scopeObject), tuple(service, "auditor", scopeObject), tuple(service, "operator", scopeObject), adminTuple}}})
+	auditWorker := "service:" + openfga.ObjectID(tenant, "audit-worker")
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(auditWorker, "member", tenantObject), tuple(auditWorker, "operator", scopeObject), tuple(auditWorker, "auditor", scopeObject)}}})
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMORY_AUDIT_PRIVATE_KEY_HEX", hex.EncodeToString(private))
 	route := standaloneRoute(t, ctx, tenant)
 	t.Setenv("MEMORY_OPERATIONS_DATABASE_URL", databaseRole(t, dsn, "facts_rebuild"))
 	authority := testtls.New(t)
@@ -101,7 +111,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := daemon.Config{Retrieval: []runtimeconfig.LexicalRoute{route}, OperationsScope: scope, Listen: listener.Addr().String(), TLSCertificate: write("server.pem", serverCert.PEM), TLSKey: write("server.key", serverCert.KeyPEM), ClientCA: write("ca.pem", authority.PEM), Identities: []mtlsidentity.Binding{{URI: "spiffe://test/memoryd", Tenant: tenant, Principal: principal}}, OpenFGAURL: endpoint, OpenFGAStore: store, OpenFGAModel: modelID, ReadinessScope: scope, MaxConnections: 4, MaxConcurrent: 4, MaxRequestBytes: 1 << 20, MaxResponseBytes: 1 << 20, RPCTimeoutSeconds: 5, ShutdownSeconds: 3}
+	config := daemon.Config{AuditKeyID: "standalone-key", Retrieval: []runtimeconfig.LexicalRoute{route}, OperationsScope: scope, Listen: listener.Addr().String(), TLSCertificate: write("server.pem", serverCert.PEM), TLSKey: write("server.key", serverCert.KeyPEM), ClientCA: write("ca.pem", authority.PEM), Identities: []mtlsidentity.Binding{{URI: "spiffe://test/memoryd", Tenant: tenant, Principal: principal}}, OpenFGAURL: endpoint, OpenFGAStore: store, OpenFGAModel: modelID, ReadinessScope: scope, MaxConnections: 4, MaxConcurrent: 4, MaxRequestBytes: 1 << 20, MaxResponseBytes: 1 << 20, RPCTimeoutSeconds: 5, ShutdownSeconds: 3}
 	runtimeURL, err := url.Parse(dsn)
 	if err != nil || runtimeURL.Scheme == "" {
 		t.Fatal("integration requires a PostgreSQL URL")
@@ -155,6 +165,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 		t.Fatalf("verified service identity: %v, %v", read, err)
 	}
 	testStandaloneProjection(t, ctx, client, base, dsn, endpoint, store, modelID, principal, route)
+	testStandaloneAudit(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, principal, public)
 	request.Tenant = "bank1"
 	if _, err := identity.PutScope(ctx, request); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("tenant mismatch: %v", err)

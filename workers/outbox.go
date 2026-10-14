@@ -80,7 +80,12 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 		return true, renewErr
 	}
 	if handlerErr != nil {
-		return true, w.queue.FailDelivery(ctx, d, w.backoff(d.Attempt))
+		delay := w.backoff(d.Attempt)
+		var retry *retryAfterError
+		if errors.As(handlerErr, &retry) {
+			delay = max(delay, retry.delay)
+		}
+		return true, w.queue.FailDelivery(ctx, d, delay)
 	}
 	return true, w.queue.AcknowledgeDelivery(ctx, d)
 }

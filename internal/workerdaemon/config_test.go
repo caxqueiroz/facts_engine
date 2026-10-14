@@ -22,3 +22,19 @@ func TestExampleAndInvalidWorkerModes(t *testing.T) {
 		t.Fatal("unbounded delivery accepted")
 	}
 }
+
+func TestAuditWorkerConfiguration(t *testing.T) {
+	config, err := LoadConfig("../../examples/memoryworker-audit.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.Audit.KeyID = ""
+	if config.Validate() == nil {
+		t.Fatal("missing signing key identity accepted")
+	}
+	config.Audit.KeyID = "key"
+	config.Projection.Tenant = "other"
+	if config.Validate() == nil {
+		t.Fatal("mixed worker modes accepted")
+	}
+}
