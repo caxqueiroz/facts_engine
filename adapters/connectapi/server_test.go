@@ -469,3 +469,34 @@ func TestContextValidation(t *testing.T) {
 		t.Fatalf("context tenant: %v", err)
 	}
 }
+
+func TestIdentityValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewIdentityServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	scope := &v1.PutScopeRequest{Tenant: "tenant", Command: &v1.Command{Key: "scope", Purpose: "admin"}, Definition: &v1.ScopeDefinition{Id: "scope", Label: "Label"}, ExpectedRevision: 9223372036854775807, Reason: "Create"}
+	if _, err := client.PutScope(context.Background(), scope); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("revision overflow: %v", err)
+	}
+	scope.ExpectedRevision = 0
+	scope.Definition.Label = strings.Repeat("x", 257)
+	if _, err := client.PutScope(context.Background(), scope); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("label limit: %v", err)
+	}
+	subject := &v1.PutSubjectRequest{Tenant: "tenant", Command: scope.Command, Definition: &v1.SubjectDefinition{Scope: "scope", Id: "subject", Kind: "customer", Label: "Customer", Lookup: map[string]string{"crm": "not an opaque ID"}}, Reason: "Create"}
+	if _, err := client.PutSubject(context.Background(), subject); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("lookup value: %v", err)
+	}
+	subject.Definition.Lookup = map[string]string{}
+	for i := range 17 {
+		subject.Definition.Lookup[strings.Repeat("a", i+1)] = "id"
+	}
+	if _, err := client.PutSubject(context.Background(), subject); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("lookup count: %v", err)
+	}
+	if _, err := client.GetSubject(context.Background(), &v1.GetSubjectRequest{Tenant: "tenant", Scope: "scope", Id: "subject", Purpose: "review", Revision: -1}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("negative revision: %v", err)
+	}
+	if _, err := client.LookupSubject(context.Background(), &v1.LookupSubjectRequest{Tenant: "other", Scope: "scope", Namespace: "crm", Value: "id", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("lookup tenant: %v", err)
+	}
+}

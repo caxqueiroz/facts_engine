@@ -24,6 +24,7 @@ func testIdentities(t *testing.T, ctx context.Context, l *postgres.Ledger, store
 	if _, err = denied.PutScope(ctx, c, scope); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("admin required", err)
 	}
+	t.Run("remote identities", func(t *testing.T) { testRemoteIdentities(t, ctx, e, denied, c) })
 	a, err := e.PutScope(ctx, c, scope)
 	if err != nil || a.StreamRevision != 1 {
 		t.Fatal(a, err)
@@ -102,10 +103,12 @@ func testIdentities(t *testing.T, ctx context.Context, l *postgres.Ledger, store
 		t.Fatal("retained identity", v, err)
 	}
 	denied, _ = facts.New(l, denyPermission{permission: "can_read_history"}, store)
+	testRemoteIdentityReadDenied(t, ctx, denied, c, true)
 	if _, err = denied.GetSubject(ctx, c, q); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("history denied", err)
 	}
 	denied, _ = facts.New(l, denyPermission{permission: "can_read"}, store)
+	testRemoteIdentityReadDenied(t, ctx, denied, c, false)
 	if _, err = denied.LookupSubject(ctx, c, lookup); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("lookup denied", err)
 	}

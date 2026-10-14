@@ -42,6 +42,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.PutScopeRequest{}, &v1.PutSubjectRequest{}, &v1.GetScopeRequest{}, &v1.GetSubjectRequest{}, &v1.LookupSubjectRequest{},
 		&v1.PrepareContextRequest{}, &v1.GetContextManifestRequest{}, &v1.RecordDecisionRequest{}, &v1.GetDecisionReceiptRequest{},
 		&v1.RecallRequest{}, &v1.RecallMemoriesRequest{}, &v1.WaitForProjectionRequest{},
 		&v1.RecordCalculationRequest{}, &v1.GetCalculationReceiptRequest{}, &v1.ListChangesRequest{}, &v1.StartAuditExportRequest{}, &v1.GetAuditExportRequest{},
@@ -95,6 +96,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterAuditServiceHandler(server, &auditService{engine: engine})
 	memoryv1connect.RegisterRetrievalServiceHandler(server, &retrievalService{engine: engine})
 	memoryv1connect.RegisterContextServiceHandler(server, &contextService{engine: engine})
+	memoryv1connect.RegisterIdentityServiceHandler(server, &identityService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil

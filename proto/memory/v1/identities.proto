@@ -1,0 +1,123 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service IdentityService {
+  rpc PutScope(PutScopeRequest) returns (PutScopeResponse);
+  rpc PutSubject(PutSubjectRequest) returns (PutSubjectResponse);
+  rpc GetScope(GetScopeRequest) returns (GetScopeResponse);
+  rpc GetSubject(GetSubjectRequest) returns (GetSubjectResponse);
+  rpc LookupSubject(LookupSubjectRequest) returns (LookupSubjectResponse);
+}
+message ScopeDefinition {
+  string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string label = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message SubjectDefinition {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string kind = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string label = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  map<string, string> lookup = 5 [(buf.validate.field).map = {
+    max_pairs: 16
+    keys: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+    values: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+}
+message PutScopeRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  ScopeDefinition definition = 3 [(buf.validate.field).required = true];
+  int64 expected_revision = 4 [(buf.validate.field).int64 = {
+    gte: 0
+    lt: 9223372036854775807
+  }];
+  string reason = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 2048
+  }];
+}
+message PutScopeResponse {
+  CommitResult result = 1;
+}
+message ScopeVersion {
+  ScopeDefinition definition = 1;
+  int64 revision = 2;
+  int64 ledger_revision = 3;
+  Caller caller = 4;
+  string reason = 5;
+}
+message GetScopeRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int64 revision = 4 [(buf.validate.field).int64.gte = 0];
+}
+message GetScopeResponse {
+  ScopeVersion version = 1;
+}
+message PutSubjectRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  SubjectDefinition definition = 3 [(buf.validate.field).required = true];
+  int64 expected_revision = 4 [(buf.validate.field).int64 = {
+    gte: 0
+    lt: 9223372036854775807
+  }];
+  string reason = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 2048
+  }];
+}
+message PutSubjectResponse {
+  CommitResult result = 1;
+}
+message SubjectVersion {
+  SubjectDefinition definition = 1;
+  int64 revision = 2;
+  int64 ledger_revision = 3;
+  Caller caller = 4;
+  string reason = 5;
+}
+message GetSubjectRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int64 revision = 4 [(buf.validate.field).int64.gte = 0];
+  string id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message GetSubjectResponse {
+  SubjectVersion version = 1;
+}
+message LookupSubjectRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string namespace = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string value = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message LookupSubjectResponse {
+  SubjectVersion version = 1;
+}
