@@ -326,4 +326,6 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		t.Fatal("outbox did not execute extraction", status, err)
 	}
 
+	testMemoryExtraction(t, ctx, l, store, c, reviewer, conversation, profile, result)
+
 }

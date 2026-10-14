@@ -225,11 +225,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 					}
 				}
 			case "extraction_job", "extraction_attempt", "extraction_result":
-				var artifact struct{ RefreshScopes []string }
+				var artifact struct{ RefreshScopes, ContentScopes []string }
 				if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
 					return err
 				}
-				for _, scope := range artifact.RefreshScopes {
+				for _, scope := range append(artifact.RefreshScopes, artifact.ContentScopes...) {
 					scopes[scope] = true
 				}
 			case "context":

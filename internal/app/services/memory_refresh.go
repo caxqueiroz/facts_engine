@@ -113,9 +113,9 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 	return s.GetJob(ctx, c, model.JobQuery{ID: result.ID, Scope: r.Scope, Purpose: r.Purpose})
 }
 
-func (s *Service) memoryRefreshAuthorization(ctx context.Context, c model.Caller, j model.ExtractionJob) ([]model.AuthorizationDecision, error) {
+func (s *Service) extractionContentAuthorization(ctx context.Context, c model.Caller, j model.ExtractionJob) ([]model.AuthorizationDecision, error) {
 	receipts := []model.AuthorizationDecision{}
-	for _, scope := range j.RefreshScopes {
+	for _, scope := range append(append([]string{}, j.RefreshScopes...), j.ContentScopes...) {
 		for _, permission := range []string{"can_read", "can_read_history", "can_read_evidence"} {
 			d, err := s.authorize(ctx, c, scope, permission, j.Request.Command)
 			if err != nil {
@@ -212,7 +212,7 @@ func (s *Service) buildMemoryRefresh(ctx context.Context, c model.Caller, j mode
 	}
 	// Fact payloads can contain source quotes. Recheck dependency evidence access
 	// before the retained request is exposed to the approved provider.
-	if _, err = s.memoryRefreshAuthorization(ctx, c, j); err != nil {
+	if _, err = s.extractionContentAuthorization(ctx, c, j); err != nil {
 		return nil, err
 	}
 	return input, nil

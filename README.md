@@ -1,6 +1,6 @@
 # Facts engine
 
-An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, durable outbox workers, CortexDB projection/recall, managed index rebuilds, signed event archive chains, immutable conversation ingestion, and durable fact extraction**. The complete v0.2 specification and production banking release remain in progress.
+An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, durable outbox workers, CortexDB projection/recall, managed index rebuilds, signed event archive chains, immutable conversation ingestion, and durable fact and memory extraction**. The complete v0.2 specification and production banking release remain in progress.
 
 The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. Constructors do not run migrations, start workers/listeners, or change global logging. The host owns the PostgreSQL pools, authentication boundary, encryption keys, OpenFGA provisioning, and shutdown.
 
@@ -171,9 +171,9 @@ Retain the archive head object reference and expected revision independently, th
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
-2. Integrate memory candidate extraction into conversation processing. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
+2. Complete extraction input chunking and redaction policies. Conversation memory candidate extraction is implemented. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
-4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
+4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
 
@@ -237,7 +237,7 @@ Repeating a conversation source revision with identical content returns the orig
 
 ## Durable fact extraction
 
-Apply migrations `00011_extraction_jobs.sql` and `00012_extraction_runs.sql`, refresh `scripts/runtime-role.sql` grants, and republish the OpenFGA model. Configure `model.EngineOptions.Extraction` through `NewWithOptions`. Each `ApprovedExtractor` supplies a host-owned `ExtractionProvider` and a pinned profile: provider/model identity, prompt bytes and digest, prompt/parser/build versions, JSON parameters, timeout, byte/candidate/attempt limits, token reservation and retry delay. The supported parser is `facts-extraction-json-v1`. Constructors never start workers or contact a provider.
+Apply migrations `00011_extraction_jobs.sql` and `00012_extraction_runs.sql`, refresh `scripts/runtime-role.sql` grants, and republish the OpenFGA model. Configure `model.EngineOptions.Extraction` through `NewWithOptions`. Each `ApprovedExtractor` supplies a host-owned `ExtractionProvider` and a pinned profile: provider/model identity, prompt bytes and digest, prompt/parser/build versions, JSON parameters, timeout, byte/candidate/attempt limits, token reservation and retry delay. Fact jobs use the parser `facts-extraction-json-v1`; memory extraction and refresh use separate approved parsers described below. Constructors never start workers or contact a provider.
 
 The embedded workflow is:
 
@@ -596,3 +596,29 @@ Each sweep retains its scope, stream, scheduled bucket, interval and approved pr
 The scheduled bucket identifies a run; eligibility uses current time when processed. Restored or retired targets are skipped. Expiry does not authorize fabricating replacement evidence or accepting a new memory: the provider may decline, and any proposed dependency must still pass eligibility checks. Later sweep buckets can schedule additional jobs while a memory remains stale, so choose the cadence with the configured model/token budgets and review workload in mind. Job retries and consumer retries remain explicit and separately visible.
 
 Integration tests expire a bound fact attestation without advancing the ledger, verify that the memory becomes stale, then verify that a subsequent durable sweep schedules exactly one job and that replaying the tick creates no duplicate sweep. A provider decline is retained without creating a replacement. Worker tests cover partial tick failures, stable bucket keys, stream/profile routing, cancellation and interval bounds.
+
+
+### Memory extraction from conversations
+
+Apply forward-only migration `00020_memory_extraction.sql` and refresh runtime/archive grants. Configure an approved profile with `ParserVersion: "memory-extraction-json-v1"`. `StartExtraction` accepts memory-only requests with explicit application-owned target IDs and registered subtype/schema bindings:
+
+```go
+job, err := engine.StartExtraction(ctx, caller, model.ExtractionRequest{
+    Command: model.Command{Key: commandKey, Purpose: "conversation_review"},
+    Scope: scope, ConversationID: conversationID, ProfileID: memoryProfile,
+    MemoryTargets: []model.MemoryExtractionTarget{{
+        ID: "conversation-summary", Subtype: "episode", SchemaVersion: "v1",
+        Dependencies: []model.MemoryDependency{dependency},
+    }},
+})
+```
+
+A request contains either fact subjects/predicates or memory targets. Targets are limited to 64, with at most 64 distinct dependency versions across the job. Dependencies are optional for memories grounded directly in conversation evidence. When supplied, the host binds exact fact record/version IDs, scope, content digest and dependency label; the provider cannot remove, replace or invent them. Tenant-qualified foreign keys preserve subtype and dependency bindings. The retained model input includes the pinned definitions, dependency versions and exact authorized conversation bytes.
+
+The provider returns `MemoryExtractionOutput` with `Candidates`. Each candidate contains the bound `ID`, `Subtype`, `SchemaVersion`, UTF-8 `Body`, effective `Valid` interval, exact `Sources`, `Uncertainty`, short `Rationale` and diagnostic `Confidence`. Unknown identities or schemas, unsupported uncertainty, invalid spans and assistant/system-only support become review issues. Source classes must satisfy the bound subtype's acceptance policy. Confidence never grants acceptance authority. Bodies are capped at 64 KiB and require a known interval start.
+
+Valid candidates atomically create immutable **unaccepted** memory proposals linked to their extraction attempt. All bound dependencies are attached to each target's proposal. Duplicate candidate IDs are rejected for review; exact matches to retained versions produce duplicate links. Different content overlapping accepted or disputed memory intervals produces `overlapping_different_content` links, without declaring a factual contradiction or selecting a winner. Current subtype changes after enqueueing produce `schema_changed` issues. Approval, attestations, dependency eligibility and supersession remain separate governed operations.
+
+The requester and worker need the usual extraction/proposal/evidence permissions, plus current read/history/evidence access across the memory and dependency scopes. Retained artifacts preserve those content scopes for later reads, scoped audit filtering and archive authorization. Fact and memory jobs share the existing durable queue, profile pinning, byte/candidate/token budgets, retries, leases and fencing. Use the same extraction worker and inspection APIs; the job kind is `memory_extraction`. Input chunk planning, configurable redaction and approved production model evaluations remain unfinished.
+
+Tests cover source and identity rejection, immutable dependency binding, two proposals committed in one run, duplicate and overlap links, proposals remaining unaccepted, separation of proposer/approver, schema changes, retained-input verification, dependency permissions and cross-scope artifact redaction.

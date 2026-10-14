@@ -300,12 +300,30 @@ type ExtractionJobState struct {
 	LastFailureCode string
 }
 
+type ExtractionMemoryDependency struct {
+	TenantID  string
+	JobID     string
+	TargetID  string
+	ScopeID   string
+	RecordID  string
+	VersionID string
+}
+
 type ExtractionMemoryProposal struct {
 	TenantID  string
 	AttemptID string
 	Ordinal   int32
 	RecordID  string
 	VersionID string
+}
+
+type ExtractionMemoryTarget struct {
+	TenantID      string
+	JobID         string
+	ID            string
+	ScopeID       string
+	Subtype       string
+	SchemaVersion string
 }
 
 type ExtractionProposal struct {

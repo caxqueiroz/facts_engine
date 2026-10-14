@@ -29,8 +29,8 @@ func (s *Service) extractionAuthorizations(ctx context.Context, c model.Caller, 
 			}
 			receipts = append(receipts, d)
 		}
-		if j.Request.Refresh != nil {
-			checks, err := s.memoryRefreshAuthorization(ctx, caller, j)
+		if j.Request.Refresh != nil || len(j.Request.MemoryTargets) > 0 {
+			checks, err := s.extractionContentAuthorization(ctx, caller, j)
 			if err != nil {
 				return nil, err
 			}
@@ -89,7 +89,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	if status.State == "running" && status.Attempts >= status.MaxAttempts && status.LeaseUntil != nil && !status.LeaseUntil.After(time.Now()) {
 		return s.expireExtraction(ctx, c, r, status, receipts)
 	}
-	attempt := model.ExtractionAttempt{RefreshScopes: job.RefreshScopes, ID: id(), Tenant: c.Tenant, Scope: r.Scope, JobID: job.ID, OwnerNonce: id(), ProfileDigest: job.ProfileDigest, Caller: c, Authorization: receipts}
+	attempt := model.ExtractionAttempt{ContentScopes: job.ContentScopes, RefreshScopes: job.RefreshScopes, ID: id(), Tenant: c.Tenant, Scope: r.Scope, JobID: job.ID, OwnerNonce: id(), ProfileDigest: job.ProfileDigest, Caller: c, Authorization: receipts}
 	var input model.ExtractionInput
 	inputLimit := false
 	if job.Request.Refresh != nil {
@@ -105,6 +105,21 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 			return model.JobStatus{}, err
 		}
 		input = model.ExtractionInput{Schema: "facts-extraction-input-v1", Tenant: c.Tenant, JobID: job.ID, AttemptID: attempt.ID, ConversationID: conversation.ID, ConversationDigest: conversation.Digest, Timezone: conversation.Request.Timezone, Profile: job.Profile, Subjects: job.Request.Subjects, Predicates: job.Predicates, Messages: []model.ExtractionInputMessage{}, OmittedRanges: []string{}, RedactionVersion: "original-utf8-v1"}
+		if len(job.Request.MemoryTargets) > 0 {
+			input.Schema = "memory-extraction-input-v1"
+			input.MemoryTargets = job.Request.MemoryTargets
+			input.MemoryTypes = job.MemoryTypes
+			input.DependencyVersions = job.DependencyVersions
+			for _, v := range job.DependencyVersions {
+				ids := []string{}
+				for _, span := range v.Proposal.Sources {
+					ids = append(ids, span.EvidenceID)
+				}
+				if _, err = s.loadEvidence(ctx, c, v.Proposal.Key.Scope, ids); err != nil {
+					return model.JobStatus{}, err
+				}
+			}
+		}
 		for i, m := range conversation.Request.Messages {
 			content, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: conversation.EvidenceIDs[i], Scope: r.Scope, Purpose: r.Purpose})
 			if err != nil {
@@ -186,7 +201,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		providerErr = providerCtx.Err()
 	}
 	cancel()
-	result := model.ExtractionResult{RefreshScopes: job.RefreshScopes, AttemptID: retained.ID, JobID: job.ID, Tenant: c.Tenant, Scope: r.Scope, Outcome: "completed", ModelIdentity: response.ModelIdentity, RequestDigest: retained.RequestDigest, ResponseDigest: model.BytesDigest(response.Body), ResponseComplete: true, InputTokens: response.InputTokens, OutputTokens: response.OutputTokens, Issues: []model.ExtractionIssue{}, Relations: []model.ExtractionRelation{}, Proposals: []model.ExtractedProposal{}}
+	result := model.ExtractionResult{ContentScopes: job.ContentScopes, RefreshScopes: job.RefreshScopes, AttemptID: retained.ID, JobID: job.ID, Tenant: c.Tenant, Scope: r.Scope, Outcome: "completed", ModelIdentity: response.ModelIdentity, RequestDigest: retained.RequestDigest, ResponseDigest: model.BytesDigest(response.Body), ResponseComplete: true, InputTokens: response.InputTokens, OutputTokens: response.OutputTokens, Issues: []model.ExtractionIssue{}, Relations: []model.ExtractionRelation{}, Proposals: []model.ExtractedProposal{}}
 	if len(response.Body) > job.Profile.MaxOutputBytes {
 		result.ResponseComplete = false
 		result.Outcome = "response_limit"
@@ -196,6 +211,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	}
 	var output model.ExtractionOutput
 	var refreshOutput model.MemoryRefreshOutput
+	var memoryOutput model.MemoryExtractionOutput
 	if providerErr != nil {
 		result.Outcome = "provider_unavailable"
 	} else if result.Outcome == "completed" {
@@ -204,6 +220,8 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		} else {
 			if job.Request.Refresh != nil {
 				refreshOutput, err = parseMemoryRefresh(response.Body)
+			} else if len(job.Request.MemoryTargets) > 0 {
+				memoryOutput, err = parseMemoryExtraction(response.Body, job.Profile.MaxCandidates)
 			} else {
 				output, err = parseExtraction(response.Body, job.Profile.MaxCandidates)
 			}
@@ -260,6 +278,8 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		if result.Outcome == "completed" {
 			if job.Request.Refresh != nil {
 				err = s.appendRefreshedMemory(ctx, t, c, job, *input.Refresh, refreshOutput, retained.ID, receipts, &result)
+			} else if len(job.Request.MemoryTargets) > 0 {
+				err = s.appendExtractedMemories(ctx, t, c, job, input, memoryOutput, retained.ID, receipts, &result)
 			} else {
 				err = s.appendExtractedProposals(ctx, t, c, job, input, output, retained.ID, receipts, &result)
 			}
@@ -451,9 +471,9 @@ func (s *Service) GetExtractionRun(ctx context.Context, c model.Caller, q model.
 	if err != nil {
 		return model.ExtractionRun{}, err
 	}
-	if job.Request.Refresh != nil {
+	if job.Request.Refresh != nil || len(job.Request.MemoryTargets) > 0 {
 		job.Request.Purpose = q.Purpose
-		if _, err = s.memoryRefreshAuthorization(ctx, c, job); err != nil {
+		if _, err = s.extractionContentAuthorization(ctx, c, job); err != nil {
 			return model.ExtractionRun{}, err
 		}
 	}
@@ -481,7 +501,7 @@ func (s *Service) expireExtraction(ctx context.Context, c model.Caller, r model.
 		if err != nil {
 			return err
 		}
-		if err = t.StageExtractionResult(ctx, model.ExtractionResult{RefreshScopes: attempt.RefreshScopes, AttemptID: attempt.ID, JobID: r.ID, Tenant: c.Tenant, Scope: r.Scope, Outcome: "lease_exhausted_response_unavailable", RequestDigest: attempt.RequestDigest, ResponseComplete: false, Authorization: auth}); err != nil {
+		if err = t.StageExtractionResult(ctx, model.ExtractionResult{ContentScopes: attempt.ContentScopes, RefreshScopes: attempt.RefreshScopes, AttemptID: attempt.ID, JobID: r.ID, Tenant: c.Tenant, Scope: r.Scope, Outcome: "lease_exhausted_response_unavailable", RequestDigest: attempt.RequestDigest, ResponseComplete: false, Authorization: auth}); err != nil {
 			return err
 		}
 		out.ID = r.ID

@@ -41,8 +41,9 @@ type ExtractionRequest struct {
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
 	Predicates                       []PredicateBinding
-	Refresh                          *VersionReference     `json:",omitempty"`
-	RefreshTrigger                   *MemoryRefreshTrigger `json:",omitempty"`
+	Refresh                          *VersionReference        `json:",omitempty"`
+	RefreshTrigger                   *MemoryRefreshTrigger    `json:",omitempty"`
+	MemoryTargets                    []MemoryExtractionTarget `json:",omitempty"`
 }
 type ExtractionJob struct {
 	ID, Tenant, ProfileDigest string
@@ -53,6 +54,9 @@ type ExtractionJob struct {
 	RefreshScopes             []string `json:",omitempty"`
 	Authorization             []AuthorizationDecision
 	CreatedRevision           int64
+	MemoryTypes               []MemoryType `json:",omitempty"`
+	DependencyVersions        []Version    `json:",omitempty"`
+	ContentScopes             []string     `json:",omitempty"`
 }
 type JobQuery struct{ ID, Scope, Purpose string }
 type JobRetryRequest struct {
@@ -90,7 +94,10 @@ type ExtractionInput struct {
 	Messages                                                                       []ExtractionInputMessage
 	OmittedRanges                                                                  []string
 	RedactionVersion                                                               string
-	Refresh                                                                        *MemoryRefreshInput `json:",omitempty"`
+	Refresh                                                                        *MemoryRefreshInput      `json:",omitempty"`
+	MemoryTargets                                                                  []MemoryExtractionTarget `json:",omitempty"`
+	MemoryTypes                                                                    []MemoryType             `json:",omitempty"`
+	DependencyVersions                                                             []Version                `json:",omitempty"`
 }
 type ExtractionCandidate struct {
 	Subject, Predicate, Discriminator, SchemaVersion string
@@ -117,6 +124,7 @@ type ExtractedProposal struct {
 	RecordID, VersionID string
 }
 type ExtractionAttempt struct {
+	ContentScopes                                                      []string `json:",omitempty"`
 	RefreshScopes                                                      []string `json:",omitempty"`
 	ID, Tenant, Scope, JobID, OwnerNonce, ProfileDigest, RequestDigest string
 	Caller                                                             Caller
@@ -128,6 +136,7 @@ type ExtractionAttempt struct {
 	Authorization                                                      []AuthorizationDecision
 }
 type ExtractionResult struct {
+	ContentScopes                                                                          []string `json:",omitempty"`
 	RefreshScopes                                                                          []string `json:",omitempty"`
 	AttemptID, JobID, Tenant, Scope, Outcome, ModelIdentity, RequestDigest, ResponseDigest string
 	ResponseBytes                                                                          []byte
@@ -194,4 +203,23 @@ type MemoryRefreshOutput struct {
 	Body          string
 	Dependencies  []MemoryDependency
 	DeclineReason string
+}
+
+type MemoryExtractionTarget struct {
+	ID, Subtype, SchemaVersion string
+	Dependencies               []MemoryDependency
+}
+type MemoryExtractionCandidate struct {
+	ID, Subtype, SchemaVersion, Body string
+	Valid                            Interval
+	Sources                          []SourceSpan
+	Uncertainty, Rationale           string
+	Confidence                       float64
+}
+type MemoryExtractionOutput struct {
+	Candidates []MemoryExtractionCandidate `json:"candidates"`
+}
+type MemoryExtractionTx interface {
+	MemoryLifecycleTx
+	MemoryVersions(context.Context, string, int64) ([]MemoryVersion, error)
 }

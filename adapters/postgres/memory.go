@@ -107,3 +107,29 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 	t.pendingMemoryType = nil
 	return nil
 }
+
+func (t *transaction) MemoryVersions(ctx context.Context, record string, revision int64) ([]model.MemoryVersion, error) {
+	rows, err := t.tx.Query(ctx, `SELECT payload FROM memory_versions WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision<=$3 ORDER BY ledger_revision,id LIMIT 10001`, t.tenant, record, revision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.MemoryVersion{}
+	size := 0
+	for rows.Next() {
+		var payload []byte
+		if err = rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		size += len(payload)
+		if len(out) >= 10000 || size > 64<<20 {
+			return nil, model.ErrPrecondition
+		}
+		var version model.MemoryVersion
+		if err = t.decode(payload, &version); err != nil {
+			return nil, err
+		}
+		out = append(out, version)
+	}
+	return out, rows.Err()
+}

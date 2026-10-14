@@ -302,11 +302,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				}
 			}
 		case "extraction_job", "extraction_attempt", "extraction_result":
-			var artifact struct{ RefreshScopes []string }
+			var artifact struct{ RefreshScopes, ContentScopes []string }
 			if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
 				return nil, nil, err
 			}
-			for _, scope := range artifact.RefreshScopes {
+			for _, scope := range append(artifact.RefreshScopes, artifact.ContentScopes...) {
 				include = include && scope == r.Scope
 			}
 			if !r.IncludeEvidence {

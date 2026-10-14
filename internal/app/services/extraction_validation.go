@@ -55,11 +55,15 @@ func candidateIssue(c model.ExtractionCandidate, input model.ExtractionInput) st
 	if len(c.Rationale) > 2048 || math.IsNaN(c.Confidence) || math.IsInf(c.Confidence, 0) || c.Confidence < 0 || c.Confidence > 1 {
 		return "invalid_diagnostics"
 	}
-	if len(c.Sources) == 0 || len(c.Sources) > 64 {
+	return extractionSourceIssue(c.Sources, input)
+}
+
+func extractionSourceIssue(sources []model.SourceSpan, input model.ExtractionInput) string {
+	if len(sources) == 0 || len(sources) > 64 {
 		return "missing_or_excessive_sources"
 	}
 	supported := false
-	for _, span := range c.Sources {
+	for _, span := range sources {
 		var message *model.ExtractionInputMessage
 		for i := range input.Messages {
 			m := &input.Messages[i]
