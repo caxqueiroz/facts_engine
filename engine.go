@@ -231,3 +231,14 @@ func NewWithOptions(l Ledger, a Authorizer, e EvidenceStore, options model.Engin
 }
 
 type EngineOptions = model.EngineOptions
+
+func (e *Engine) IngestConversation(ctx context.Context, c Caller, r model.ConversationRequest) (model.ConversationRecord, error) {
+	return e.service.IngestConversation(ctx, c, r)
+}
+func (e *Engine) GetConversation(ctx context.Context, c Caller, q model.ConversationQuery) (model.ConversationRecord, error) {
+	return e.service.GetConversation(ctx, c, q)
+}
+
+type ConversationRequest = model.ConversationRequest
+type ConversationRecord = model.ConversationRecord
+type ConversationQuery = model.ConversationQuery

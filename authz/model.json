@@ -142,6 +142,38 @@
             ]
           }
         },
+        "can_ingest": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_ingest_bank_record": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "administrator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "can_propose": {
           "intersection": {
             "child": [

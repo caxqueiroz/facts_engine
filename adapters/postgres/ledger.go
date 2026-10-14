@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingConversation  *model.ConversationRecord
 	pendingRetention     *model.RetentionEvent
 	pendingContext       *model.ContextManifest
 	pendingDecision      *model.DecisionRecord
@@ -213,6 +214,17 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 		if digest != e.Object.Digest {
 			return "", model.ErrConflict
 		}
+		stored, err := t.Evidence(ctx, existing)
+		if err != nil {
+			return "", err
+		}
+		candidate := e
+		candidate.ID = stored.ID
+		candidate.SourceTime = candidate.SourceTime.UTC()
+		stored.SourceTime = stored.SourceTime.UTC()
+		if model.Digest(stored) != model.Digest(candidate) {
+			return "", model.ErrConflict
+		}
 		return existing, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -370,6 +382,9 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	err = t.flushTemporal(ctx, e)
 	if err != nil {
 		return e, err
+	}
+	if err = t.flushConversation(ctx, e); err != nil {
+		return model.Event{}, err
 	}
 	if err = t.flushRetention(ctx, e); err != nil {
 		return model.Event{}, err

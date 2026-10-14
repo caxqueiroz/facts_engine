@@ -153,6 +153,21 @@ type ContextScope struct {
 	ScopeID   string
 }
 
+type Conversation struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type ConversationMessage struct {
+	TenantID       string
+	ConversationID string
+	Ordinal        int32
+	EvidenceID     string
+}
+
 type DecisionArtifact struct {
 	TenantID   string
 	DecisionID string

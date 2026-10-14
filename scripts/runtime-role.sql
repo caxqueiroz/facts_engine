@@ -48,3 +48,5 @@ GRANT facts_runtime TO facts_retention;
 GRANT INSERT ON retention_events,retention_policies,legal_holds,legal_hold_releases TO facts_retention;
 GRANT UPDATE(disposed) ON retention_objects TO facts_retention;
 GRANT DELETE ON evidence_objects TO facts_retention;
+GRANT SELECT,INSERT ON conversations,conversation_messages TO facts_runtime;
+GRANT SELECT ON conversations,conversation_messages TO facts_archiver;
