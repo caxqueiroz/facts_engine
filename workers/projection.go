@@ -2,10 +2,12 @@ package workers
 
 import (
 	"context"
+	internaltelemetry "github.com/caxqueiroz/facts_engine/internal/telemetry"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 type Projection struct {
+	observer   *internaltelemetry.Observer
 	source     model.ProjectionSource
 	index      model.RetrievalIndex
 	auth       model.Authorizer
@@ -14,12 +16,23 @@ type Projection struct {
 }
 
 func NewProjection(source model.ProjectionSource, index model.RetrievalIndex, auth model.Authorizer, caller model.Caller, generation string) (*Projection, error) {
+	return NewProjectionWithTelemetry(source, index, auth, caller, generation, model.TelemetryOptions{})
+}
+
+// NewProjectionWithTelemetry uses host-owned providers without installing globals.
+func NewProjectionWithTelemetry(source model.ProjectionSource, index model.RetrievalIndex, auth model.Authorizer, caller model.Caller, generation string, telemetry model.TelemetryOptions) (*Projection, error) {
 	if source == nil || index == nil || auth == nil || !model.ValidID(caller.Tenant) || !model.ValidID(caller.Principal) || !model.ValidID(generation) {
 		return nil, model.ErrInvalid
 	}
-	return &Projection{source, index, auth, caller, generation}, nil
+	observer, err := internaltelemetry.New(telemetry)
+	if err != nil {
+		return nil, err
+	}
+	return &Projection{observer, source, index, auth, caller, generation}, nil
 }
-func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
+func (p *Projection) Handle(ctx context.Context, d model.Delivery) (err error) {
+	ctx, operation := p.observer.Start(ctx, "project.document")
+	defer operation.End(&err)
 	if d.Key.Tenant != p.caller.Tenant || d.Key.Consumer != model.ProjectionConsumer(p.generation) {
 		return model.ErrDenied
 	}

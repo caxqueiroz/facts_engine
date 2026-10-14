@@ -6,20 +6,27 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/caxqueiroz/facts_engine/adapters/archive"
+	internaltelemetry "github.com/caxqueiroz/facts_engine/internal/telemetry"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 type Archive struct {
-	source model.ArchiveSource
-	store  model.ArchiveStore
-	signer model.AuditSigner
-	keys   map[string]ed25519.PublicKey
-	auth   model.Authorizer
-	caller model.Caller
-	stream string
+	observer *internaltelemetry.Observer
+	source   model.ArchiveSource
+	store    model.ArchiveStore
+	signer   model.AuditSigner
+	keys     map[string]ed25519.PublicKey
+	auth     model.Authorizer
+	caller   model.Caller
+	stream   string
 }
 
 func NewArchive(source model.ArchiveSource, store model.ArchiveStore, signer model.AuditSigner, keys map[string]ed25519.PublicKey, auth model.Authorizer, c model.Caller, stream string) (*Archive, error) {
+	return NewArchiveWithTelemetry(source, store, signer, keys, auth, c, stream, model.TelemetryOptions{})
+}
+
+// NewArchiveWithTelemetry uses host-owned providers without installing globals.
+func NewArchiveWithTelemetry(source model.ArchiveSource, store model.ArchiveStore, signer model.AuditSigner, keys map[string]ed25519.PublicKey, auth model.Authorizer, c model.Caller, stream string, telemetry model.TelemetryOptions) (*Archive, error) {
 	if source == nil || store == nil || signer == nil || auth == nil || len(keys) == 0 || !model.ValidID(c.Tenant) || !model.ValidID(c.Principal) || !model.ValidID(stream) {
 		return nil, model.ErrInvalid
 	}
@@ -30,9 +37,15 @@ func NewArchive(source model.ArchiveSource, store model.ArchiveStore, signer mod
 		}
 		copied[id] = append(ed25519.PublicKey(nil), k...)
 	}
-	return &Archive{source, store, signer, copied, auth, c, stream}, nil
+	observer, err := internaltelemetry.New(telemetry)
+	if err != nil {
+		return nil, err
+	}
+	return &Archive{observer, source, store, signer, copied, auth, c, stream}, nil
 }
-func (a *Archive) Handle(ctx context.Context, d model.Delivery) error {
+func (a *Archive) Handle(ctx context.Context, d model.Delivery) (err error) {
+	ctx, operation := a.observer.Start(ctx, "archive.event")
+	defer operation.End(&err)
 	if d.Key.Tenant != a.caller.Tenant || d.Key.Consumer != model.ArchiveConsumer(a.stream) || d.Event.LedgerRevision < 1 {
 		return model.ErrDenied
 	}

@@ -78,7 +78,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 		}
 		defer closeIndex()
 		caller := model.Caller{Tenant: c.Projection.Tenant, Principal: c.Principal, Service: true}
-		handler, err = workers.NewProjection(ledger, index, auth, caller, c.Projection.Generation)
+		handler, err = workers.NewProjectionWithTelemetry(ledger, index, auth, caller, c.Projection.Generation, telemetry.Options)
 		if err != nil {
 			return errors.New("cannot initialize projection handler")
 		}
@@ -116,7 +116,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("invalid archive signing key")
 		}
 		caller := model.Caller{Tenant: c.Archive.Tenant, Principal: c.Principal, Service: true}
-		handler, err = workers.NewArchive(ledger, objects, signer, keys, auth, caller, c.Archive.Stream)
+		handler, err = workers.NewArchiveWithTelemetry(ledger, objects, signer, keys, auth, caller, c.Archive.Stream, telemetry.Options)
 		if err != nil {
 			return errors.New("cannot initialize archive handler")
 		}

@@ -21,6 +21,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"os"
 	"testing"
 	"time"
@@ -78,9 +80,13 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		}
 		return ledger
 	}
+	spanExporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(spanExporter))
+	defer func() { _ = tracerProvider.Shutdown(context.Background()) }()
+	workerTelemetry := model.TelemetryOptions{TracerProvider: tracerProvider}
 	projector := source("facts_projector")
 	c := model.Caller{Tenant: "bank1", Principal: "index-worker"}
-	handler, err := workers.NewProjection(projector, index, allow{}, c, "g1")
+	handler, err := workers.NewProjectionWithTelemetry(projector, index, allow{}, c, "g1", workerTelemetry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +364,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal(err)
 	}
 	keys := map[string]ed25519.PublicKey{"archive-key": public}
-	archiveHandler, err := workers.NewArchive(archiver, objects, signer, keys, allow{}, model.Caller{Tenant: "bank1", Principal: "archive-worker"}, "audit-v1")
+	archiveHandler, err := workers.NewArchiveWithTelemetry(archiver, objects, signer, keys, allow{}, model.Caller{Tenant: "bank1", Principal: "archive-worker"}, "audit-v1", workerTelemetry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,6 +412,18 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal(err)
 	}
 	drain(archiveWorker, archiver, archiveKey)
+	observedStages := map[string]bool{}
+	for _, span := range spanExporter.GetSpans() {
+		for _, attribute := range span.Attributes {
+			if string(attribute.Key) == "facts.outcome" && attribute.Value.AsString() == "ok" {
+				observedStages[span.Name] = true
+			}
+		}
+	}
+	if !observedStages["project.document"] || !observedStages["archive.event"] {
+		t.Fatal("successful worker stages not traced", observedStages)
+	}
+
 	progress, err := archiver.ConsumerStatus(ctx, archiveKey)
 	if err != nil || progress.AcknowledgedRevision != result.LedgerRevision {
 		t.Fatal(progress, err)
