@@ -94,3 +94,6 @@ GRANT SELECT ON extraction_subjects TO facts_archiver;
 
 GRANT SELECT,INSERT ON confirmation_artifacts TO facts_runtime;
 GRANT SELECT ON confirmation_artifacts TO facts_archiver;
+
+GRANT SELECT,INSERT ON attestation_delegations TO facts_runtime;
+GRANT SELECT ON attestation_delegations TO facts_archiver;

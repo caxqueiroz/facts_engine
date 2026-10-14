@@ -43,7 +43,7 @@ func (t *transaction) withdrawMemoryAttestation(ctx context.Context, id, scope s
 	if err := t.read(ctx, &a, `SELECT payload FROM memory_attestations WHERE tenant_id=$1 AND id=$2`, t.tenant, id); err != nil {
 		return model.CommitResult{}, err
 	}
-	if a.Scope != scope || a.Attestor.Principal != c.Principal {
+	if a.Scope != scope || a.Attestor != c {
 		return model.CommitResult{}, model.ErrDenied
 	}
 	v, err := t.MemoryVersion(ctx, a.RecordID, a.VersionID)

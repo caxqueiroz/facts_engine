@@ -10,6 +10,9 @@ func NewWithOptions(l model.Ledger, a model.Authorizer, e model.EvidenceStore, o
 	if err = configureExtraction(s, o.Extraction); err != nil {
 		return nil, err
 	}
+	if err = configureAttestationIdentity(s, o.AttestationIdentity); err != nil {
+		return nil, err
+	}
 	s.audit = o.Audit
 	if o.Retrieval.Index != nil || o.Retrieval.Progress != nil || o.Retrieval.Registry != nil || o.Retrieval.Generation != "" {
 		retrieval, err := NewWithRetrieval(l, a, e, o.Retrieval)

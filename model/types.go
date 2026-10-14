@@ -234,6 +234,8 @@ type Approval struct {
 	ExpectedRevision           int64
 }
 type Attestation struct {
+	Recorder                                                        *Caller                `json:",omitempty"`
+	Delegation                                                      *AttestationDelegation `json:",omitempty"`
 	EvidenceAuthorization                                           *AuthorizationDecision `json:",omitempty"`
 	Confirmation                                                    *ClientConfirmation    `json:",omitempty"`
 	ID, Scope, RecordID, VersionID, ContentDigest, Kind, EvidenceID string

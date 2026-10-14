@@ -6,6 +6,12 @@ import (
 )
 
 func (t *transaction) stageConfirmation(ctx context.Context, a model.Attestation, kind string) error {
+	if a.Delegation != nil {
+		r := a.Delegation.Receipt
+		if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_delegations VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, r.Authority, r.BindingID, r.RequestDigest, a.ID, a.Scope, kind); err != nil {
+			return err
+		}
+	}
 	if a.Confirmation == nil {
 		return nil
 	}

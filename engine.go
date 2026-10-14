@@ -373,3 +373,14 @@ type SubjectLookupQuery = model.SubjectLookupQuery
 type IdentityTx = model.IdentityTx
 
 type ClientConfirmation = model.ClientConfirmation
+
+func (e *Engine) RecordDelegatedAttestation(ctx context.Context, c Caller, r model.DelegatedAttestationRequest) (CommitResult, error) {
+	return e.service.RecordDelegatedAttestation(ctx, c, r)
+}
+
+type DelegatedAttestationRequest = model.DelegatedAttestationRequest
+type AttestationIdentityRequest = model.AttestationIdentityRequest
+type AttestationIdentityVerifier = model.AttestationIdentityVerifier
+type AttestationIdentityReceipt = model.AttestationIdentityReceipt
+type AttestationIdentityOptions = model.AttestationIdentityOptions
+type AttestationDelegation = model.AttestationDelegation

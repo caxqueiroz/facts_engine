@@ -16,6 +16,8 @@ type scope
     define reader: [user, service]
     define proposer: [user, service]
     define approver: [user, service]
+    define confirmation_recorder: [service]
+    define can_record_delegated_attestation: confirmation_recorder and tenant_member
     define attestor: [user, service]
     define acceptor: [service]
     define administrator: [user, service]

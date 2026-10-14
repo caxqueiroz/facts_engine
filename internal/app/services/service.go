@@ -12,14 +12,15 @@ import (
 )
 
 type Service struct {
-	extractors       map[string]model.ApprovedExtractor
-	extractionLimits model.ExtractionOptions
-	reads            model.ReadOptions
-	retrieval        model.RetrievalOptions
-	ledger           model.Ledger
-	auth             model.Authorizer
-	evidence         model.EvidenceStore
-	audit            model.AuditOptions
+	attestationIdentity model.AttestationIdentityOptions
+	extractors          map[string]model.ApprovedExtractor
+	extractionLimits    model.ExtractionOptions
+	reads               model.ReadOptions
+	retrieval           model.RetrievalOptions
+	ledger              model.Ledger
+	auth                model.Authorizer
+	evidence            model.EvidenceStore
+	audit               model.AuditOptions
 }
 
 func New(l model.Ledger, a model.Authorizer, e model.EvidenceStore) (*Service, error) {
@@ -54,7 +55,7 @@ func (s *Service) authorize(ctx context.Context, c model.Caller, scope, permissi
 	d.ContextDigest = model.Digest(req)
 	return d, nil
 }
-func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permission string, cmd model.Command, input any, fn func(model.Tx, *model.CommitResult) error) (model.CommitResult, error) {
+func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permission string, cmd model.Command, input any, fn func(model.Tx, *model.CommitResult) error, commitChecks ...func() error) (model.CommitResult, error) {
 	var result model.CommitResult
 	if !model.ValidID(cmd.Key) {
 		return result, model.ErrInvalid
@@ -73,6 +74,11 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 			return err
 		}
 		if previous != nil {
+			for _, check := range commitChecks {
+				if err := check(); err != nil {
+					return err
+				}
+			}
 			result = *previous
 			return nil
 		}
@@ -107,6 +113,11 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		event, err := tx.Append(ctx, eventInput)
 		if err != nil {
 			return err
+		}
+		for _, check := range commitChecks {
+			if err := check(); err != nil {
+				return err
+			}
 		}
 		result.LedgerRevision = event.LedgerRevision
 		if result.ID == "" {
@@ -298,9 +309,12 @@ func validKind(k string) bool {
 	return slices.Contains([]string{"client_confirmation", "source_verification", "application_validation"}, k)
 }
 func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest) (model.CommitResult, error) {
+	return s.recordAttestation(ctx, c, r, r, nil)
+}
+func (s *Service) recordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest, input any, delegation *model.AttestationDelegation) (model.CommitResult, error) {
 	a := r.Attestation
-	// The trusted caller is the attestor. Delegated identity flows are not inferred.
-	if a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || a.Attestor != c || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+	// Server-owned identity metadata never comes from an attestation request.
+	if a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || (delegation == nil && a.Attestor != c) || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if _, err := s.authorize(ctx, c, a.Scope, "can_attest", r.Command); err != nil {
@@ -316,9 +330,21 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 	if err := s.verifyAttestationEvidence(ctx, c, a); err != nil {
 		return model.CommitResult{}, err
 	}
-	return s.mutate(ctx, c, a.Scope, "record_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+	a.Recorder = &c
+	a.Delegation = delegation
+	return s.mutate(ctx, c, a.Scope, "record_attestation", "can_attest", r.Command, input, func(tx model.Tx, out *model.CommitResult) error {
 		if a.EvidenceAuthorization != nil && time.Since(a.EvidenceAuthorization.CheckedAt) > 30*time.Second {
 			return model.ErrUnavailable
+		}
+		if delegation != nil {
+			if !delegation.Receipt.ExpiresAt.After(time.Now()) || time.Since(delegation.Receipt.VerifiedAt) > 30*time.Second {
+				return model.ErrUnavailable
+			}
+			for _, check := range delegation.Authorization {
+				if time.Since(check.CheckedAt) > 30*time.Second {
+					return model.ErrUnavailable
+				}
+			}
 		}
 		record, err := tx.Record(ctx, a.RecordID)
 		if err != nil {
@@ -348,7 +374,7 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 		}
 		allowed := false
 		for _, req := range p.Required {
-			if req.Kind == a.Kind && slices.Contains(req.Principals, c.Principal) {
+			if req.Kind == a.Kind && slices.Contains(req.Principals, a.Attestor.Principal) {
 				allowed = true
 			}
 		}
@@ -357,7 +383,7 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 		}
 		out.ID = a.ID
 		return tx.InsertAttestation(ctx, a)
-	})
+	}, func() error { return freshAttestationIdentity(a, time.Now()) })
 }
 func (s *Service) WithdrawAttestation(ctx context.Context, c model.Caller, r model.Withdrawal) (model.CommitResult, error) {
 	return s.mutate(ctx, c, r.Scope, "withdraw_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {

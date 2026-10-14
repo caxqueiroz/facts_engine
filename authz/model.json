@@ -54,6 +54,25 @@
         "approver": {
           "this": {}
         },
+        "confirmation_recorder": {
+          "this": {}
+        },
+        "can_record_delegated_attestation": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "confirmation_recorder"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "attestor": {
           "this": {}
         },
@@ -497,6 +516,13 @@
               {
                 "type": "user"
               },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "confirmation_recorder": {
+            "directly_related_user_types": [
               {
                 "type": "service"
               }

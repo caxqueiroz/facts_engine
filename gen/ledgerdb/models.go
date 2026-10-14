@@ -51,6 +51,16 @@ type Attestation struct {
 	Kind           string
 }
 
+type AttestationDelegation struct {
+	TenantID      string
+	Authority     string
+	BindingID     string
+	RequestDigest string
+	AttestationID string
+	ScopeID       string
+	Kind          string
+}
+
 type AttestationEvent struct {
 	TenantID       string
 	AttestationID  string

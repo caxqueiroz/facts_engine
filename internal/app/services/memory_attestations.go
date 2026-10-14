@@ -27,7 +27,7 @@ func (s *Service) recordMemoryAttestation(ctx context.Context, tx model.Tx, c mo
 	}
 	allowed := false
 	for _, required := range policy.Required {
-		if required.Kind == a.Kind && slices.Contains(required.Principals, c.Principal) {
+		if required.Kind == a.Kind && slices.Contains(required.Principals, a.Attestor.Principal) {
 			allowed = true
 		}
 	}
