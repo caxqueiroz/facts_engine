@@ -93,7 +93,7 @@ func (s *Service) PrepareContext(ctx context.Context, c model.Caller, r model.Co
 	if err != nil {
 		return model.ContextManifest{}, err
 	}
-	if identity.Generation != recall.Generation || !model.ValidID(identity.EmbeddingID) || identity.SearchVersion == "" || identity.RerankerID == "" || identity.Dimensions < 1 {
+	if identity.Generation != recall.Generation || !model.ValidID(identity.EmbeddingID) || identity.SearchVersion == "" || identity.RerankerID == "" || (identity.EmbeddingID == "none" && identity.Dimensions != 0) || (identity.EmbeddingID != "none" && identity.Dimensions < 1) {
 		return model.ContextManifest{}, model.ErrPrecondition
 	}
 	rendered, err := renderContext(recall.Items)

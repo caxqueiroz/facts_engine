@@ -104,6 +104,7 @@ func TestPostgresLedger(t *testing.T) {
 	if _, err := engine.RegisterEvidence(ctx, caller, e); err != nil {
 		t.Fatal(err)
 	}
+	testEvidenceAccess(t, ctx, ledger, store, caller)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	value := "tea"
 	q := model.FactProposal{Command: cmd("proposal"), Key: model.FactKey{Scope: "case1", Subject: "subject1", Predicate: "preference"}, SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &now}, Sources: []model.SourceSpan{{EvidenceID: "ev1", Start: 9, End: 12, Quote: "tea"}}}

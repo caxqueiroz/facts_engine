@@ -22,7 +22,7 @@ type Config struct {
 }
 
 func valid(c Config) bool {
-	return model.ValidID(c.Tenant) && model.ValidID(c.Generation) && model.ValidID(c.EmbeddingID) && c.Dimensions >= 1 && c.Dimensions <= 2000
+	return model.ValidID(c.Tenant) && model.ValidID(c.Generation) && model.ValidID(c.EmbeddingID) && c.Dimensions >= 1 && c.Dimensions <= 2000 && (c.EmbeddingID != "none" || c.Dimensions == 1)
 }
 func coreConfig(c Config) core.Config {
 	return core.Config{VectorDim: c.Dimensions, IndexType: core.IndexTypeFlat, SimilarityFn: core.CosineSimilarity}
@@ -50,7 +50,7 @@ func Provision(ctx context.Context, db *sql.DB, c Config) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `CREATE TABLE facts_projection_identity(singleton boolean PRIMARY KEY CHECK(singleton),tenant text NOT NULL,generation text NOT NULL,embedding_id text NOT NULL,dimensions integer NOT NULL,cortex_version text NOT NULL); CREATE TABLE facts_projection_receipts(id text PRIMARY KEY,digest text NOT NULL); CREATE TABLE facts_projection_gate(singleton boolean PRIMARY KEY CHECK(singleton),fence bigint NOT NULL CHECK(fence>=0),sealed boolean NOT NULL); INSERT INTO facts_projection_gate VALUES(true,0,false)`); err != nil {
+	if _, err = tx.ExecContext(ctx, `CREATE INDEX facts_lexical_content ON embeddings USING gin(to_tsvector('simple',content)); CREATE TABLE facts_projection_identity(singleton boolean PRIMARY KEY CHECK(singleton),tenant text NOT NULL,generation text NOT NULL,embedding_id text NOT NULL,dimensions integer NOT NULL,cortex_version text NOT NULL); CREATE TABLE facts_projection_receipts(id text PRIMARY KEY,digest text NOT NULL); CREATE TABLE facts_projection_gate(singleton boolean PRIMARY KEY CHECK(singleton),fence bigint NOT NULL CHECK(fence>=0),sealed boolean NOT NULL); INSERT INTO facts_projection_gate VALUES(true,0,false)`); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO facts_projection_identity VALUES(true,$1,$2,$3,$4,$5)`, c.Tenant, c.Generation, c.EmbeddingID, c.Dimensions, Version); err != nil {
@@ -67,7 +67,7 @@ type Index struct {
 }
 
 func New(ctx context.Context, db *sql.DB, c Config, embedder model.Embedder) (*Index, error) {
-	if db == nil || !valid(c) || embedder == nil || db.Stats().MaxOpenConnections < 1 || db.Stats().MaxOpenConnections > 32 {
+	if db == nil || !valid(c) || ((embedder == nil) != (c.EmbeddingID == "none")) || db.Stats().MaxOpenConnections < 1 || db.Stats().MaxOpenConnections > 32 {
 		return nil, model.ErrInvalid
 	}
 	var safe bool
@@ -95,6 +95,11 @@ func New(ctx context.Context, db *sql.DB, c Config, embedder model.Embedder) (*I
 	return &Index{db, core.NewPostgresStore(db, coreConfig(c)), c, embedder}, nil
 }
 func (i *Index) vector(ctx context.Context, text string) ([]float32, error) {
+	// Cortex requires a physical vector column. Lexical-only generations use a
+	// one-dimensional storage placeholder that is never searched as an embedding.
+	if i.config.EmbeddingID == "none" {
+		return []float32{1}, nil
+	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	v, err := i.embedder.Embed(ctx, text)
@@ -188,6 +193,9 @@ func (i *Index) Candidates(ctx context.Context, tenant, generation, scope, query
 	if !model.ValidID(scope) || len(query) == 0 || len(query) > 4096 || limit < 1 || limit > 100 {
 		return nil, model.ErrInvalid
 	}
+	if i.config.EmbeddingID == "none" {
+		return i.lexicalCandidates(ctx, tenant, generation, scope, query, limit)
+	}
 	vector, err := i.vector(ctx, query)
 	if err != nil {
 		return nil, err
@@ -250,6 +258,9 @@ func projectionContent(d model.ProjectionDocument) ([]byte, map[string]string, e
 func (i *Index) DescribeRetrieval(_ context.Context, tenant, generation string) (model.RetrievalIdentity, error) {
 	if tenant != i.config.Tenant || generation != i.config.Generation {
 		return model.RetrievalIdentity{}, model.ErrDenied
+	}
+	if i.config.EmbeddingID == "none" {
+		return lexicalIdentity(generation), nil
 	}
 	return model.RetrievalIdentity{Generation: generation, EmbeddingID: i.config.EmbeddingID, Dimensions: i.config.Dimensions, SearchVersion: "cortex-" + Version + "-exact-cosine-v1", RerankerID: "none"}, nil
 }

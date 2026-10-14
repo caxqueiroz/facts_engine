@@ -196,3 +196,13 @@ func (e *Engine) DisposeEvidence(ctx context.Context, c Caller, r model.Evidence
 func (e *Engine) GetRetentionStatus(ctx context.Context, c Caller, q model.RetentionStatusQuery) (model.RetentionStatus, error) {
 	return e.service.GetRetentionStatus(ctx, c, q)
 }
+
+func (e *Engine) GetEvidenceMetadata(ctx context.Context, c Caller, q model.EvidenceQuery) (model.Evidence, error) {
+	return e.service.GetEvidenceMetadata(ctx, c, q)
+}
+func (e *Engine) GetEvidenceContent(ctx context.Context, c Caller, q model.EvidenceQuery) (model.EvidenceContent, error) {
+	return e.service.GetEvidenceContent(ctx, c, q)
+}
+
+type EvidenceQuery = model.EvidenceQuery
+type EvidenceContent = model.EvidenceContent

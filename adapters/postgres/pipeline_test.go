@@ -119,6 +119,14 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil || result.Incomplete || len(result.Items) == 0 {
 		t.Fatal(result, err)
 	}
+	lexicalEngine, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: index.Lexical(), Progress: l, Generation: "g1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lexicalManifest, err := lexicalEngine.PrepareContext(ctx, c, model.ContextRequest{Command: model.Command{Key: "lexical-context", Purpose: query.Purpose}, Scope: "case1", Query: query})
+	if err != nil || len(lexicalManifest.Items) == 0 || lexicalManifest.Retrieval.EmbeddingID != "none" || lexicalManifest.Retrieval.Dimensions != 0 {
+		t.Fatal("lexical context provenance", lexicalManifest, err)
+	}
 	testContexts(t, ctx, engine, l, store, c, index, query)
 	drain(worker, projector, key)
 	result, err = engine.Recall(ctx, c, query)

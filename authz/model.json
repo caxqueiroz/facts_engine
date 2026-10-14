@@ -238,6 +238,22 @@
             ]
           }
         },
+        "can_read_evidence_metadata": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "reader"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "can_read_evidence": {
           "intersection": {
             "child": [

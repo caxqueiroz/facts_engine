@@ -95,6 +95,29 @@ func TestPostgresContract(t *testing.T) {
 	if err != nil || len(hits) != 0 {
 		t.Fatal("database isolation", hits, err)
 	}
+
+	lexical := a.Lexical()
+	for _, query := range []string{"canonical", "canonical fact"} {
+		hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope1", query, 10)
+		if err != nil || len(hits) != 1 || hits[0].VersionID != "version" {
+			t.Fatal("lexical match", hits, err)
+		}
+	}
+	hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope1", "unmatchedterm", 10)
+	if err != nil || len(hits) != 0 {
+		t.Fatal("unmatched lexical query", hits, err)
+	}
+	hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope2", "fact", 10)
+	if err != nil || len(hits) != 0 {
+		t.Fatal("lexical scope leak", hits, err)
+	}
+	if _, err = lexical.Candidates(ctx, "bank-b", "g1", "scope1", "fact", 10); !errors.Is(err, model.ErrDenied) {
+		t.Fatal("lexical tenant leak", err)
+	}
+	identity, err := lexical.DescribeRetrieval(ctx, "bank-a", "g1")
+	if err != nil || identity.EmbeddingID != "none" || identity.Dimensions != 0 {
+		t.Fatal(identity, err)
+	}
 	var n int
 	if err := admin.QueryRowContext(ctx, `SELECT count(*) FROM embeddings`).Scan(&n); err != nil || n != 1 {
 		t.Fatal(n, err)
