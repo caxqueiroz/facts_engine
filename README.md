@@ -223,8 +223,9 @@ Tests cover exact copied bytes, malformed mappings, UTF-8 boundaries, policy/per
 | `sql/queries/reads.sql` | Known-at revision lookup, fact/history pagination, immutable event lookup and memory-refresh dependent discovery |
 | `sql/queries/outbox.sql` | Consumer registration, delivery claims/renewals/acknowledgements/failures, operator retries and scoped change feeds |
 | `sql/queries/rebuild.sql` | Generation state, management locks, consumer pause/resume, active-generation cutover and legacy/paged verification inventories |
+| `sql/queries/retention.sql` | Retention locks/policies, legal holds, reference blockers, age checks and atomic unreferenced-evidence disposal |
 
-Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Query conversion is still incomplete; retention, archive enumeration and other query families remain to be converted.
+Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Query conversion is still incomplete; archive enumeration and other query families remain to be converted.
 
 ## Remaining delivery work
 
