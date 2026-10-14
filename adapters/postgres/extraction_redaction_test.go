@@ -50,6 +50,9 @@ func testExtractionRedaction(t *testing.T, ctx context.Context, l model.Ledger, 
 		if input.RedactionVersion != "utf8-omit-v1" || len(input.Messages) != 2 || len(input.ExcludedRanges) != 2 {
 			t.Fatal("redacted input shape", input)
 		}
+		if input.Profile.PayloadRedaction != nil && (input.PayloadRedactionVersion != "field-omit-v1" || len(input.DependencyVersions) != 1 || input.DependencyVersions[0].Proposal.Value.Kind != "" || len(input.DependencyVersions[0].Proposal.Sources) != 0) {
+			t.Fatal("combined redaction disclosed dependency payload")
+		}
 		message := input.Messages[1]
 		if input.Messages[0].Content != "ID: " || input.Messages[0].SourceStart != 0 {
 			t.Fatal("prefix mapping", input.Messages[0])
@@ -67,7 +70,7 @@ func testExtractionRedaction(t *testing.T, ctx context.Context, l model.Ledger, 
 			body, _ = json.Marshal(model.MemoryExtractionOutput{Candidates: []model.MemoryExtractionCandidate{{ID: "summary", Subtype: "episode", SchemaVersion: "v1", Body: "Preference for tea.", Valid: model.Interval{From: &from}, Sources: sources, Uncertainty: "asserted"}}})
 		} else {
 			value := "tea"
-			good := model.ExtractionCandidate{Subject: "customer", Predicate: "preference", SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Sources: sources, Uncertainty: "asserted"}
+			good := model.ExtractionCandidate{Subject: "customer", Predicate: "preference", SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &from}, Sources: sources, Uncertainty: "asserted"}
 			hidden := good
 			hidden.Discriminator = "concealed"
 			hidden.Sources = []model.SourceSpan{{EvidenceID: message.EvidenceID, Start: 4, End: 10, Quote: "SECRET"}}
@@ -232,4 +235,43 @@ func testExtractionRedaction(t *testing.T, ctx context.Context, l model.Ledger, 
 			return memoryRun.Result.Issues
 		}())
 	}
+	// Required conversation derivatives can be combined with an independently
+	// profile-bound omission of complete dependency proposal payloads.
+	factRef := run.Result.Proposals[0]
+	var factVersion model.Version
+	err = l.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		var err error
+		factVersion, err = tx.Version(ctx, factRef.RecordID, factRef.VersionID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.ApproveFact(ctx, model.Caller{Tenant: c.Tenant, Principal: "reviewer"}, model.Approval{Command: cmd("approve-redacted-dependency"), Scope: "case", RecordID: factRef.RecordID, VersionID: factRef.VersionID, ExpectedRevision: 1}); err != nil {
+		t.Fatal(err)
+	}
+	combinedProfile := memoryProfile
+	combinedProfile.ID = "redacted-memory-dependent"
+	combinedProfile.PayloadRedaction = &model.ExtractionPayloadRedaction{PolicyVersion: "approved-v1", DependencyPayloads: true}
+	options.Extraction.Profiles = []model.ApprovedExtractor{{Profile: combinedProfile, Provider: provider}}
+	engine, err = facts.NewWithOptions(l, allow{}, store, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dependent.Command = cmd("combined-memory-extract")
+	dependent.ProfileID = combinedProfile.ID
+	dependent.MemoryTargets[0].Dependencies = []model.MemoryDependency{{Scope: "case", RecordID: factRef.RecordID, VersionID: factRef.VersionID, ContentDigest: factVersion.Digest, Label: "assertion"}}
+	combinedJob, err := engine.StartExtraction(ctx, c, dependent)
+	if err != nil {
+		t.Fatal("combined redaction scheduling", err)
+	}
+	combinedDone, err := engine.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd("combined-memory-run"), ID: combinedJob.ID, Scope: "case"})
+	if err != nil || combinedDone.State != "completed" {
+		t.Fatal("combined redaction execution", combinedDone, err)
+	}
+	combinedRun, err := engine.GetExtractionRun(ctx, c, model.ExtractionRunQuery{ID: combinedDone.AttemptID, Scope: "case", Purpose: request.Purpose})
+	if err != nil || combinedRun.Result == nil || len(combinedRun.Result.Proposals) != 1 || calls.Load() != 3 {
+		t.Fatal("combined redaction proposal missing", err)
+	}
+
 }

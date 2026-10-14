@@ -150,7 +150,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize worker evidence store")
 		}
 
-		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, Extraction: c.Refresh.options()})
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, Extraction: c.Refresh.options(), RedactionPolicyVersions: c.Refresh.RedactionPolicyVersions})
 		if err != nil {
 			return errors.New("invalid refresh engine or approved profile configuration")
 		}

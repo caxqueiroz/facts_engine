@@ -17,7 +17,18 @@ type ExtractionResponse struct {
 	Body                      []byte
 	InputTokens, OutputTokens int64
 }
+
+// ExtractionPayloadRedaction applies field-omit-v1 to provider input only.
+// The policy and selected fields are included in the approved profile digest.
+type ExtractionPayloadRedaction struct {
+	PolicyVersion         string
+	DependencyPayloads    bool
+	OriginalMemoryPayload bool
+	RefreshEvidence       bool
+}
 type ExtractionProfile struct {
+	PayloadRedaction *ExtractionPayloadRedaction `json:",omitempty"`
+
 	RedactionPolicyVersion                                                                       string `json:",omitempty"`
 	InputSelectionVersion                                                                        string `json:",omitempty"`
 	CostUnit                                                                                     string `json:",omitempty"`
@@ -109,6 +120,9 @@ type ExtractionInputMessage struct {
 	Content                                       string
 }
 type ExtractionInput struct {
+	PayloadRedactionVersion string   `json:",omitempty"`
+	PayloadOmittedPaths     []string `json:",omitempty"`
+
 	InputSelectionVersion                                                          string                 `json:",omitempty"`
 	ExcludedRanges                                                                 []ExtractionInputRange `json:",omitempty"`
 	Schema, Tenant, JobID, AttemptID, ConversationID, ConversationDigest, Timezone string

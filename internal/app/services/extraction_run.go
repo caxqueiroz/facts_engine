@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/model"
@@ -153,7 +152,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		}
 
 	}
-	attempt.RequestBytes, err = json.Marshal(input)
+	attempt.RequestBytes, err = marshalExtractionInput(input)
 	if err != nil {
 		return model.JobStatus{}, err
 	}

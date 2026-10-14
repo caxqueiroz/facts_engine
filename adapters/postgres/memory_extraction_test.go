@@ -40,6 +40,7 @@ func testMemoryExtraction(t *testing.T, ctx context.Context, l model.Ledger, sto
 	request := model.ExtractionRequest{Command: cmd("extract-memory-start"), Scope: scope, ConversationID: conversation.ID, ProfileID: "memory-extractor", MemoryTargets: []model.MemoryExtractionTarget{target("episode"), target("second"), target("assistant"), target("uncertain")}}
 	profile.ID = request.ProfileID
 	profile.ParserVersion = "memory-extraction-json-v1"
+	profile.PayloadRedaction = &model.ExtractionPayloadRedaction{PolicyVersion: "memory-fields-v1", DependencyPayloads: true}
 	worker := model.Caller{Tenant: c.Tenant, Principal: "memory-extractor", Service: true}
 	var engine *facts.Engine
 	changed := false
@@ -52,6 +53,9 @@ func testMemoryExtraction(t *testing.T, ctx context.Context, l model.Ledger, sto
 		}
 		if input.Schema != "memory-extraction-input-v1" || len(input.MemoryTypes) != 1 || len(input.MemoryTargets) != 4 || len(input.DependencyVersions) != 1 || input.DependencyVersions[0].Digest != fact.Digest {
 			return model.ExtractionResponse{}, errors.New("unbound memory extraction input")
+		}
+		if input.PayloadRedactionVersion != "field-omit-v1" || len(input.PayloadOmittedPaths) != 2 || input.DependencyVersions[0].Proposal.Value.Kind != "" || len(input.DependencyVersions[0].Proposal.Sources) != 0 || input.DependencyVersions[0].Proposer != (model.Caller{}) {
+			return model.ExtractionResponse{}, errors.New("dependency payload was not omitted")
 		}
 		retained, err := engine.GetExtractionRun(ctx, worker, model.ExtractionRunQuery{ID: input.AttemptID, Scope: scope, Purpose: request.Purpose})
 		if err != nil || !bytes.Equal(raw, retained.Attempt.RequestBytes) {
@@ -75,7 +79,7 @@ func testMemoryExtraction(t *testing.T, ctx context.Context, l model.Ledger, sto
 		body, _ := json.Marshal(model.MemoryExtractionOutput{Candidates: []model.MemoryExtractionCandidate{good, second, unknown, assistant, uncertain}})
 		return model.ExtractionResponse{ModelIdentity: "fixture-memory-v1", Body: body, InputTokens: 10, OutputTokens: 10}, nil
 	})
-	engine, err = facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
+	engine, err = facts.NewWithOptions(l, allow{}, store, model.EngineOptions{RedactionPolicyVersions: []string{"memory-fields-v1"}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +197,7 @@ func testMemoryExtraction(t *testing.T, ctx context.Context, l model.Ledger, sto
 	}); err != nil || !foundCross {
 		t.Fatal("dependency-scope audit omitted memory extraction", err)
 	}
-	restricted, err := facts.NewWithOptions(l, denyScope{scope: "case1"}, store, model.EngineOptions{Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
+	restricted, err := facts.NewWithOptions(l, denyScope{scope: "case1"}, store, model.EngineOptions{RedactionPolicyVersions: []string{"memory-fields-v1"}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
 	if err != nil {
 		t.Fatal(err)
 	}

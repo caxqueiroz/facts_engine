@@ -179,3 +179,18 @@ func TestExtractionWorkerConfiguration(t *testing.T) {
 		t.Fatal("invalid example profiles", err)
 	}
 }
+
+func TestRedactedRefreshWorkerConfiguration(t *testing.T) {
+	config, err := LoadConfig("../../examples/memoryworker-refresh-redacted.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := model.EngineOptions{Extraction: config.Refresh.options(), RedactionPolicyVersions: config.Refresh.RedactionPolicyVersions}
+	if _, err := facts.NewWithOptions(configLedger{}, configAuth{}, configEvidence{}, options); err != nil {
+		t.Fatal(err)
+	}
+	options.RedactionPolicyVersions = nil
+	if _, err := facts.NewWithOptions(configLedger{}, configAuth{}, configEvidence{}, options); err == nil {
+		t.Fatal("unregistered redaction policy accepted")
+	}
+}

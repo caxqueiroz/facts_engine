@@ -41,20 +41,21 @@ type RefreshBinding struct {
 	ProfileID string `json:"profile_id"`
 }
 type RefreshConfig struct {
-	SweepIntervalMinutes   int                       `json:"sweep_interval_minutes,omitempty"`
-	Tenant                 string                    `json:"tenant"`
-	Stream                 string                    `json:"stream"`
-	Purpose                string                    `json:"purpose"`
-	Bindings               []RefreshBinding          `json:"bindings"`
-	Profiles               []model.ExtractionProfile `json:"profiles"`
-	MaxConcurrentPerTenant int                       `json:"max_concurrent_per_tenant"`
-	DailyTokenBudget       int64                     `json:"daily_token_budget"`
-	CostUnit               string                    `json:"cost_unit"`
-	DailyCostBudgetUnits   int64                     `json:"daily_cost_budget_units"`
+	RedactionPolicyVersions []string                  `json:"redaction_policy_versions,omitempty"`
+	SweepIntervalMinutes    int                       `json:"sweep_interval_minutes,omitempty"`
+	Tenant                  string                    `json:"tenant"`
+	Stream                  string                    `json:"stream"`
+	Purpose                 string                    `json:"purpose"`
+	Bindings                []RefreshBinding          `json:"bindings"`
+	Profiles                []model.ExtractionProfile `json:"profiles"`
+	MaxConcurrentPerTenant  int                       `json:"max_concurrent_per_tenant"`
+	DailyTokenBudget        int64                     `json:"daily_token_budget"`
+	CostUnit                string                    `json:"cost_unit"`
+	DailyCostBudgetUnits    int64                     `json:"daily_cost_budget_units"`
 }
 
 func (c *RefreshConfig) Validate() error {
-	if c == nil || !model.ValidID(c.Tenant) || !model.ValidID(c.Stream) || len(c.Purpose) == 0 || len(c.Purpose) > 256 || len(c.Bindings) < 1 || len(c.Bindings) > 64 || len(c.Profiles) < 1 || len(c.Profiles) > 32 || c.MaxConcurrentPerTenant < 1 || c.MaxConcurrentPerTenant > 32 || c.DailyTokenBudget < 1 {
+	if c == nil || len(c.RedactionPolicyVersions) > 64 || !model.ValidID(c.Tenant) || !model.ValidID(c.Stream) || len(c.Purpose) == 0 || len(c.Purpose) > 256 || len(c.Bindings) < 1 || len(c.Bindings) > 64 || len(c.Profiles) < 1 || len(c.Profiles) > 32 || c.MaxConcurrentPerTenant < 1 || c.MaxConcurrentPerTenant > 32 || c.DailyTokenBudget < 1 {
 		return model.ErrInvalid
 	}
 	profiles := map[string]bool{}

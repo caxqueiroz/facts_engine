@@ -74,7 +74,11 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 		if input.Refresh == nil || input.Refresh.Original.ID != original.VersionID || len(input.Refresh.Dependencies) != 1 || len(input.Refresh.Dependencies[0].Versions) != 1 {
 			return model.ExtractionResponse{}, errors.New("missing refresh provenance")
 		}
-		if len(input.Refresh.Original.Proposal.Sources) != 2 || len(input.Refresh.Evidence) != 1 || input.Refresh.Evidence[0].EvidenceID != "refresh-evidence" || input.Refresh.Evidence[0].Content != source {
+		if input.Profile.PayloadRedaction != nil {
+			if input.PayloadRedactionVersion != "field-omit-v1" || len(input.PayloadOmittedPaths) != 6 || input.Refresh.Original.Proposal.Body != "" || len(input.Refresh.Original.Proposal.Sources) != 0 || len(input.Refresh.Evidence) != 0 || input.Refresh.Dependencies[0].Versions[0].Proposal.Value.Kind != "" || bytes.Contains(raw, []byte("I prefer tea")) {
+				return model.ExtractionResponse{}, errors.New("refresh payload was not omitted")
+			}
+		} else if len(input.Refresh.Original.Proposal.Sources) != 2 || len(input.Refresh.Evidence) != 1 || input.Refresh.Evidence[0].EvidenceID != "refresh-evidence" || input.Refresh.Evidence[0].Content != source {
 			return model.ExtractionResponse{}, errors.New("duplicate refresh evidence or lost citations")
 		}
 		retained, err := engine.GetExtractionRun(ctx, worker, model.ExtractionRunQuery{ID: input.AttemptID, Scope: scope, Purpose: "refresh-review"})
@@ -82,7 +86,11 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 			return model.ExtractionResponse{}, errors.New("request not durably retained")
 		}
 		current := input.Refresh.Dependencies[0].Versions[0]
-		body, _ := json.Marshal(model.MemoryRefreshOutput{Body: "Customer now prefers coffee.", Dependencies: []model.MemoryDependency{{Scope: scope, RecordID: current.RecordID, VersionID: current.ID, ContentDigest: current.Digest, Label: "assertion"}}})
+		text := "Customer now prefers coffee."
+		if input.Profile.PayloadRedaction != nil {
+			text = "Customer prefers coffee after refresh."
+		}
+		body, _ := json.Marshal(model.MemoryRefreshOutput{Body: text, Dependencies: []model.MemoryDependency{{Scope: scope, RecordID: current.RecordID, VersionID: current.ID, ContentDigest: current.Digest, Label: "assertion"}}})
 		return model.ExtractionResponse{ModelIdentity: "fixture-v1", Body: body, InputTokens: 10, OutputTokens: 10}, nil
 	})
 	engine, err = facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
@@ -175,7 +183,34 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if _, err = engine.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd("refresh-run-again"), ID: job.ID, Scope: scope}); err != nil || calls != 1 {
 		t.Fatal("refresh replay invoked provider", calls, err)
 	}
-	if _, err = engine.SupersedeMemory(ctx, reviewer, model.Supersession{Approval: model.Approval{Command: cmd("refresh-memory-supersede"), Scope: scope, RecordID: original.RecordID, VersionID: refreshed.VersionID, ExpectedRevision: 3}, Valid: memoryRequest.Valid, ReplacedVersionIDs: []string{original.VersionID}, Reason: "dependency_correction"}); err != nil {
+	redactedProfile := profile
+	redactedProfile.ID = "refresh-redacted"
+	redactedProfile.PayloadRedaction = &model.ExtractionPayloadRedaction{PolicyVersion: "refresh-fields-v1", DependencyPayloads: true, OriginalMemoryPayload: true, RefreshEvidence: true}
+	redacted, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{RedactionPolicyVersions: []string{"refresh-fields-v1"}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: redactedProfile, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	redactedRequest := request
+	redactedRequest.Command = cmd("refresh-redacted-start")
+	redactedRequest.ProfileID = redactedProfile.ID
+	redactedJob, err := redacted.StartMemoryRefresh(ctx, c, redactedRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	redactedDone, err := redacted.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd("refresh-redacted-run"), ID: redactedJob.ID, Scope: scope})
+	if err != nil || redactedDone.State != "completed" {
+		t.Fatal("redacted refresh", redactedDone, err)
+	}
+	redactedRun, err := redacted.GetExtractionRun(ctx, c, model.ExtractionRunQuery{ID: redactedDone.AttemptID, Scope: scope, Purpose: "refresh-review"})
+	if err != nil || redactedRun.Result == nil || len(redactedRun.Result.Proposals) != 1 {
+		t.Fatal("redacted refresh proposal missing", err)
+	}
+	redactedRef := redactedRun.Result.Proposals[0]
+	redactedVersion, err := redacted.GetMemoryVersion(ctx, c, model.MemoryVersionQuery{Scope: scope, RecordID: redactedRef.RecordID, VersionID: redactedRef.VersionID, Purpose: "refresh-review"})
+	if err != nil || model.Digest(redactedVersion.Proposal.Sources) != model.Digest(memoryRequest.Sources) || redactedVersion.Proposal.Dependencies[0].VersionID != corrected.VersionID {
+		t.Fatal("redaction altered canonical validation", err)
+	}
+	if _, err = engine.SupersedeMemory(ctx, reviewer, model.Supersession{Approval: model.Approval{Command: cmd("refresh-memory-supersede"), Scope: scope, RecordID: original.RecordID, VersionID: refreshed.VersionID, ExpectedRevision: redactedVersion.Proposal.ExpectedRevision + 1}, Valid: memoryRequest.Valid, ReplacedVersionIDs: []string{original.VersionID}, Reason: "dependency_correction"}); err != nil {
 		t.Fatal(err)
 	}
 	current, err = engine.GetMemory(ctx, c, model.MemoryQuery{Key: memoryRequest.Key, ValidAt: from, Purpose: "refresh-review"})

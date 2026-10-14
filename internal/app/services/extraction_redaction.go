@@ -27,7 +27,7 @@ func (s *Service) prepareExtractionMessages(ctx context.Context, c model.Caller,
 		// Bound dependency payloads contain values and source quotes, not just IDs.
 		// A conversation redaction policy cannot authorize disclosing those payloads.
 		for _, target := range r.MemoryTargets {
-			if len(target.Dependencies) > 0 {
+			if len(target.Dependencies) > 0 && (p.PayloadRedaction == nil || !p.PayloadRedaction.DependencyPayloads) {
 				return fail(model.ErrPrecondition)
 			}
 		}

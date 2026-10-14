@@ -24,6 +24,15 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	s.extractors = map[string]model.ApprovedExtractor{}
 	for _, approved := range o.Profiles {
 		p := approved.Profile
+		if redaction := p.PayloadRedaction; redaction != nil {
+			if !model.ValidID(redaction.PolicyVersion) || !s.redactionPolicies[redaction.PolicyVersion] || (!redaction.DependencyPayloads && !redaction.OriginalMemoryPayload && !redaction.RefreshEvidence) ||
+				(p.ParserVersion != "memory-extraction-json-v1" && p.ParserVersion != "memory-refresh-json-v1") ||
+				(p.ParserVersion != "memory-refresh-json-v1" && (redaction.OriginalMemoryPayload || redaction.RefreshEvidence)) {
+				return model.ErrInvalid
+			}
+			copied := *redaction
+			p.PayloadRedaction = &copied
+		}
 		if p.RedactionPolicyVersion != "" && (!s.redactionPolicies[p.RedactionPolicyVersion] || p.InputSelectionVersion != "original-ranges-v1" || p.ParserVersion == "memory-refresh-json-v1") {
 			return model.ErrInvalid
 		}
