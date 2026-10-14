@@ -50,3 +50,15 @@ type ChangesTx interface {
 	Tx
 	Changes(context.Context, string, int64, int64, int) ([]Event, error)
 }
+
+// OutboxProgress is a consistent snapshot for operational monitoring. Pending
+// includes leased, delayed and failed work, not only immediately claimable work.
+type OutboxProgress struct {
+	LedgerRevision, AcknowledgedRevision int64
+	OldestRecordedAt                     *time.Time
+	State                                string
+}
+
+type OutboxProgressReader interface {
+	ReadOutboxProgress(context.Context, ConsumerKey) (OutboxProgress, error)
+}

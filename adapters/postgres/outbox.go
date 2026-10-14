@@ -177,3 +177,17 @@ func (t *transaction) Changes(ctx context.Context, scope string, after, through 
 }
 
 var _ model.Outbox = (*Ledger)(nil)
+
+func (l *Ledger) ReadOutboxProgress(ctx context.Context, key model.ConsumerKey) (model.OutboxProgress, error) {
+	var result model.OutboxProgress
+	if !validConsumer(key) {
+		return result, model.ErrInvalid
+	}
+	err := l.Transact(ctx, key.Tenant, func(tx model.Tx) error {
+		return tx.(*transaction).tx.QueryRow(ctx, ledgerdb.ReadOutboxProgress, key.Tenant, key.Consumer).Scan(&result.LedgerRevision, &result.AcknowledgedRevision, &result.State, &result.OldestRecordedAt)
+	})
+	if err == nil && (result.LedgerRevision < result.AcknowledgedRevision || (result.LedgerRevision > result.AcknowledgedRevision) != (result.OldestRecordedAt != nil)) {
+		return model.OutboxProgress{}, model.ErrPrecondition
+	}
+	return result, err
+}

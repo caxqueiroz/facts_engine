@@ -302,6 +302,39 @@ func (q *Queries) LockAvailableConsumer(ctx context.Context, arg LockAvailableCo
 	return i, err
 }
 
+const ReadOutboxProgress = `-- name: ReadOutboxProgress :one
+SELECT COALESCE(r.revision,0)::bigint AS ledger_revision,c.acknowledged_revision,c.state,e.recorded_at
+FROM consumer_offsets c
+LEFT JOIN tenant_revisions r ON r.tenant_id=c.tenant_id
+LEFT JOIN outbox o ON o.tenant_id=c.tenant_id AND o.ledger_revision=c.acknowledged_revision+1
+LEFT JOIN ledger_events e ON e.tenant_id=o.tenant_id AND e.id=o.event_id
+WHERE c.tenant_id=$1 AND c.consumer_id=$2
+`
+
+type ReadOutboxProgressParams struct {
+	TenantID   string
+	ConsumerID string
+}
+
+type ReadOutboxProgressRow struct {
+	LedgerRevision       int64
+	AcknowledgedRevision int64
+	State                string
+	RecordedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) ReadOutboxProgress(ctx context.Context, arg ReadOutboxProgressParams) (ReadOutboxProgressRow, error) {
+	row := q.db.QueryRow(ctx, ReadOutboxProgress, arg.TenantID, arg.ConsumerID)
+	var i ReadOutboxProgressRow
+	err := row.Scan(
+		&i.LedgerRevision,
+		&i.AcknowledgedRevision,
+		&i.State,
+		&i.RecordedAt,
+	)
+	return i, err
+}
+
 const RegisterConsumer = `-- name: RegisterConsumer :execrows
 INSERT INTO consumer_offsets(tenant_id,consumer_id,max_attempts)
 VALUES ($1,$2,$3)

@@ -67,3 +67,11 @@ VALUES ($1,$2,$3);
 SELECT payload,recorded_at
 FROM ledger_events
 WHERE tenant_id=$1 AND scope_id=$2 AND ledger_revision>$3 AND ledger_revision<=$4 ORDER BY ledger_revision LIMIT $5;
+
+-- name: ReadOutboxProgress :one
+SELECT COALESCE(r.revision,0)::bigint AS ledger_revision,c.acknowledged_revision,c.state,e.recorded_at
+FROM consumer_offsets c
+LEFT JOIN tenant_revisions r ON r.tenant_id=c.tenant_id
+LEFT JOIN outbox o ON o.tenant_id=c.tenant_id AND o.ledger_revision=c.acknowledged_revision+1
+LEFT JOIN ledger_events e ON e.tenant_id=o.tenant_id AND e.id=o.event_id
+WHERE c.tenant_id=$1 AND c.consumer_id=$2;

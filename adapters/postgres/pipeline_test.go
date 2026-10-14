@@ -125,6 +125,39 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if _, err := engine.Recall(ctx, c, query); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("coverage requirement bypassed", err)
 	}
+	initialProgress, err := projector.ReadOutboxProgress(ctx, key)
+	if err != nil || initialProgress.LedgerRevision <= initialProgress.AcknowledgedRevision || initialProgress.OldestRecordedAt == nil {
+		t.Fatal("missing projection lag", initialProgress, err)
+	}
+	monitor, err := workers.NewProgressMonitor(projector, []workers.ProgressTarget{{Key: key, Kind: "projection"}}, meterProvider, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = monitor.Close() }()
+	assertLagMetric := func(want int64) {
+		t.Helper()
+		var data metricdata.ResourceMetrics
+		if err := reader.Collect(ctx, &data); err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, scope := range data.ScopeMetrics {
+			for _, m := range scope.Metrics {
+				if m.Name == "facts.outbox.pending_revisions" {
+					for _, point := range m.Data.(metricdata.Gauge[int64]).DataPoints {
+						found = true
+						if point.Value != want {
+							t.Fatal("incorrect pending revisions", point.Value, want)
+						}
+					}
+				}
+			}
+		}
+		if !found {
+			t.Fatal("missing progress gauge")
+		}
+	}
+	assertLagMetric(initialProgress.LedgerRevision - initialProgress.AcknowledgedRevision)
 	drain := func(w *workers.Worker, ledger *postgres.Ledger, key model.ConsumerKey) {
 		t.Helper()
 		for i := 0; i < 1000; i++ {
@@ -136,6 +169,10 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 				s, err := ledger.ConsumerStatus(ctx, key)
 				if err != nil || s.State != "pending" || s.LastFailureCode != "" {
 					t.Fatal("consumer did not converge", s, err)
+				}
+				snapshot, err := ledger.ReadOutboxProgress(ctx, key)
+				if err != nil || snapshot.LedgerRevision != snapshot.AcknowledgedRevision || snapshot.OldestRecordedAt != nil {
+					t.Fatal("drained progress inconsistent", snapshot, err)
 				}
 				return
 			}
@@ -154,6 +191,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	waitDone := make(chan error, 1)
 	go func() { _, err := engine.WaitForProjection(waitContext, c, waitRequest); waitDone <- err }()
 	drain(worker, projector, key)
+	assertLagMetric(0)
 	if err := <-waitDone; err != nil {
 		t.Fatal("projection wait did not converge", err)
 	}
