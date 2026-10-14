@@ -187,6 +187,10 @@ func TestPostgresLedger(t *testing.T) {
 			if err == nil {
 				success++
 			} else if errors.Is(err, model.ErrRevision) {
+				var detail *model.RevisionConflict
+				if !errors.As(err, &detail) || detail.RecordID != approval.RecordID || detail.ExpectedRevision != approval.ExpectedRevision || detail.CurrentRevision != approval.ExpectedRevision+1 {
+					t.Fatal("missing or incorrect locked revision", err, detail)
+				}
 				conflict++
 			} else {
 				t.Fatal(err)

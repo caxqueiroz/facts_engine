@@ -170,7 +170,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, structured revision-conflict details, and full sqlc query coverage.
+1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, remaining memory-specific pagination and history contracts. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -320,3 +320,22 @@ Authorization is checked before waiting and again before returning a receipt. A 
 A receipt establishes that the configured consumer processed the requested revision. It does not promise a search hit, remove search limits, or include later commits. Recall still revalidates candidates against the ledger and reports incomplete coverage when newer revisions are pending. `RequireGeneration` prevents a later search from silently using another generation, and managed recall also checks for cutover during the search. Direct fact reads remain immediately consistent and require no projection wait.
 
 Tests cover deadline expiry, progress arriving during a wait, failed consumers, authorization revocation, epoch changes, and wrong-generation search rejection. Real PostgreSQL/Cortex integration verifies a wait before and after outbox delivery.
+
+
+### Handling concurrent fact changes
+
+Fact proposal, approval/acceptance, supersession, rejection, dispute, resolution and retraction commands compare `ExpectedRevision` against the record stream under its database lock. A mismatch returns `*model.RevisionConflict` (also exported as `factsengine.RevisionConflict`) with `RecordID`, `ExpectedRevision` and `CurrentRevision`. Existing `errors.Is(err, model.ErrRevision)` handling remains valid; use `errors.As` to inspect details:
+
+```go
+var conflict *model.RevisionConflict
+if errors.As(err, &conflict) {
+    // Refresh the authorized fact/history and review the intervening changes.
+    // Build a new command only after deciding whether the intended change still applies.
+    currentRevision := conflict.CurrentRevision
+    _ = currentRevision
+}
+```
+
+The reported revision is the state observed while the record was locked, not a reservation: it can change again before a retry. The engine never automatically overwrites intervening work. Reusing a committed command with identical input still returns its original receipt; a revised intent needs a new command key. Conflict details contain no fact values, evidence text or other callers' commands, and the error's text stays generic. Mutation authorization is rechecked before returning the details; denial or an authorization outage withholds them. Operational lease/fence conflicts continue to use the generic `ErrRevision` contract and should be handled through the corresponding job/consumer status API.
+
+The real PostgreSQL concurrent-approval test verifies that the losing command receives the winning stream revision. Disclosure tests verify that authorization revocation suppresses typed conflict details.

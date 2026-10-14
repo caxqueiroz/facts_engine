@@ -118,7 +118,7 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 			return err
 		}
 		if rec.Revision != r.ExpectedRevision {
-			return model.ErrRevision
+			return &model.RevisionConflict{RecordID: rec.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: rec.Revision}
 		}
 		p, attIDs, err := s.acceptanceChecks(ctx, tx, c, rec, v, r.Automated)
 		if err != nil {
@@ -194,7 +194,7 @@ func (s *Service) change(ctx context.Context, c model.Caller, r model.LifecycleC
 			return err
 		}
 		if rec.Revision != r.ExpectedRevision {
-			return model.ErrRevision
+			return &model.RevisionConflict{RecordID: rec.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: rec.Revision}
 		}
 		if op == "reject_fact" {
 			accepted, err := t.HasAcceptance(ctx, rec.ID, v.ID)

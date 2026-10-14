@@ -266,3 +266,5 @@ func (e *Engine) WaitForProjection(ctx context.Context, c Caller, q model.Projec
 
 type ProjectionWaitRequest = model.ProjectionWaitRequest
 type ProjectionReceipt = model.ProjectionReceipt
+
+type RevisionConflict = model.RevisionConflict

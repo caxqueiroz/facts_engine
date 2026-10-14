@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/model"
 	"slices"
@@ -105,6 +106,15 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		}
 		return tx.SaveReceipt(ctx, c, op, cmd.Key, digest, result)
 	})
+	var conflict *model.RevisionConflict
+	if errors.As(err, &conflict) {
+		// A conflict may follow lock contention beyond the initial authorization
+		// window. Recheck before disclosing the locked record revision.
+		if _, checkErr := s.authorize(ctx, c, scope, permission, cmd); checkErr != nil {
+			return model.CommitResult{}, checkErr
+		}
+		return model.CommitResult{}, conflict
+	}
 	return result, err
 }
 func (s *Service) RegisterAcceptancePolicy(ctx context.Context, c model.Caller, r model.PolicyRequest) (model.CommitResult, error) {
@@ -242,7 +252,7 @@ func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Ca
 		return err
 	}
 	if rec.Revision != r.ExpectedRevision {
-		return model.ErrRevision
+		return &model.RevisionConflict{RecordID: rec.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: rec.Revision}
 	}
 	v := model.Version{ExtractionAttemptID: attemptID, ID: id(), RecordID: rec.ID, Proposal: r, Proposer: c, PolicyID: d.PolicyID}
 	v.Digest = model.Digest(struct {
@@ -369,7 +379,7 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 			return model.ErrNotFound
 		}
 		if rec.Revision != r.ExpectedRevision {
-			return model.ErrRevision
+			return &model.RevisionConflict{RecordID: rec.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: rec.Revision}
 		}
 		v, err := tx.Version(ctx, r.RecordID, r.VersionID)
 		if err != nil {
