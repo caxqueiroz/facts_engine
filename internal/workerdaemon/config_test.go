@@ -108,3 +108,26 @@ func TestRefreshWorkerConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestRefreshSweepConfiguration(t *testing.T) {
+	c, err := LoadConfig("../../examples/memoryworker-refresh-sweep.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, interval := range []int{0, -1, 1441} {
+		c.Refresh.SweepIntervalMinutes = interval
+		if c.Validate() == nil {
+			t.Fatal("invalid interval accepted", interval)
+		}
+	}
+	c.Refresh.SweepIntervalMinutes = 60
+	c.MaxAttempts = 1
+	if c.Validate() == nil {
+		t.Fatal("sweep silently accepted queue settings")
+	}
+	c.MaxAttempts = 0
+	c.Mode = "refresh"
+	if c.Validate() == nil {
+		t.Fatal("consumer silently accepted ticker configuration")
+	}
+}

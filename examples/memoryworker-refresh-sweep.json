@@ -1,0 +1,43 @@
+{
+  "mode": "refresh-sweep",
+  "principal": "facts-refresh-worker",
+  "openfga_url": "http://127.0.0.1:8080",
+  "openfga_store": "replace-with-store-id",
+  "openfga_model": "replace-with-model-id",
+  "max_connections": 8,
+  "delivery_timeout_seconds": 120,
+  "refresh": {
+    "tenant": "bank1",
+    "stream": "refresh-v1",
+    "purpose": "memory-refresh",
+    "bindings": [
+      {
+        "scope": "case1",
+        "profile_id": "refresh-development-v1"
+      }
+    ],
+    "max_concurrent_per_tenant": 1,
+    "daily_token_budget": 100000,
+    "profiles": [
+      {
+        "ID": "refresh-development-v1",
+        "ProviderID": "replace-with-approved-provider",
+        "RequestedModel": "replace-with-approved-model",
+        "PromptVersion": "v1",
+        "PromptDigest": "3314f55fe2ca5b4d292a56b303232221010736c66727c21d8d2129a212f2ec96",
+        "ParserVersion": "memory-refresh-json-v1",
+        "ApplicationBuild": "development",
+        "Prompt": "UHJvcG9zZSBhIHJlcGxhY2VtZW50IHN1bW1hcnkgdXNpbmcgb25seSBzdXBwbGllZCBkZXBlbmRlbmNpZXMuIE5ldmVyIGFjY2VwdCBhIHZlcnNpb24u",
+        "Parameters": {},
+        "Timeout": 30000000000,
+        "MaxInputBytes": 1048576,
+        "MaxOutputBytes": 1048576,
+        "MaxCandidates": 1,
+        "MaxAttempts": 3,
+        "MaxTokensPerAttempt": 1000,
+        "RetryDelay": 1000000000
+      }
+    ],
+    "sweep_interval_minutes": 60
+  }
+}

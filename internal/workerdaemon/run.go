@@ -32,6 +32,9 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 		return err
 	}
 	dsn := os.Getenv("MEMORY_WORKER_DATABASE_URL")
+	if c.Mode == "refresh-sweep" {
+		dsn = os.Getenv("MEMORY_DATABASE_URL")
+	}
 	if dsn == "" {
 		return errors.New("missing worker database configuration")
 	}
@@ -113,25 +116,29 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize archive handler")
 		}
 		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ArchiveConsumer(c.Archive.Stream)}
-	case "refresh":
-		dsn := os.Getenv("MEMORY_DATABASE_URL")
-		if dsn == "" {
-			return errors.New("missing worker engine database configuration")
-		}
-		engineConfig, err := pgxpool.ParseConfig(dsn)
-		if err != nil {
-			return errors.New("invalid worker engine database configuration")
-		}
-		engineConfig.MaxConns = c.MaxConnections
-		engineConfig.ConnConfig.ConnectTimeout = 5 * time.Second
-		enginePool, err := pgxpool.NewWithConfig(startup, engineConfig)
-		if err != nil {
-			return errors.New("cannot create worker engine pool")
-		}
-		defer enginePool.Close()
-		engineLedger, err := postgres.New(startup, enginePool, cipher)
-		if err != nil {
-			return errors.New("worker engine schema or role check failed")
+	case "refresh", "refresh-sweep":
+		enginePool := pool
+		engineLedger := ledger
+		if c.Mode == "refresh" {
+			dsn := os.Getenv("MEMORY_DATABASE_URL")
+			if dsn == "" {
+				return errors.New("missing worker engine database configuration")
+			}
+			engineConfig, err := pgxpool.ParseConfig(dsn)
+			if err != nil {
+				return errors.New("invalid worker engine database configuration")
+			}
+			engineConfig.MaxConns = c.MaxConnections
+			engineConfig.ConnConfig.ConnectTimeout = 5 * time.Second
+			enginePool, err = pgxpool.NewWithConfig(startup, engineConfig)
+			if err != nil {
+				return errors.New("cannot create worker engine pool")
+			}
+			defer enginePool.Close()
+			engineLedger, err = postgres.New(startup, enginePool, cipher)
+			if err != nil {
+				return errors.New("worker engine schema or role check failed")
+			}
 		}
 		store, err := evidence.NewPostgres(enginePool, cipher)
 		if err != nil {
@@ -143,6 +150,20 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("invalid refresh engine or approved profile configuration")
 		}
 		caller := model.Caller{Tenant: c.Refresh.Tenant, Principal: c.Principal, Service: true}
+		if c.Mode == "refresh-sweep" {
+			interval := time.Duration(c.Refresh.SweepIntervalMinutes) * time.Minute
+			ticker, err := workers.NewMemoryRefreshTicker(engine, caller, c.Refresh.Stream, c.Refresh.Purpose, c.Refresh.bindings(), interval)
+			if err != nil {
+				return errors.New("cannot initialize refresh sweep ticker")
+			}
+			logger.Info("worker started", "mode", c.Mode)
+			err = RunSweepLoop(ctx, ticker, interval, time.Duration(c.DeliveryTimeoutSeconds)*time.Second)
+			logger.Info("worker stopped", "mode", c.Mode, "failed", err != nil)
+			if err != nil {
+				return errors.New("worker stopped after sweep failure")
+			}
+			return nil
+		}
 		handler, err = workers.NewMemoryRefresh(engine, caller, c.Refresh.Stream, c.Refresh.Purpose, c.Refresh.bindings())
 		if err != nil {
 			return errors.New("cannot initialize refresh scheduler")

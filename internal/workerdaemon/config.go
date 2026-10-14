@@ -41,6 +41,7 @@ type RefreshBinding struct {
 	ProfileID string `json:"profile_id"`
 }
 type RefreshConfig struct {
+	SweepIntervalMinutes   int                       `json:"sweep_interval_minutes,omitempty"`
 	Tenant                 string                    `json:"tenant"`
 	Stream                 string                    `json:"stream"`
 	Purpose                string                    `json:"purpose"`
@@ -114,7 +115,14 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
-	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
+	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
+		return model.ErrInvalid
+	}
+	if c.Mode == "refresh-sweep" {
+		if c.MaxAttempts != 0 || c.LeaseSeconds != 0 || c.PollMilliseconds != 0 || c.MinBackoffMilliseconds != 0 || c.MaxBackoffSeconds != 0 {
+			return model.ErrInvalid
+		}
+	} else if c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 {
 		return model.ErrInvalid
 	}
 	switch c.Mode {
@@ -130,8 +138,11 @@ func (c Config) Validate() error {
 		if c.Refresh != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.Archive.Validate() != nil {
 			return model.ErrInvalid
 		}
-	case "refresh":
+	case "refresh", "refresh-sweep":
 		if c.Archive != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.Refresh.Validate() != nil {
+			return model.ErrInvalid
+		}
+		if (c.Mode == "refresh" && c.Refresh.SweepIntervalMinutes != 0) || (c.Mode == "refresh-sweep" && (c.Refresh.SweepIntervalMinutes < 1 || c.Refresh.SweepIntervalMinutes > 1440)) {
 			return model.ErrInvalid
 		}
 	default:

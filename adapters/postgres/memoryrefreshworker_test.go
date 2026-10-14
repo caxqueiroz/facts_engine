@@ -98,10 +98,78 @@ func testStandaloneRefresh(t *testing.T, ctx context.Context, dsn, endpoint, sto
 			if err != nil || status.State != "pending" || status.Attempts != 0 {
 				t.Fatal("scheduler executed job", status, err)
 			}
+			testStandaloneRefreshSweep(t, ctx, config, engine, ledger, caller)
 			return
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("standalone refresh did not schedule job")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func testStandaloneRefreshSweep(t *testing.T, ctx context.Context, config workerdaemon.Config, engine *facts.Engine, ledger model.Ledger, caller model.Caller) {
+	t.Helper()
+	t.Setenv("MEMORY_WORKER_DATABASE_URL", "")
+	config.Mode = "refresh-sweep"
+	config.MaxAttempts = 0
+	config.LeaseSeconds = 0
+	config.PollMilliseconds = 0
+	config.MinBackoffMilliseconds = 0
+	config.MaxBackoffSeconds = 0
+	refresh := *config.Refresh
+	refresh.SweepIntervalMinutes = 60
+	config.Refresh = &refresh
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan error, 1)
+	go func() { done <- workerdaemon.Run(runCtx, config, slog.New(slog.NewTextHandler(io.Discard, nil))) }()
+	defer func() {
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Error(err)
+			}
+		case <-time.After(6 * time.Second):
+			t.Error("refresh sweep did not stop")
+		}
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		changes, err := engine.ListChanges(ctx, caller, model.ChangesQuery{Scope: "case1", Purpose: refresh.Purpose, Limit: 1000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, event := range changes.Events {
+			if event.Type != "sweep_memory_refresh" {
+				continue
+			}
+			if event.RefreshSweep == nil || event.RefreshSweep.Stream != refresh.Stream || event.RefreshSweep.ProfileID != refresh.Profiles[0].ID || event.RefreshSweep.ProfileDigest != model.ExtractionProfileDigest(refresh.Profiles[0]) || event.RefreshSweep.Interval != time.Hour || !event.RefreshSweep.ScheduledFor.Equal(event.RefreshSweep.ScheduledFor.Truncate(time.Hour)) || event.Caller.Principal != config.Principal {
+				t.Fatal("invalid persisted sweep", event.ID)
+			}
+			for _, scheduled := range changes.Events {
+				if scheduled.Type != "start_memory_refresh" {
+					continue
+				}
+				var job model.ExtractionJob
+				if err := ledger.Transact(ctx, caller.Tenant, func(tx model.Tx) error {
+					var err error
+					job, err = tx.(model.ExtractionTx).ExtractionJob(ctx, scheduled.EntityID)
+					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if job.Request.RefreshTrigger != nil && job.Request.RefreshTrigger.EventID == event.ID {
+					status, err := engine.GetJob(ctx, caller, model.JobQuery{ID: job.ID, Scope: "case1", Purpose: refresh.Purpose})
+					if err != nil || status.State != "pending" || status.Attempts != 0 {
+						t.Fatal("sweep executed model", status, err)
+					}
+					return
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("standalone ticker did not emit sweep")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
