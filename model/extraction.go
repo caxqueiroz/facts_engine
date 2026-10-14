@@ -35,6 +35,10 @@ type ApprovedExtractor struct {
 	Provider ExtractionProvider
 }
 type ExtractionOptions struct {
+	// ScheduleOnly allows profile validation and durable job creation without a
+	// provider. Profiles must omit Provider; RunExtraction is disabled in this host.
+	// A separate execution host must configure the same profile digest and budgets.
+	ScheduleOnly           bool
 	CostUnit               string
 	DailyCostBudgetUnits   int64
 	Profiles               []ApprovedExtractor

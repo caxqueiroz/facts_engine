@@ -120,7 +120,18 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if err != nil || tinyResult.State != "failed" || tinyResult.LastFailureCode != "input_limit" || calls != 0 {
 		t.Fatal("oversized refresh did not fail before provider", tinyResult, err)
 	}
-	job := testAutomaticMemoryRefresh(t, ctx, engine, l, store, queue, worker, request, original)
+	scheduler, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Extraction: model.ExtractionOptions{ScheduleOnly: true, Profiles: []model.ApprovedExtractor{{Profile: profile}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := testAutomaticMemoryRefresh(t, ctx, scheduler, l, store, queue, worker, request, original)
+	if _, err = scheduler.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd("scheduler-must-not-run"), ID: job.ID, Scope: scope}); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("scheduler executed extraction", err)
+	}
+	unchanged, err := engine.GetJob(ctx, c, model.JobQuery{ID: job.ID, Scope: scope, Purpose: request.Purpose})
+	if err != nil || unchanged != job {
+		t.Fatal("scheduler execution rejection mutated job", unchanged, job, err)
+	}
 	t.Run("remote refresh replay", func(t *testing.T) { testRemoteRefreshReplay(t, ctx, engine, l, c, job) })
 	if calls != 0 {
 		t.Fatal("scheduler invoked model")

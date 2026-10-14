@@ -62,6 +62,9 @@ func (s *Service) loadExtractionJob(ctx context.Context, c model.Caller, q model
 	return j, status, nil
 }
 func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.ExtractionRunRequest) (model.JobStatus, error) {
+	if s.extractionLimits.ScheduleOnly {
+		return model.JobStatus{}, model.ErrPrecondition
+	}
 	if !c.Service || !model.ValidID(r.Key) {
 		return model.JobStatus{}, model.ErrInvalid
 	}
