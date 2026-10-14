@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // ErrRefreshNotNeeded is distinct from configuration, evidence and schema
@@ -41,4 +42,23 @@ func ChangesMemoryDependency(e Event) bool {
 		return true
 	}
 	return false
+}
+
+type MemoryRefreshSweepRequest struct {
+	Command
+	Scope, Stream, ProfileID string
+	ScheduledFor             time.Time
+	Interval                 time.Duration
+}
+type MemoryRefreshSweep struct {
+	Stream, ProfileID, ProfileDigest string
+	ScheduledFor                     time.Time
+	Interval                         time.Duration
+}
+type MemoryRefreshSweepStarter interface {
+	StartMemoryRefreshSweep(context.Context, Caller, MemoryRefreshSweepRequest) (CommitResult, error)
+}
+
+func IsMemoryRefreshSweep(e Event) bool {
+	return e.Type == "sweep_memory_refresh" && e.RefreshSweep != nil
 }

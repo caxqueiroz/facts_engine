@@ -340,3 +340,7 @@ type MemoryRefreshRequest = model.MemoryRefreshRequest
 func (e *Engine) ScanMemoryRefresh(ctx context.Context, c Caller, q model.MemoryRefreshScan) (model.MemoryRefreshScanResult, error) {
 	return e.service.ScanMemoryRefresh(ctx, c, q)
 }
+
+func (e *Engine) StartMemoryRefreshSweep(ctx context.Context, c Caller, r model.MemoryRefreshSweepRequest) (model.CommitResult, error) {
+	return e.service.StartMemoryRefreshSweep(ctx, c, r)
+}

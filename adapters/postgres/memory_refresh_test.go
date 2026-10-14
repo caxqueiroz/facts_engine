@@ -170,4 +170,6 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if err != nil || old.Proposal.Body != "Customer prefers tea." {
 		t.Fatal("refresh rewrote original", old, err)
 	}
+	testExpiryMemoryRefresh(t, ctx, l, store, queue, c, reviewer, worker, profile, proposal)
+
 }

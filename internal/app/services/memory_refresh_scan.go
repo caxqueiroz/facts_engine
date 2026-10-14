@@ -26,7 +26,7 @@ func (s *Service) loadMemoryRefreshEvent(ctx context.Context, c model.Caller, q 
 	if err != nil {
 		return event, err
 	}
-	if !model.ChangesMemoryDependency(event) {
+	if !model.ChangesMemoryDependency(event) && !model.IsMemoryRefreshSweep(event) {
 		return model.Event{}, model.ErrInvalid
 	}
 	return event, nil
@@ -65,6 +65,9 @@ func (s *Service) ScanMemoryRefresh(ctx context.Context, c model.Caller, q model
 	event, err := s.loadMemoryRefreshEvent(ctx, c, q.Trigger, q.Purpose)
 	if err != nil {
 		return model.MemoryRefreshScanResult{}, err
+	}
+	if model.IsMemoryRefreshSweep(event) && event.Scope != q.Scope {
+		return model.MemoryRefreshScanResult{}, model.ErrDenied
 	}
 	var out model.MemoryRefreshScanResult
 	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {

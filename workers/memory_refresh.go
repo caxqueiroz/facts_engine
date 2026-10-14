@@ -32,7 +32,11 @@ func (w *MemoryRefresh) Handle(ctx context.Context, d model.Delivery) error {
 	if d.Key.Tenant != w.caller.Tenant || d.Key.Consumer != model.MemoryRefreshConsumer(w.stream) || d.Event.Caller.Tenant != w.caller.Tenant {
 		return model.ErrDenied
 	}
-	if !model.ChangesMemoryDependency(d.Event) {
+	sweep := model.IsMemoryRefreshSweep(d.Event)
+	if sweep && d.Event.RefreshSweep.Stream != w.stream {
+		return nil
+	}
+	if !model.ChangesMemoryDependency(d.Event) && !sweep {
 		return nil
 	}
 	if !model.ValidID(d.Event.ID) || d.Event.LedgerRevision < 1 || d.Fence < 1 {
@@ -40,6 +44,14 @@ func (w *MemoryRefresh) Handle(ctx context.Context, d model.Delivery) error {
 	}
 	trigger := model.MemoryRefreshTrigger{EventID: d.Event.ID, LedgerRevision: d.Event.LedgerRevision}
 	for _, binding := range w.bindings {
+		if sweep {
+			if d.Event.Scope != binding.Scope {
+				continue
+			}
+			if d.Event.RefreshSweep.ProfileID != binding.ProfileID || d.Event.Command.Purpose != w.purpose {
+				return model.ErrPrecondition
+			}
+		}
 		after := ""
 		for {
 			if err := ctx.Err(); err != nil {

@@ -84,6 +84,9 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		}
 		eventInput := model.Event{RecordKind: result.RecordKind, ID: id(), EntityID: result.ID, Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth}
 		switch request := input.(type) {
+		case memoryRefreshSweepCommand:
+			eventInput.RefreshSweep = &model.MemoryRefreshSweep{Stream: request.Stream, ProfileID: request.ProfileID, ProfileDigest: request.ProfileDigest, ScheduledFor: request.ScheduledFor, Interval: request.Interval}
+
 		case model.PredicateRequest:
 			eventInput.DefinitionPredicate = request.Definition.Predicate
 		case model.Supersession:

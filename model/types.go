@@ -269,8 +269,9 @@ type FactResult struct {
 	LedgerRevision, StreamRevision int64
 }
 type Event struct {
-	RecordKind                           string `json:",omitempty"`
-	DefinitionPredicate                  string `json:",omitempty"`
+	RefreshSweep                         *MemoryRefreshSweep `json:",omitempty"`
+	RecordKind                           string              `json:",omitempty"`
+	DefinitionPredicate                  string              `json:",omitempty"`
 	EntityID, Reason                     string
 	Affected                             *Interval
 	ReplacedVersionIDs                   []string

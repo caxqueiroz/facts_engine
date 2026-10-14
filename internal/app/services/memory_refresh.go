@@ -36,6 +36,12 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 			return model.JobStatus{}, err
 		}
 		relevant := false
+		if model.IsMemoryRefreshSweep(event) {
+			if event.Scope != r.Scope || event.RefreshSweep.ProfileID != r.ProfileID || event.RefreshSweep.ProfileDigest != model.ExtractionProfileDigest(approved.Profile) {
+				return model.JobStatus{}, model.ErrPrecondition
+			}
+			relevant = true
+		}
 		for _, dependency := range original.Proposal.Dependencies {
 			if dependency.RecordID == event.RecordID && dependency.Scope == event.Scope {
 				relevant = true
