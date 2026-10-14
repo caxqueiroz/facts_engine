@@ -23,6 +23,7 @@ type Engine interface {
 	RetrievalEngine
 	ContextEngine
 	IdentityEngine
+	OperationsEngine
 }
 
 type SnapshotEngine interface {

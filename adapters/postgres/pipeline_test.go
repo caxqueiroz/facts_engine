@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	facts "github.com/caxqueiroz/facts_engine"
 	"github.com/caxqueiroz/facts_engine/adapters/archive"
@@ -352,4 +353,26 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal(err)
 	}
 	t.Run("managed rebuild and cutover", func(t *testing.T) { testRebuild(t, ctx, l, source("facts_rebuild"), store, index, db) })
+	t.Run("remote rebuild audit identity", func(t *testing.T) {
+		var encrypted []byte
+		if err := admin.QueryRow(ctx, `SELECT payload FROM projection_rebuild_events WHERE tenant_id=$1 AND generation=$2 AND operation=$3 ORDER BY fence LIMIT 1`, "bank1", "g1", "start").Scan(&encrypted); err != nil {
+			t.Fatal(err)
+		}
+		cipher, err := postgres.NewAESGCM(bytes.Repeat([]byte{4}, 32))
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, err := cipher.Open("bank1", encrypted)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var retained struct{ Actor model.RebuildActor }
+		if err := json.Unmarshal(payload, &retained); err != nil {
+			t.Fatal(err)
+		}
+		a := retained.Actor
+		if a.Caller == nil || a.Authorization == nil || a.Caller.Principal != "operator" || a.Caller.Tenant != "bank1" || a.Authorization.Request.Caller != *a.Caller || a.Authorization.Request.Scope != "projection-admin" || a.Authorization.Request.Permission != "can_operate" || !a.Authorization.Allowed || a.Authorization.ContextDigest != model.Digest(a.Authorization.Request) {
+			t.Fatal("missing retained operation authorization", a)
+		}
+	})
 }

@@ -1,0 +1,80 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service OperationsService {
+  rpc GetProjectionStatus(GetProjectionStatusRequest) returns (GetProjectionStatusResponse);
+  rpc RebuildIndex(RebuildIndexRequest) returns (RebuildIndexResponse);
+}
+message GetProjectionStatusRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string generation = 2 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetProjectionStatusResponse {
+  string active_generation = 1;
+  int64 active_epoch = 2;
+  RebuildStatus rebuild = 3;
+  ProjectionConsumerStatus consumer = 4;
+  int64 ledger_revision = 5;
+  bool incomplete = 6;
+}
+message RebuildIndexRequest {
+  option (buf.validate.message).cel = {
+    id: "rebuild.parameters"
+    message: "start requires attempts; resume, activate and abandon require a fence; verify needs neither"
+    expression: "this.action == 'start' ? (this.max_attempts >= 1 && this.expected_fence == 0) : (this.max_attempts == 0 && (this.action == 'verify' ? this.expected_fence == 0 : this.expected_fence >= 1))"
+  };
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string generation = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string action = 4 [(buf.validate.field).string = {
+    in: [
+      "start",
+      "verify",
+      "resume",
+      "activate",
+      "abandon"
+    ]
+  }];
+  int32 max_attempts = 5 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 100
+  }];
+  int64 expected_fence = 6 [(buf.validate.field).int64.gte = 0];
+}
+message RebuildIndexResponse {
+  RebuildStatus status = 1;
+}
+message RebuildStatus {
+  string tenant = 1;
+  string generation = 2;
+  string state = 3;
+  int64 fence = 4;
+  int64 through_revision = 5;
+  int64 base_epoch = 6;
+  string previous_generation = 7;
+  int64 count = 8;
+  string digest = 9;
+  string verification_version = 10;
+}
+message ProjectionConsumerStatus {
+  string consumer = 1;
+  int64 acknowledged_revision = 2;
+  string state = 3;
+  int64 fence = 4;
+  int32 attempts = 5;
+  int32 max_attempts = 6;
+  google.protobuf.Timestamp lease_until = 7;
+  google.protobuf.Timestamp available_at = 8;
+  string last_failure_code = 9;
+}

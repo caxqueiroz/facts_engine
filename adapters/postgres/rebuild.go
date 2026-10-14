@@ -8,6 +8,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"sort"
+	"time"
 )
 
 func validGeneration(k model.GenerationKey) bool {
@@ -52,9 +53,15 @@ func (l *Ledger) rebuild(ctx context.Context, k model.GenerationKey, a model.Reb
 		if err := ledgerdb.New(t.tx).LockProjectionManagement(ctx, model.Digest([]string{k.Tenant, "projection-management"})); err != nil {
 			return err
 		}
+		if err := validateRebuildAuthorization(k, a); err != nil {
+			return err
+		}
 		var err error
 		s, err = fn(t)
-		return err
+		if err != nil {
+			return err
+		}
+		return validateRebuildAuthorization(k, a)
 	})
 	return s, err
 }
@@ -376,3 +383,22 @@ func (l *Ledger) AbandonRebuild(ctx context.Context, k model.GenerationKey, a mo
 }
 
 var _ model.RebuildStore = (*Ledger)(nil)
+
+// Application entry points bind the complete verified identity and a fresh
+// authorization receipt. Legacy worker entry points remain host-authorized.
+func validateRebuildAuthorization(k model.GenerationKey, a model.RebuildActor) error {
+	if a.Caller == nil && a.Authorization == nil {
+		return nil
+	}
+	if a.Caller == nil || a.Authorization == nil {
+		return model.ErrInvalid
+	}
+	d := a.Authorization
+	if a.Caller.Tenant != k.Tenant || a.Caller.Principal != a.Principal || d.Request.Caller != *a.Caller || d.Request.Purpose != a.Purpose || d.Request.Permission != "can_operate" || !model.ValidID(d.Request.Scope) || !d.Allowed || d.ModelID == "" || d.Consistency != "HIGHER_CONSISTENCY" || d.ContextDigest != model.Digest(d.Request) {
+		return model.ErrDenied
+	}
+	if time.Since(d.CheckedAt) > 30*time.Second || d.CheckedAt.After(time.Now().Add(time.Second)) {
+		return model.ErrUnavailable
+	}
+	return nil
+}

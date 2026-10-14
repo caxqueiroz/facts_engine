@@ -12,6 +12,7 @@ import (
 )
 
 type Service struct {
+	operations          model.OperationsOptions
 	redactionPolicies   map[string]bool
 	attestationIdentity model.AttestationIdentityOptions
 	extractors          map[string]model.ApprovedExtractor

@@ -38,5 +38,11 @@ func NewWithOptions(l model.Ledger, a model.Authorizer, e model.EvidenceStore, o
 		}
 		s.reads = reads.reads
 	}
+	if o.Operations.Scope != "" || o.Operations.Store != nil || o.Operations.Index != nil || o.Operations.Progress != nil {
+		if !model.ValidID(o.Operations.Scope) || o.Operations.Store == nil || o.Operations.Index == nil || o.Operations.Progress == nil {
+			return nil, model.ErrInvalid
+		}
+		s.operations = o.Operations
+	}
 	return s, nil
 }

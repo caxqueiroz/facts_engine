@@ -81,10 +81,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 		t.Fatal(err)
 	}
 	actor := model.RebuildActor{Principal: "operator", Purpose: "verified_rebuild"}
-	manager, err := workers.NewRebuild(registry, routes, actor)
-	if err != nil {
-		t.Fatal(err)
-	}
+	manager := newRemoteRebuild(t, ctx, l, registry, store, routes)
 	oldKey := model.GenerationKey{Tenant: "bank1", Generation: "g1"}
 	key := model.GenerationKey{Tenant: "bank1", Generation: "g2"}
 	c := model.Caller{Tenant: "bank1", Principal: "reader"}
@@ -367,7 +364,10 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if err != nil {
 		t.Fatal(err)
 	}
-	abandoned, err := registry.AbandonRebuild(ctx, unusedKey, actor, unused.Fence)
+	if _, err := manager.Abandon(ctx, unusedKey, unused.Fence); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("unprovisioned destination gate should remain unavailable", err)
+	}
+	abandoned, err := registry.RebuildStatus(ctx, unusedKey)
 	if err != nil || abandoned.State != "abandoned" {
 		t.Fatal(abandoned, err)
 	}

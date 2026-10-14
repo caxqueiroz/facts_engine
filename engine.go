@@ -397,3 +397,12 @@ type AttestationDelegation = model.AttestationDelegation
 type ExtractionCostBudget = model.ExtractionCostBudget
 type ExtractionReservation = model.ExtractionReservation
 type ExtractionAdmission = model.ExtractionAdmission
+
+// GetProjectionStatus reads tenant-wide operational progress using the host's
+// configured operations scope, never a client-selected authorization scope.
+func (e *Engine) GetProjectionStatus(ctx context.Context, c Caller, q model.ProjectionStatusQuery) (model.ProjectionStatus, error) {
+	return e.service.GetProjectionStatus(ctx, c, q)
+}
+func (e *Engine) RebuildIndex(ctx context.Context, c Caller, r model.RebuildRequest) (model.RebuildStatus, error) {
+	return e.service.RebuildIndex(ctx, c, r)
+}

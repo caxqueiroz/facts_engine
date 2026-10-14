@@ -24,7 +24,13 @@ type ProjectionCheck struct {
 
 // RebuildActor is a trusted operator identity supplied by the host. The
 // administrative port must not be exposed as an unchecked end-user API.
-type RebuildActor struct{ Principal, Purpose string }
+type RebuildActor struct {
+	Principal, Purpose string
+	// Present for application-authorized operations; legacy trusted worker callers
+	// retain their host-supplied principal and purpose contract.
+	Caller        *Caller                `json:",omitempty"`
+	Authorization *AuthorizationDecision `json:",omitempty"`
+}
 type ProjectionRegistry interface {
 	ActiveProjection(context.Context, string) (ActiveProjection, error)
 }

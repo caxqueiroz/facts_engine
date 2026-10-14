@@ -500,3 +500,29 @@ func TestIdentityValidation(t *testing.T) {
 		t.Fatalf("lookup tenant: %v", err)
 	}
 }
+
+func TestOperationsValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewOperationsServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	r := &v1.RebuildIndexRequest{Tenant: "tenant", Generation: "g1", Purpose: "review", Action: "start"}
+	if _, err := client.RebuildIndex(context.Background(), r); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("start attempts: %v", err)
+	}
+	r.Action = "activate"
+	if _, err := client.RebuildIndex(context.Background(), r); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("activation fence: %v", err)
+	}
+	r.ExpectedFence = 1
+	r.MaxAttempts = 3
+	if _, err := client.RebuildIndex(context.Background(), r); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("unexpected attempts: %v", err)
+	}
+	r.Action = "verify"
+	r.MaxAttempts = 0
+	if _, err := client.RebuildIndex(context.Background(), r); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("unexpected verify fence: %v", err)
+	}
+	if _, err := client.GetProjectionStatus(context.Background(), &v1.GetProjectionStatusRequest{Tenant: "other", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("operations tenant: %v", err)
+	}
+}
