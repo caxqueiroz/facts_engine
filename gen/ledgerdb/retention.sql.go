@@ -360,6 +360,24 @@ func (q *Queries) HasUnboundLegacyEvidence(ctx context.Context, arg HasUnboundLe
 	return exists, err
 }
 
+const HasUnselectedEvidenceDerivative = `-- name: HasUnselectedEvidenceDerivative :one
+SELECT EXISTS(SELECT 1 FROM evidence_derivations
+WHERE tenant_id=$1 AND parent_evidence_id=$2 AND NOT (evidence_id=ANY($3::text[])))
+`
+
+type HasUnselectedEvidenceDerivativeParams struct {
+	TenantID         string
+	ParentEvidenceID string
+	SelectedIds      []string
+}
+
+func (q *Queries) HasUnselectedEvidenceDerivative(ctx context.Context, arg HasUnselectedEvidenceDerivativeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, HasUnselectedEvidenceDerivative, arg.TenantID, arg.ParentEvidenceID, arg.SelectedIds)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const InsertLegalHold = `-- name: InsertLegalHold :execrows
 INSERT INTO legal_holds (tenant_id,scope_id,id)
 VALUES ($1,$2,$3)

@@ -236,6 +236,26 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// worker authorizes disclosure to its external archive destination.
 		for _, entry := range p.Entries {
 			switch entry.Kind {
+			case "retention":
+				var event model.RetentionEvent
+				if err := json.Unmarshal(entry.Payload, &event); err != nil {
+					return err
+				}
+				if event.Disposal != nil {
+					ids := append([]string{event.Disposal.EvidenceID}, event.Disposal.DerivativeEvidenceIDs...)
+					for _, id := range ids {
+						evidence, err := tx.Evidence(ctx, id)
+						if err != nil {
+							return err
+						}
+						if evidence.Scope != event.Scope {
+							return model.ErrPrecondition
+						}
+						if err := add("evidence", id, evidence); err != nil {
+							return err
+						}
+					}
+				}
 			case "memory_attestation", "attestation":
 				var attestation model.Attestation
 				if err := json.Unmarshal(entry.Payload, &attestation); err != nil {

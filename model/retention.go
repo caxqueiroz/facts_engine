@@ -24,6 +24,9 @@ type ReleaseLegalHoldRequest struct {
 	ID, Scope, Reason string
 }
 type EvidenceDisposalRequest struct {
+	// DerivativeEvidenceIDs explicitly selects the complete direct derivative set.
+	// Empty preserves single-object disposal; custom adapters must implement EvidenceLineageDisposalTx.
+	DerivativeEvidenceIDs []string `json:",omitempty"`
 	Command
 	Scope, EvidenceID, PolicyID, Jurisdiction, Reason string
 }
@@ -58,4 +61,10 @@ type RetentionTx interface {
 	StageRetention(context.Context, RetentionEvent) error
 	RetentionStatus(context.Context, string, string) (RetentionStatus, error)
 	DisposeEvidence(context.Context, EvidenceDisposalRequest) error
+}
+
+// EvidenceLineageDisposalTx atomically disposes an original and its explicitly
+// enumerated derivatives under the same retention policy and scope.
+type EvidenceLineageDisposalTx interface {
+	DisposeEvidenceLineage(context.Context, EvidenceDisposalRequest) error
 }

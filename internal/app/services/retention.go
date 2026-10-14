@@ -27,7 +27,16 @@ func (s *Service) retentionMutation(ctx context.Context, c model.Caller, scope, 
 		event.Caller = c
 		event.Command = cmd
 		if dispose {
-			if err = t.DisposeEvidence(ctx, *event.Disposal); err != nil {
+			if len(event.Disposal.DerivativeEvidenceIDs) > 0 {
+				lineage, ok := tx.(model.EvidenceLineageDisposalTx)
+				if !ok {
+					return model.ErrPrecondition
+				}
+				err = lineage.DisposeEvidenceLineage(ctx, *event.Disposal)
+			} else {
+				err = t.DisposeEvidence(ctx, *event.Disposal)
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -58,6 +67,17 @@ func (s *Service) DisposeEvidence(ctx context.Context, c model.Caller, r model.E
 	if !model.ValidID(r.EvidenceID) || !model.ValidID(r.PolicyID) || !model.ValidID(r.Jurisdiction) || r.Reason == "" || len(r.Reason) > 1024 {
 		return model.CommitResult{}, model.ErrInvalid
 	}
+	if len(r.DerivativeEvidenceIDs) > 256 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	seen := map[string]bool{r.EvidenceID: true}
+	for _, id := range r.DerivativeEvidenceIDs {
+		if !model.ValidID(id) || seen[id] {
+			return model.CommitResult{}, model.ErrInvalid
+		}
+		seen[id] = true
+	}
+	r.DerivativeEvidenceIDs = append([]string(nil), r.DerivativeEvidenceIDs...)
 	if _, err := s.authorize(ctx, c, r.Scope, "can_dispose", r.Command); err != nil {
 		return model.CommitResult{}, err
 	}

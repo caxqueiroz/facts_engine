@@ -231,6 +231,7 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 	snapshots := map[string]bool{}
 	evidence := map[string]model.Evidence{}
 	gaps := []model.AuditGap{}
+	disposedEvidence := map[string]bool{}
 	out := []model.AuditEntry{}
 	for _, entry := range entries {
 		switch entry.Kind {
@@ -322,7 +323,16 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				return nil, nil, err
 			}
 			if event.Kind == "dispose_evidence" {
-				gaps = append(gaps, model.AuditGap{Kind: "evidence_content", ID: event.TargetID, Reason: "disposed_under_retention_policy"})
+				ids := []string{event.TargetID}
+				if event.Disposal != nil {
+					ids = append(ids, event.Disposal.DerivativeEvidenceIDs...)
+				}
+				for _, id := range ids {
+					if !disposedEvidence[id] {
+						gaps = append(gaps, model.AuditGap{Kind: "evidence_content", ID: id, Reason: "disposed_under_retention_policy"})
+						disposedEvidence[id] = true
+					}
+				}
 			}
 		case "context":
 			var m model.ContextManifest

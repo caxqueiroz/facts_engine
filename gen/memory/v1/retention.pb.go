@@ -452,16 +452,17 @@ func (x *ReleaseLegalHoldResponse) GetResult() *CommitResult {
 }
 
 type DisposeEvidenceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
-	Command       *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
-	Scope         string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
-	EvidenceId    string                 `protobuf:"bytes,4,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
-	PolicyId      string                 `protobuf:"bytes,5,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
-	Jurisdiction  string                 `protobuf:"bytes,6,opt,name=jurisdiction,proto3" json:"jurisdiction,omitempty"`
-	Reason        string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Tenant                string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command               *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Scope                 string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	EvidenceId            string                 `protobuf:"bytes,4,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
+	PolicyId              string                 `protobuf:"bytes,5,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Jurisdiction          string                 `protobuf:"bytes,6,opt,name=jurisdiction,proto3" json:"jurisdiction,omitempty"`
+	Reason                string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	DerivativeEvidenceIds []string               `protobuf:"bytes,8,rep,name=derivative_evidence_ids,json=derivativeEvidenceIds,proto3" json:"derivative_evidence_ids,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *DisposeEvidenceRequest) Reset() {
@@ -541,6 +542,13 @@ func (x *DisposeEvidenceRequest) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *DisposeEvidenceRequest) GetDerivativeEvidenceIds() []string {
+	if x != nil {
+		return x.DerivativeEvidenceIds
+	}
+	return nil
 }
 
 type DisposeEvidenceResponse struct {
@@ -821,7 +829,7 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\x06reason\x18\x05 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\"K\n" +
 	"\x18ReleaseLegalHoldResponse\x12/\n" +
-	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xd9\x03\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xc6\x04\n" +
 	"\x16DisposeEvidenceRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
@@ -831,7 +839,8 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\tpolicy_id\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\bpolicyId\x12M\n" +
 	"\fjurisdiction\x18\x06 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\fjurisdiction\x12\"\n" +
 	"\x06reason\x18\a \x01(\tB\n" +
-	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\"J\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\x12k\n" +
+	"\x17derivative_evidence_ids\x18\b \x03(\tB3\xbaH0\x92\x01-\x10\x80\x02\x18\x01\"&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x15derivativeEvidenceIds\"J\n" +
 	"\x17DisposeEvidenceResponse\x12/\n" +
 	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\x91\x02\n" +
 	"\x19GetRetentionStatusRequest\x12A\n" +

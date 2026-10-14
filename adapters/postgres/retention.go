@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
@@ -124,40 +125,119 @@ func (t *transaction) RetentionStatus(ctx context.Context, scope, id string) (mo
 	return out, nil
 }
 func (t *transaction) DisposeEvidence(ctx context.Context, r model.EvidenceDisposalRequest) error {
+	if len(r.DerivativeEvidenceIDs) != 0 {
+		return model.ErrPrecondition
+	}
+	e, _, err := t.prepareEvidenceDisposal(ctx, r, false, false)
+	if err != nil {
+		return err
+	}
+	return t.disposeEvidenceObject(ctx, e)
+}
+
+func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.EvidenceDisposalRequest) error {
+	if len(r.DerivativeEvidenceIDs) == 0 || len(r.DerivativeEvidenceIDs) > 256 {
+		return model.ErrInvalid
+	}
 	if err := t.lockRetentionScope(ctx, r.Scope); err != nil {
 		return err
 	}
-	e, err := t.Evidence(ctx, r.EvidenceID)
+	ids := append([]string{r.EvidenceID}, r.DerivativeEvidenceIDs...)
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if !model.ValidID(id) || seen[id] {
+			return model.ErrInvalid
+		}
+		seen[id] = true
+	}
+	sort.Strings(ids)
+	objects := make([]model.Evidence, 0, len(ids))
+	for _, id := range ids {
+		item := r
+		item.EvidenceID = id
+		item.DerivativeEvidenceIDs = nil
+		e, disposed, err := t.prepareEvidenceDisposal(ctx, item, id == r.EvidenceID, id != r.EvidenceID)
+		if err != nil {
+			return err
+		}
+		if id == r.EvidenceID {
+			if e.Derivation != nil {
+				return model.ErrPrecondition
+			}
+		} else if e.Derivation == nil || e.Derivation.ParentEvidenceID != r.EvidenceID {
+			return model.ErrPrecondition
+		}
+		if !disposed {
+			objects = append(objects, e)
+		}
+	}
+	// The scope lock serializes registration and holds. Repeatable-read conflicts
+	// force a retry if a derivative was published after this snapshot began.
+	missing, err := ledgerdb.New(t.tx).HasUnselectedEvidenceDerivative(ctx, ledgerdb.HasUnselectedEvidenceDerivativeParams{TenantID: t.tenant, ParentEvidenceID: r.EvidenceID, SelectedIds: r.DerivativeEvidenceIDs})
 	if err != nil {
 		return err
 	}
-	if e.Scope != r.Scope {
-		return model.ErrDenied
+	if missing {
+		return model.ErrPrecondition
 	}
-	if err = t.lockEvidenceObject(ctx, e.Object); err != nil {
-		return err
+	// Every member must pass before any deletion. Immutable metadata and the
+	// explicit command membership remain available in the retention event.
+	for _, e := range objects {
+		if err := t.disposeEvidenceObject(ctx, e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *transaction) prepareEvidenceDisposal(ctx context.Context, r model.EvidenceDisposalRequest, selectedDerivatives, allowDisposed bool) (model.Evidence, bool, error) {
+	if err := t.lockRetentionScope(ctx, r.Scope); err != nil {
+		return model.Evidence{}, false, err
+	}
+	e, err := t.Evidence(ctx, r.EvidenceID)
+	if err != nil {
+		return e, false, err
+	}
+	if e.Scope != r.Scope {
+		return e, false, model.ErrDenied
+	}
+	disposed, err := ledgerdb.New(t.tx).LockRetentionObject(ctx, ledgerdb.LockRetentionObjectParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
+	if err != nil {
+		return e, false, err
+	}
+	if disposed && !allowDisposed {
+		return e, false, model.ErrPrecondition
 	}
 	status, err := t.RetentionStatus(ctx, r.Scope, r.EvidenceID)
 	if err != nil {
-		return err
+		return e, false, err
 	}
-	if len(status.ActiveHolds) > 0 || len(status.Blockers) > 0 || status.Disposed || status.PolicyID != r.PolicyID {
-		return model.ErrPrecondition
+	for _, blocker := range status.Blockers {
+		if blocker != "evidence_derivatives" || !selectedDerivatives {
+			return e, false, model.ErrPrecondition
+		}
+	}
+	if len(status.ActiveHolds) > 0 || (status.Disposed && !allowDisposed) || status.PolicyID != r.PolicyID {
+		return e, false, model.ErrPrecondition
 	}
 	policy, err := t.RetentionPolicy(ctx, r.Scope, r.PolicyID)
 	if err != nil {
-		return err
+		return e, false, err
 	}
 	if policy.RecordClass != "evidence_bytes" || policy.Purpose != r.Purpose || policy.Jurisdiction != r.Jurisdiction {
-		return model.ErrPrecondition
+		return e, false, model.ErrPrecondition
 	}
 	mature, err := ledgerdb.New(t.tx).EvidenceAgeMature(ctx, ledgerdb.EvidenceAgeMatureParams{RegisteredAt: nullableTime(&status.RegisteredAt), MinimumAgeSeconds: policy.MinimumAgeSeconds})
 	if err != nil {
-		return err
+		return e, false, err
 	}
 	if !mature {
-		return model.ErrPrecondition
+		return e, false, model.ErrPrecondition
 	}
+	return e, disposed, nil
+}
+
+func (t *transaction) disposeEvidenceObject(ctx context.Context, e model.Evidence) error {
 	deleted, err := ledgerdb.New(t.tx).DeleteEvidenceObject(ctx, ledgerdb.DeleteEvidenceObjectParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
 	if err != nil {
 		return err

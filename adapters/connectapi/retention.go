@@ -38,7 +38,7 @@ func (s *retentionService) ReleaseLegalHold(ctx context.Context, r *v1.ReleaseLe
 	return &v1.ReleaseLegalHoldResponse{Result: commit(out)}, nil
 }
 func (s *retentionService) DisposeEvidence(ctx context.Context, r *v1.DisposeEvidenceRequest) (*v1.DisposeEvidenceResponse, error) {
-	out, err := s.engine.DisposeEvidence(ctx, callerFrom(ctx), model.EvidenceDisposalRequest{Command: command(r.Command), Scope: r.Scope, EvidenceID: r.EvidenceId, PolicyID: r.PolicyId, Jurisdiction: r.Jurisdiction, Reason: r.Reason})
+	out, err := s.engine.DisposeEvidence(ctx, callerFrom(ctx), model.EvidenceDisposalRequest{Command: command(r.Command), Scope: r.Scope, EvidenceID: r.EvidenceId, DerivativeEvidenceIDs: append([]string(nil), r.DerivativeEvidenceIds...), PolicyID: r.PolicyId, Jurisdiction: r.Jurisdiction, Reason: r.Reason})
 	if err != nil {
 		return nil, err
 	}

@@ -132,3 +132,7 @@ VALUES ($1,$2,$3);
 -- name: InsertRetentionEvent :execrows
 INSERT INTO retention_events (tenant_id,id,scope_id,kind,target_id,ledger_revision,payload)
 VALUES ($1,$2,$3,$4,$5,$6,$7);
+
+-- name: HasUnselectedEvidenceDerivative :one
+SELECT EXISTS(SELECT 1 FROM evidence_derivations
+WHERE tenant_id=$1 AND parent_evidence_id=$2 AND NOT (evidence_id=ANY(sqlc.arg(selected_ids)::text[])));

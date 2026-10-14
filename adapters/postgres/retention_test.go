@@ -18,13 +18,18 @@ import (
 )
 
 type rollbackRetentionLedger struct{ *postgres.Ledger }
-type rollbackRetentionTx struct{ model.RetentionTx }
+type rollbackRetentionTx struct {
+	model.RetentionTx
+	model.EvidenceLineageDisposalTx
+}
 
 func (t rollbackRetentionTx) Append(context.Context, model.Event) (model.Event, error) {
 	return model.Event{}, model.ErrUnavailable
 }
 func (l rollbackRetentionLedger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
-	return l.Ledger.Transact(ctx, tenant, func(tx model.Tx) error { return fn(rollbackRetentionTx{tx.(model.RetentionTx)}) })
+	return l.Ledger.Transact(ctx, tenant, func(tx model.Tx) error {
+		return fn(rollbackRetentionTx{tx.(model.RetentionTx), tx.(model.EvidenceLineageDisposalTx)})
+	})
 }
 func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, store *evidence.Postgres, admin *pgxpool.Pool) {
 	t.Helper()
@@ -192,6 +197,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	if _, err = engine.ReleaseLegalHold(ctx, c, model.ReleaseLegalHoldRequest{Command: command("release-race"), ID: "race-hold", Scope: "case", Reason: "closed"}); err != nil {
 		t.Fatal(err)
 	}
+	testRetentionLineage(t, ctx, ledger, store, engine, c, register)
 	public, private, _ := ed25519.GenerateKey(rand.Reader)
 	signer, _ := audit.NewEd25519("retention-key", private)
 	exporter, _ := facts.NewWithAudit(ledger, allow{}, store, model.AuditOptions{Signer: signer})
@@ -215,6 +221,18 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	if !found {
 		t.Fatal("missing disposal coverage gap")
 	}
+	for _, id := range []string{"lineage-root", "lineage-a", "lineage-b", "lineage-c", "lineage-prior-root", "lineage-prior-child"} {
+		found := false
+		for _, gap := range done.Bundle.Manifest.Gaps {
+			if gap.ID == id && gap.Reason == "disposed_under_retention_policy" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("missing lineage disposal coverage gap", id)
+		}
+	}
+
 	register("export-blocked", "export-blocked-object", "case", "short-lived")
 	blocked := request
 	blocked.Key = "export-blocked"

@@ -74,6 +74,13 @@ message DisposeEvidenceRequest {
     min_bytes: 1
     max_bytes: 1024
   }];
+  repeated string derivative_evidence_ids = 8 [(buf.validate.field).repeated = {
+    max_items: 256
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
 }
 message DisposeEvidenceResponse {
   CommitResult result = 1;
