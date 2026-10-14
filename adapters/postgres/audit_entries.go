@@ -27,6 +27,8 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 		return nil
 	}
 	queries := []struct{ kind, query string }{
+		{"context", `SELECT c.id,c.payload FROM context_manifests c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM context_scopes s WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
+		{"decision", `SELECT c.id,c.payload FROM decision_receipts c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM decision_scopes s WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
 		{"policy", `SELECT id,payload FROM policy_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
 		{"predicate", `SELECT predicate||'/'||version,payload FROM predicate_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY predicate,version`},
 		{"version", `SELECT id,payload FROM record_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},

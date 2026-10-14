@@ -246,3 +246,17 @@ func projectionContent(d model.ProjectionDocument) ([]byte, map[string]string, e
 
 	return content, metadata, nil
 }
+
+func (i *Index) DescribeRetrieval(_ context.Context, tenant, generation string) (model.RetrievalIdentity, error) {
+	if tenant != i.config.Tenant || generation != i.config.Generation {
+		return model.RetrievalIdentity{}, model.ErrDenied
+	}
+	return model.RetrievalIdentity{Generation: generation, EmbeddingID: i.config.EmbeddingID, Dimensions: i.config.Dimensions, SearchVersion: "cortex-" + Version + "-exact-cosine-v1", RerankerID: "none"}, nil
+}
+func (r Router) DescribeRetrieval(ctx context.Context, t, g string) (model.RetrievalIdentity, error) {
+	i := r[t]
+	if i == nil {
+		return model.RetrievalIdentity{}, model.ErrUnavailable
+	}
+	return i.DescribeRetrieval(ctx, t, g)
+}

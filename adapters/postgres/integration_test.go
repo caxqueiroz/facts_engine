@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}

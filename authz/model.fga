@@ -33,6 +33,7 @@ type scope
     define can_resolve: approver and tenant_member
     define can_snapshot: reader and tenant_member
     define can_record_calculation: proposer and tenant_member
+    define can_prepare_context: reader and tenant_member
     define can_record_decision: proposer and tenant_member
     define can_export_audit: auditor and tenant_member
     define can_operate: operator and tenant_member

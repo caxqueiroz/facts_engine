@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,9 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingContext       *model.ContextManifest
+	pendingDecision      *model.DecisionRecord
+	decisionItemScopes   map[model.VersionReference]string
 	pendingCalculation   *model.CalculationRecord
 	calculationSnapshots []model.FactSnapshot
 	pendingAuditJob      *model.AuditExportJob
@@ -348,6 +351,9 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	err = t.flushTemporal(ctx, e)
 	if err != nil {
 		return e, err
+	}
+	if err = t.flushContext(ctx, e); err != nil {
+		return model.Event{}, err
 	}
 	if err = t.flushAudit(ctx, e); err != nil {
 		return e, err

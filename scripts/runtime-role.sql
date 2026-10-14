@@ -35,3 +35,5 @@ GRANT UPDATE ON tenant_revisions TO facts_rebuild;
 GRANT SELECT,INSERT,UPDATE ON projection_generations,active_projections TO facts_rebuild;
 GRANT SELECT,INSERT ON projection_rebuild_events TO facts_rebuild;
 GRANT INSERT ON tenant_revisions TO facts_rebuild;
+GRANT SELECT,INSERT ON context_manifests,context_scopes,context_items,decision_receipts,decision_scopes,decision_items,decision_artifacts TO facts_runtime;
+GRANT SELECT ON context_manifests,context_scopes,context_items,decision_receipts,decision_scopes,decision_items,decision_artifacts TO facts_archiver;

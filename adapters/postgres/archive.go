@@ -107,6 +107,8 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
+			{"context", `SELECT id,payload FROM context_manifests WHERE tenant_id=$1 AND ledger_revision=$2`},
+			{"decision", `SELECT id,payload FROM decision_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"snapshot", `SELECT id,payload FROM fact_snapshots WHERE tenant_id=$1 AND creation_revision=$2`},
 			{"calculation", `SELECT id,payload FROM calculation_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"attestation", `SELECT id,payload FROM attestations WHERE tenant_id=$1 AND ledger_revision=$2`},
@@ -148,6 +150,23 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// worker authorizes disclosure to its external archive destination.
 		for _, entry := range p.Entries {
 			switch entry.Kind {
+			case "context":
+				var m model.ContextManifest
+				if err := json.Unmarshal(entry.Payload, &m); err != nil {
+					return err
+				}
+				for _, scope := range m.Request.Query.Scopes {
+					scopes[scope] = true
+				}
+			case "decision":
+				var d model.DecisionRecord
+				if err := json.Unmarshal(entry.Payload, &d); err != nil {
+					return err
+				}
+				for _, scope := range d.Scopes {
+					scopes[scope] = true
+				}
+
 			case "snapshot":
 				var snapshot model.FactSnapshot
 				if err := json.Unmarshal(entry.Payload, &snapshot); err != nil {

@@ -261,6 +261,22 @@
             ]
           }
         },
+        "can_prepare_context": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "reader"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "can_record_decision": {
           "intersection": {
             "child": [

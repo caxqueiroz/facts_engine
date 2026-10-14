@@ -160,3 +160,23 @@ func (e *Engine) Recall(ctx context.Context, c Caller, q model.RecallRequest) (m
 type RecallRequest = model.RecallRequest
 type RecallResult = model.RecallResult
 type RetrievalOptions = model.RetrievalOptions
+
+func (e *Engine) PrepareContext(ctx context.Context, c Caller, r model.ContextRequest) (model.ContextManifest, error) {
+	return e.service.PrepareContext(ctx, c, r)
+}
+func (e *Engine) GetContextManifest(ctx context.Context, c Caller, q model.ContextQuery) (model.ContextManifest, error) {
+	return e.service.GetContextManifest(ctx, c, q)
+}
+func (e *Engine) RecordDecision(ctx context.Context, c Caller, r model.DecisionReceipt) (model.DecisionRecord, error) {
+	return e.service.RecordDecision(ctx, c, r)
+}
+func (e *Engine) GetDecisionReceipt(ctx context.Context, c Caller, q model.DecisionQuery) (model.DecisionRecord, error) {
+	return e.service.GetDecisionReceipt(ctx, c, q)
+}
+
+type ContextRequest = model.ContextRequest
+type ContextManifest = model.ContextManifest
+type ContextQuery = model.ContextQuery
+type DecisionReceipt = model.DecisionReceipt
+type DecisionRecord = model.DecisionRecord
+type DecisionQuery = model.DecisionQuery

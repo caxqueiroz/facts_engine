@@ -151,7 +151,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	}
 	gaps = append(gaps, extra...)
 	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"extraction_artifacts", "context_manifests", "decision_receipts", "retention_events"} {
+	for _, kind := range []string{"extraction_artifacts", "memory_items", "retention_events"} {
 		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
 	}
 	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
@@ -256,6 +256,23 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 	for _, entry := range entries {
 		include := true
 		switch entry.Kind {
+		case "context":
+			var m model.ContextManifest
+			if err := json.Unmarshal(entry.Payload, &m); err != nil {
+				return nil, nil, err
+			}
+			for _, scope := range m.Request.Query.Scopes {
+				include = include && scope == r.Scope
+			}
+		case "decision":
+			var d model.DecisionRecord
+			if err := json.Unmarshal(entry.Payload, &d); err != nil {
+				return nil, nil, err
+			}
+			for _, scope := range d.Scopes {
+				include = include && scope == r.Scope
+			}
+
 		case "snapshot":
 			include = snapshots[entry.ID]
 		case "calculation":

@@ -119,6 +119,12 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil || result.Incomplete || len(result.Items) == 0 {
 		t.Fatal(result, err)
 	}
+	testContexts(t, ctx, engine, l, store, c, index, query)
+	drain(worker, projector, key)
+	result, err = engine.Recall(ctx, c, query)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var expected model.FactResult
 	for _, item := range result.Items {
 		direct, err := engine.GetFact(ctx, c, model.FactQuery{Key: item.Key, ValidAt: query.ValidAt})

@@ -129,6 +129,67 @@ type ConsumerRetryCommand struct {
 	RecordedAt  pgtype.Timestamptz
 }
 
+type ContextItem struct {
+	TenantID  string
+	ContextID string
+	Ordinal   int32
+	RecordID  string
+	VersionID string
+	ScopeID   string
+}
+
+type ContextManifest struct {
+	TenantID          string
+	ID                string
+	ScopeID           string
+	SelectionRevision int64
+	LedgerRevision    int64
+	Payload           []byte
+}
+
+type ContextScope struct {
+	TenantID  string
+	ContextID string
+	ScopeID   string
+}
+
+type DecisionArtifact struct {
+	TenantID   string
+	DecisionID string
+	Role       string
+	EvidenceID string
+}
+
+type DecisionItem struct {
+	TenantID   string
+	DecisionID string
+	Role       string
+	Ordinal    int32
+	RecordID   string
+	VersionID  string
+	ScopeID    string
+}
+
+type DecisionReceipt struct {
+	TenantID           string
+	ID                 string
+	ScopeID            string
+	ApplicationID      string
+	ExternalDecisionID string
+	RequestDigest      string
+	ContextID          pgtype.Text
+	SnapshotID         pgtype.Text
+	CalculationID      pgtype.Text
+	LedgerRevision     int64
+	Payload            []byte
+}
+
+type DecisionScope struct {
+	TenantID   string
+	DecisionID string
+	ScopeID    string
+}
+
 type Evidence struct {
 	TenantID       string
 	ID             string

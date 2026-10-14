@@ -206,3 +206,10 @@ func (r *Generations) VerifyProjection(ctx context.Context, k model.GenerationKe
 	}
 	return i.VerifyProjection(ctx, k, f, d)
 }
+func (r *Generations) DescribeRetrieval(ctx context.Context, t, g string) (model.RetrievalIdentity, error) {
+	i, err := r.get(model.GenerationKey{Tenant: t, Generation: g})
+	if err != nil {
+		return model.RetrievalIdentity{}, err
+	}
+	return i.DescribeRetrieval(ctx, t, g)
+}
