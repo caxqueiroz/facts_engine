@@ -41,6 +41,7 @@ type ExtractionRequest struct {
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
 	Predicates                       []PredicateBinding
+	Refresh                          *VersionReference `json:",omitempty"`
 }
 type ExtractionJob struct {
 	ID, Tenant, ProfileDigest string
@@ -48,6 +49,7 @@ type ExtractionJob struct {
 	Request                   ExtractionRequest
 	Profile                   ExtractionProfile
 	Predicates                []PredicateVersion
+	RefreshScopes             []string `json:",omitempty"`
 	Authorization             []AuthorizationDecision
 	CreatedRevision           int64
 }
@@ -87,6 +89,7 @@ type ExtractionInput struct {
 	Messages                                                                       []ExtractionInputMessage
 	OmittedRanges                                                                  []string
 	RedactionVersion                                                               string
+	Refresh                                                                        *MemoryRefreshInput `json:",omitempty"`
 }
 type ExtractionCandidate struct {
 	Subject, Predicate, Discriminator, SchemaVersion string
@@ -108,10 +111,12 @@ type ExtractionRelation struct {
 	RecordID, VersionID, Kind string
 }
 type ExtractedProposal struct {
+	RecordKind          string `json:",omitempty"`
 	Candidate           int
 	RecordID, VersionID string
 }
 type ExtractionAttempt struct {
+	RefreshScopes                                                      []string `json:",omitempty"`
 	ID, Tenant, Scope, JobID, OwnerNonce, ProfileDigest, RequestDigest string
 	Caller                                                             Caller
 	Fence, LedgerRevision                                              int64
@@ -122,6 +127,7 @@ type ExtractionAttempt struct {
 	Authorization                                                      []AuthorizationDecision
 }
 type ExtractionResult struct {
+	RefreshScopes                                                                          []string `json:",omitempty"`
 	AttemptID, JobID, Tenant, Scope, Outcome, ModelIdentity, RequestDigest, ResponseDigest string
 	ResponseBytes                                                                          []byte
 	ResponseComplete                                                                       bool
@@ -162,3 +168,28 @@ type ExtractionRunner interface {
 }
 
 func ExtractionConsumer(stream string) string { return "extraction-" + Digest(stream) }
+
+// MemoryRefreshRequest binds an asynchronous replacement proposal to an exact
+// accepted memory version. The job never accepts or supersedes it automatically.
+type MemoryRefreshRequest struct {
+	Command
+	Scope, RecordID, VersionID, ProfileID string
+}
+type MemoryRefreshInput struct {
+	Schema                         string
+	Original                       MemoryVersion
+	Definition                     MemoryType
+	LedgerRevision, StreamRevision int64
+	Dependencies                   []MemoryRefreshDependency
+	Evidence                       []ExtractionInputMessage
+}
+type MemoryRefreshDependency struct {
+	Scope, RecordID string
+	Timeline        []Acceptance
+	Versions        []Version
+}
+type MemoryRefreshOutput struct {
+	Body          string
+	Dependencies  []MemoryDependency
+	DeclineReason string
+}

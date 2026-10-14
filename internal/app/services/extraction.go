@@ -21,7 +21,7 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	s.extractors = map[string]model.ApprovedExtractor{}
 	for _, approved := range o.Profiles {
 		p := approved.Profile
-		if approved.Provider == nil || !model.ValidID(p.ID) || !model.ValidID(p.ProviderID) || !model.ValidID(p.RequestedModel) || !model.ValidID(p.PromptVersion) || p.ParserVersion != "facts-extraction-json-v1" || !model.ValidID(p.ApplicationBuild) || len(p.Prompt) == 0 || len(p.Prompt) > 64<<10 || model.BytesDigest(p.Prompt) != p.PromptDigest || len(p.Parameters) > 16<<10 || !json.Valid(p.Parameters) || p.Timeout < time.Second || p.Timeout > 2*time.Minute || p.MaxInputBytes < 1 || p.MaxInputBytes > 16<<20 || p.MaxOutputBytes < 1 || p.MaxOutputBytes > 2<<20 || p.MaxCandidates < 1 || p.MaxCandidates > 64 || p.MaxAttempts < 1 || p.MaxAttempts > 10 || p.RetryDelay < time.Second || p.RetryDelay > time.Hour || p.MaxTokensPerAttempt < 1 || p.MaxTokensPerAttempt > o.DailyTokenBudget {
+		if approved.Provider == nil || !model.ValidID(p.ID) || !model.ValidID(p.ProviderID) || !model.ValidID(p.RequestedModel) || !model.ValidID(p.PromptVersion) || (p.ParserVersion != "facts-extraction-json-v1" && p.ParserVersion != "memory-refresh-json-v1") || !model.ValidID(p.ApplicationBuild) || len(p.Prompt) == 0 || len(p.Prompt) > 64<<10 || model.BytesDigest(p.Prompt) != p.PromptDigest || len(p.Parameters) > 16<<10 || !json.Valid(p.Parameters) || p.Timeout < time.Second || p.Timeout > 2*time.Minute || p.MaxInputBytes < 1 || p.MaxInputBytes > 16<<20 || p.MaxOutputBytes < 1 || p.MaxOutputBytes > 2<<20 || p.MaxCandidates < 1 || p.MaxCandidates > 64 || p.MaxAttempts < 1 || p.MaxAttempts > 10 || p.RetryDelay < time.Second || p.RetryDelay > time.Hour || p.MaxTokensPerAttempt < 1 || p.MaxTokensPerAttempt > o.DailyTokenBudget {
 			return model.ErrInvalid
 		}
 		if _, exists := s.extractors[p.ID]; exists {
@@ -43,7 +43,7 @@ func extractionTx(tx model.Tx) (model.ExtractionTx, error) {
 	return t, nil
 }
 func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.ExtractionRequest) (model.JobStatus, error) {
-	if !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) || len(r.Subjects) == 0 || len(r.Subjects) > 64 || len(r.Predicates) == 0 || len(r.Predicates) > 64 {
+	if r.Refresh != nil || !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) || len(r.Subjects) == 0 || len(r.Subjects) > 64 || len(r.Predicates) == 0 || len(r.Predicates) > 64 {
 		return model.JobStatus{}, model.ErrInvalid
 	}
 	subjects := map[string]bool{}
@@ -65,7 +65,7 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 		return model.JobStatus{}, err
 	}
 	approved, ok := s.extractors[r.ProfileID]
-	if !ok {
+	if !ok || approved.Profile.ParserVersion != "facts-extraction-json-v1" {
 		return model.JobStatus{}, model.ErrPrecondition
 	}
 	conversation, err := s.GetConversation(ctx, c, model.ConversationQuery{ID: r.ConversationID, Scope: r.Scope, Purpose: r.Purpose})
@@ -143,6 +143,9 @@ func (s *Service) GetJob(ctx context.Context, c model.Caller, q model.JobQuery) 
 			return err
 		}
 		status.Purpose = job.Request.Purpose
+		if job.Request.Refresh != nil {
+			status.Kind = "memory_refresh"
+		}
 		return nil
 	})
 	if errors.Is(err, model.ErrNotFound) {

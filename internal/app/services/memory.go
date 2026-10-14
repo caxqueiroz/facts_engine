@@ -98,49 +98,52 @@ func (s *Service) ProposeMemory(ctx context.Context, c model.Caller, r model.Mem
 		}
 	}
 	return s.mutate(ctx, c, r.Key.Scope, "propose_memory", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
-		t, err := memoryTx(tx)
+		return s.stageMemoryProposal(ctx, tx, c, r, checks, out)
+	})
+}
+func (s *Service) stageMemoryProposal(ctx context.Context, tx model.Tx, c model.Caller, r model.MemoryProposal, checks []model.AuthorizationDecision, out *model.CommitResult) error {
+	t, err := memoryTx(tx)
+	if err != nil {
+		return err
+	}
+	active, err := t.ActiveMemoryType(ctx, r.Key.Scope, r.Subtype)
+	if err != nil {
+		return err
+	}
+	if active != r.SchemaVersion {
+		return model.ErrPrecondition
+	}
+	definition, err := t.MemoryType(ctx, r.Key.Scope, r.Subtype, r.SchemaVersion)
+	if err != nil {
+		return err
+	}
+	for _, d := range r.Dependencies {
+		v, err := tx.Version(ctx, d.RecordID, d.VersionID)
 		if err != nil {
 			return err
 		}
-		active, err := t.ActiveMemoryType(ctx, r.Key.Scope, r.Subtype)
-		if err != nil {
-			return err
-		}
-		if active != r.SchemaVersion {
+		if v.Proposal.Key.Scope != d.Scope || v.Digest != d.ContentDigest {
 			return model.ErrPrecondition
 		}
-		definition, err := t.MemoryType(ctx, r.Key.Scope, r.Subtype, r.SchemaVersion)
-		if err != nil {
-			return err
+	}
+	record, err := t.LockMemory(ctx, r.Key)
+	if err != nil {
+		return err
+	}
+	if record.Revision != r.ExpectedRevision {
+		return &model.RevisionConflict{RecordID: record.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: record.Revision}
+	}
+	for _, check := range checks {
+		if time.Since(check.CheckedAt) > 30*time.Second {
+			return model.ErrUnavailable
 		}
-		for _, d := range r.Dependencies {
-			v, err := tx.Version(ctx, d.RecordID, d.VersionID)
-			if err != nil {
-				return err
-			}
-			if v.Proposal.Key.Scope != d.Scope || v.Digest != d.ContentDigest {
-				return model.ErrPrecondition
-			}
-		}
-		record, err := t.LockMemory(ctx, r.Key)
-		if err != nil {
-			return err
-		}
-		if record.Revision != r.ExpectedRevision {
-			return &model.RevisionConflict{RecordID: record.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: record.Revision}
-		}
-		for _, check := range checks {
-			if time.Since(check.CheckedAt) > 30*time.Second {
-				return model.ErrUnavailable
-			}
-		}
-		version := model.MemoryVersion{Authorization: checks, ID: id(), RecordID: record.ID, Proposal: r, Proposer: c, PolicyID: definition.PolicyID, Digest: model.MemoryDigest(r)}
-		if err = t.StageMemoryVersion(ctx, version); err != nil {
-			return err
-		}
-		*out = model.CommitResult{ID: version.ID, RecordID: record.ID, VersionID: version.ID, RecordKind: "memory", ContentDigest: version.Digest, StreamRevision: record.Revision + 1}
-		return tx.SetRevision(ctx, record.ID, out.StreamRevision)
-	})
+	}
+	version := model.MemoryVersion{Authorization: checks, ID: id(), RecordID: record.ID, Proposal: r, Proposer: c, PolicyID: definition.PolicyID, Digest: model.MemoryDigest(r)}
+	if err = t.StageMemoryVersion(ctx, version); err != nil {
+		return err
+	}
+	*out = model.CommitResult{ID: version.ID, RecordID: record.ID, VersionID: version.ID, RecordKind: "memory", ContentDigest: version.Digest, StreamRevision: record.Revision + 1}
+	return tx.SetRevision(ctx, record.ID, out.StreamRevision)
 }
 func (s *Service) GetMemoryVersion(ctx context.Context, c model.Caller, q model.MemoryVersionQuery) (model.MemoryVersion, error) {
 	empty := model.MemoryVersion{}

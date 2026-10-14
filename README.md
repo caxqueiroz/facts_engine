@@ -171,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
-2. Complete memory dependency refresh jobs. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
+2. Complete automatic scheduling of memory refresh after dependency changes. Durable, explicitly requested refresh jobs are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
@@ -430,7 +430,7 @@ The engine verifies source bytes/spans, dependency ownership/digests, active sub
 
 Memory proposals and subtype definitions participate in scoped signed audits and event archives. Metadata-only audits withhold memory bodies because they may quote evidence. A scoped audit also withholds a memory version with dependencies outside that scope; archive workers authorize every dependency scope. Memory evidence links block uncoordinated byte disposal.
 
-Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Memory recall is now implemented as described below. Refresh jobs remain in progress; prepared memory contexts are implemented below. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
+Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Memory recall is now implemented as described below. Explicit memory refresh jobs and prepared memory contexts are implemented below; automatic refresh scheduling remains in progress. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
 
 
 ### Memory acceptance, lifecycle and dependency eligibility
@@ -498,7 +498,7 @@ Memory recall resolves candidates in one ledger snapshot, then checks current ac
 
 Refresh [runtime grants](scripts/runtime-role.sql) before running the updated projector. Indexing a memory requires the worker's current `can_read`, `can_read_history` and `can_read_evidence` permissions in the memory scope and every dependency scope. **Rebuild into a new generation for existing deployments:** older consumers may already have acknowledged memory events without indexing them. Restarting an existing consumer does not replay those events. Use the managed rebuild and verified cutover procedure above.
 
-Coverage and generation requirements match fact recall. Candidate over-fetch is bounded and shared across fact and memory candidates, so filtering can return fewer results than requested; `Incomplete` describes ledger/index coverage, not exhaustive search. `PrepareContext` can opt into memory items as described below. Automated dependency refresh remains unfinished.
+Coverage and generation requirements match fact recall. Candidate over-fetch is bounded and shared across fact and memory candidates, so filtering can return fewer results than requested; `Incomplete` describes ledger/index coverage, not exhaustive search. `PrepareContext` can opt into memory items as described below. Explicit refresh jobs are implemented below; automatic scheduling from dependency changes remains unfinished.
 
 Integration tests exercise memory projection through the outbox, vector and lexical retrieval, fact/memory separation, tampered index text, evidence-permission denial, stale-index retraction filtering, historical recall, and rebuild verification.
 
@@ -525,3 +525,28 @@ Memory entries require current read, history, evidence and context-preparation p
 `RecordDecision` accepts memory version references from the retained manifest in `SelectedItems` and `UsedItems`. Used items must be selected, and every selection must have been supplied. Separate tenant-qualified foreign keys bind fact and memory items to their respective immutable versions. Memory bodies may quote evidence, so metadata-only audit exports withhold memory-bearing contexts with an explicit gap; authorized full exports retain the exact bytes. Cross-scope contexts remain withheld from a single-scope export.
 
 Tests cover mixed ordering and revision consistency, memory decision links, unauthorized and unsupplied references, preserved manifests after disputes, exclusion from fresh contexts, current evidence/history permissions, dependency-scope authorization, metadata redaction and signed full exports.
+
+
+### Durable memory refresh proposals
+
+Apply forward-only migration `00018_memory_refresh.sql` and refresh runtime/archive grants. Configure an approved extraction profile with `ParserVersion: "memory-refresh-json-v1"`. It uses the existing `ExtractionProvider` contract, concurrency/token budgets, bounded response handling, expiring leases, fenced completion, retries and retained model artifacts. Fact-extraction profiles remain separate.
+
+`StartMemoryRefresh` schedules work for an exact accepted memory version whose dependency coverage is currently stale:
+
+```go
+job, err := engine.StartMemoryRefresh(ctx, caller, model.MemoryRefreshRequest{
+    Command: model.Command{Key: commandKey, Purpose: "dependency_review"},
+    Scope: scope, RecordID: memoryRecordID, VersionID: memoryVersionID,
+    ProfileID: approvedRefreshProfile,
+})
+```
+
+Use `workers.NewExtraction` through the outbox to handle `start_memory_refresh` notifications, or call `RunExtraction` explicitly with a trusted service caller. `GetJob`, `GetExtractionRun` and `RetryJob` support refresh jobs; their kind is `memory_refresh`. Replaying a completed delivery does not call the provider again.
+
+The retained request includes the original immutable memory, bound subtype, source evidence, and current ledger timelines and versions for its original dependency records. The provider returns `MemoryRefreshOutput`: a new `Body` and exact `Dependencies`, or a `DeclineReason`. It cannot change the memory identity, subtype, effective interval or original source spans, remove dependency records, or introduce unsupplied versions. Eligibility is rechecked before proposing. A changed memory stream, retired original, restored dependencies, changed schema, ineligible replacement dependencies or provider decline produces a retained issue instead of a proposal. Fragmented or conflicting dependency coverage is not resolved by similarity or model confidence.
+
+Successful work atomically appends a new **unaccepted** memory proposal and links it to the retained extraction result. It never approves or supersedes the original. The original remains stale until an authorized acceptance/supersession satisfies the normal policy, source and attestation requirements. Both versions remain available through authorized history reads.
+
+The requester and worker need extraction/proposal permissions in the memory scope and read/history/evidence permissions across its dependency scopes. Retained refresh artifacts recheck those scope permissions before disclosure; full single-scope exports withhold cross-scope refresh payloads, and archive workers authorize all involved scopes. Request/response byte limits and profile identity remain pinned to each durable job. No production refresh model has been selected or evaluated.
+
+Tests cover durable scheduling, request retention before provider invocation, corrected dependency provenance, strict output validation, worker routing, replay without duplicate provider calls, permission denial, proposals remaining unaccepted, governed supersession and preservation of the original body. **Automatic discovery and scheduling from dependency-change events remains unfinished**; hosts currently call `StartMemoryRefresh` explicitly.

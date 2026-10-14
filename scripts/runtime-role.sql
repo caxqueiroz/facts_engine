@@ -74,3 +74,6 @@ GRANT SELECT ON memory_versions,memory_types,memory_timeline_generations,memory_
 
 GRANT SELECT,INSERT ON context_memory_items,decision_memory_items TO facts_runtime;
 GRANT SELECT ON context_memory_items,decision_memory_items TO facts_archiver;
+
+GRANT SELECT,INSERT ON extraction_memory_proposals TO facts_runtime;
+GRANT SELECT ON extraction_memory_proposals TO facts_archiver;

@@ -103,6 +103,12 @@ func (t *transaction) flushExtractionRun(ctx context.Context, e model.Event) err
 			return err
 		}
 		for _, p := range r.Proposals {
+			if p.RecordKind == "memory" {
+				if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_memory_proposals VALUES($1,$2,$3,$4,$5)`, t.tenant, r.AttemptID, p.Candidate, p.RecordID, p.VersionID); err != nil {
+					return err
+				}
+				continue
+			}
 			if _, err = t.tx.Exec(ctx, `INSERT INTO extraction_proposals VALUES($1,$2,$3,$4,$5)`, t.tenant, r.AttemptID, p.Candidate, p.RecordID, p.VersionID); err != nil {
 				return err
 			}
@@ -122,7 +128,7 @@ func (t *transaction) FailExpiredExtraction(ctx context.Context, id string, fenc
 	return nil
 }
 func (t *transaction) RejectExtractionInput(ctx context.Context, id string) error {
-	done, err := t.tx.Exec(ctx, `UPDATE extraction_job_state SET state='failed',fence=fence+1,last_failure_code='input_limit' WHERE tenant_id=$1 AND id=$2 AND state='pending'`, t.tenant, id)
+	done, err := t.tx.Exec(ctx, `UPDATE extraction_job_state SET state='failed',fence=fence+1,lease_until=NULL,last_failure_code='input_limit' WHERE tenant_id=$1 AND id=$2 AND (state='pending' OR (state='running' AND lease_until<=clock_timestamp()))`, t.tenant, id)
 	if err != nil {
 		return err
 	}

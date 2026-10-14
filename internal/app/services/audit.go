@@ -302,6 +302,13 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				}
 			}
 		case "extraction_job", "extraction_attempt", "extraction_result":
+			var artifact struct{ RefreshScopes []string }
+			if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
+				return nil, nil, err
+			}
+			for _, scope := range artifact.RefreshScopes {
+				include = include && scope == r.Scope
+			}
 			if !r.IncludeEvidence {
 				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "model_payloads_withheld"})
 				continue

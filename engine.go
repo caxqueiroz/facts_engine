@@ -330,3 +330,9 @@ func (e *Engine) RecallMemories(ctx context.Context, c Caller, q model.RecallReq
 }
 
 type MemoryRecallResult = model.MemoryRecallResult
+
+func (e *Engine) StartMemoryRefresh(ctx context.Context, c Caller, r model.MemoryRefreshRequest) (model.JobStatus, error) {
+	return e.service.StartMemoryRefresh(ctx, c, r)
+}
+
+type MemoryRefreshRequest = model.MemoryRefreshRequest

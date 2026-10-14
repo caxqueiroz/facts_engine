@@ -275,14 +275,16 @@ type ExtractionAttempt struct {
 }
 
 type ExtractionJob struct {
-	TenantID       string
-	ID             string
-	ScopeID        string
-	ConversationID string
-	ProfileID      string
-	ProfileDigest  string
-	LedgerRevision int64
-	Payload        []byte
+	TenantID        string
+	ID              string
+	ScopeID         string
+	ConversationID  pgtype.Text
+	ProfileID       string
+	ProfileDigest   string
+	LedgerRevision  int64
+	Payload         []byte
+	MemoryRecordID  pgtype.Text
+	MemoryVersionID pgtype.Text
 }
 
 type ExtractionJobState struct {
@@ -296,6 +298,14 @@ type ExtractionJobState struct {
 	AvailableAt     pgtype.Timestamptz
 	LeaseUntil      pgtype.Timestamptz
 	LastFailureCode string
+}
+
+type ExtractionMemoryProposal struct {
+	TenantID  string
+	AttemptID string
+	Ordinal   int32
+	RecordID  string
+	VersionID string
 }
 
 type ExtractionProposal struct {

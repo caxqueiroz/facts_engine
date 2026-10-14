@@ -103,5 +103,7 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 			}
 		}
 	}
+	t.pendingMemoryVersion = nil
+	t.pendingMemoryType = nil
 	return nil
 }

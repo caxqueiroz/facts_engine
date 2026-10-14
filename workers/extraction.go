@@ -26,7 +26,7 @@ func (e *Extraction) Handle(ctx context.Context, d model.Delivery) error {
 		return model.ErrDenied
 	}
 	switch d.Event.Type {
-	case "start_extraction", "retry_extraction":
+	case "start_extraction", "start_memory_refresh", "retry_extraction":
 	default:
 		return nil
 	}
