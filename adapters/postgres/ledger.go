@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingRetention     *model.RetentionEvent
 	pendingContext       *model.ContextManifest
 	pendingDecision      *model.DecisionRecord
 	decisionItemScopes   map[model.VersionReference]string
@@ -199,6 +200,12 @@ func (t *transaction) Evidence(ctx context.Context, id string) (model.Evidence, 
 	return e, err
 }
 func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (string, error) {
+	if err := t.lockRetentionScope(ctx, e.Scope); err != nil {
+		return "", err
+	}
+	if err := t.lockEvidenceObject(ctx, e.Object); err != nil {
+		return "", err
+	}
 	source := model.Digest([]string{e.SourceSystem, e.SourceObject, e.SourceRevision})
 	var existing, digest string
 	err := t.tx.QueryRow(ctx, `SELECT id,digest FROM evidence WHERE tenant_id=$1 AND scope_id=$2 AND source_identity=$3`, t.tenant, e.Scope, source).Scan(&existing, &digest)
@@ -216,6 +223,10 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 		return "", err
 	}
 	_, err = t.tx.Exec(ctx, `INSERT INTO evidence VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, e.ID, e.Scope, source, e.Object.Digest, b)
+	if err != nil {
+		return "", err
+	}
+	_, err = t.tx.Exec(ctx, `INSERT INTO evidence_retention(tenant_id,evidence_id,scope_id,locator,object_version) VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.Scope, e.Object.Locator, e.Object.Version)
 	return e.ID, err
 }
 func (t *transaction) Record(ctx context.Context, id string) (model.Record, error) {
@@ -242,6 +253,11 @@ func (t *transaction) Version(ctx context.Context, record, id string) (model.Ver
 	return v, err
 }
 func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error {
+	for _, source := range v.Proposal.Sources {
+		if err := t.guardEvidenceReference(ctx, source.EvidenceID); err != nil {
+			return err
+		}
+	}
 	b, err := t.encode(v)
 	if err != nil {
 		return err
@@ -278,7 +294,10 @@ func (t *transaction) Attestations(ctx context.Context, version string) ([]model
 	}
 	return out, rows.Err()
 }
-func (t *transaction) InsertAttestation(_ context.Context, a model.Attestation) error {
+func (t *transaction) InsertAttestation(ctx context.Context, a model.Attestation) error {
+	if err := t.guardEvidenceReference(ctx, a.EvidenceID); err != nil {
+		return err
+	}
 	t.pendingAttestation = &a
 	return nil
 }
@@ -351,6 +370,9 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	err = t.flushTemporal(ctx, e)
 	if err != nil {
 		return e, err
+	}
+	if err = t.flushRetention(ctx, e); err != nil {
+		return model.Event{}, err
 	}
 	if err = t.flushContext(ctx, e); err != nil {
 		return model.Event{}, err

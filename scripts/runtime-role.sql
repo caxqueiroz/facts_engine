@@ -37,3 +37,14 @@ GRANT SELECT,INSERT ON projection_rebuild_events TO facts_rebuild;
 GRANT INSERT ON tenant_revisions TO facts_rebuild;
 GRANT SELECT,INSERT ON context_manifests,context_scopes,context_items,decision_receipts,decision_scopes,decision_items,decision_artifacts TO facts_runtime;
 GRANT SELECT ON context_manifests,context_scopes,context_items,decision_receipts,decision_scopes,decision_items,decision_artifacts TO facts_archiver;
+-- Retention metadata is readable by engine/archiver; privileged changes use
+-- separate database and OpenFGA roles, never ordinary runtime credentials.
+GRANT SELECT ON retention_domain TO facts_runtime,facts_archiver;
+GRANT SELECT ON retention_events,retention_policies,legal_holds,legal_hold_releases,evidence_retention,retention_objects,retention_scopes TO facts_runtime,facts_archiver;
+GRANT INSERT ON retention_scopes,retention_objects,evidence_retention TO facts_runtime;
+GRANT UPDATE(epoch) ON retention_scopes,retention_objects TO facts_runtime;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_retention') THEN CREATE ROLE facts_retention NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
+GRANT facts_runtime TO facts_retention;
+GRANT INSERT ON retention_events,retention_policies,legal_holds,legal_hold_releases TO facts_retention;
+GRANT UPDATE(disposed) ON retention_objects TO facts_retention;
+GRANT DELETE ON evidence_objects TO facts_retention;

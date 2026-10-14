@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
-func (t *transaction) StageCalculation(_ context.Context, r model.CalculationRecord, snapshots []model.FactSnapshot) error {
+func (t *transaction) StageCalculation(ctx context.Context, r model.CalculationRecord, snapshots []model.FactSnapshot) error {
+	for _, ref := range []model.ArtifactReference{r.Receipt.Input, r.Receipt.Output} {
+		if err := t.guardEvidenceReference(ctx, ref.EvidenceID); err != nil {
+			return err
+		}
+	}
 	t.pendingCalculation = &r
 	t.calculationSnapshots = snapshots
 	return nil
@@ -26,7 +31,10 @@ func (t *transaction) CalculationRun(ctx context.Context, application, run strin
 	err := t.read(ctx, &r, `SELECT payload FROM calculation_receipts WHERE tenant_id=$1 AND application_id=$2 AND external_run_id=$3`, t.tenant, application, run)
 	return r, err
 }
-func (t *transaction) StageAuditJob(_ context.Context, j model.AuditExportJob) error {
+func (t *transaction) StageAuditJob(ctx context.Context, j model.AuditExportJob) error {
+	if err := t.lockRetentionScope(ctx, j.Request.Scope); err != nil {
+		return err
+	}
 	t.pendingAuditJob = &j
 	return nil
 }

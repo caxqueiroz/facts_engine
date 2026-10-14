@@ -1,0 +1,110 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"github.com/caxqueiroz/facts_engine/model"
+)
+
+func retentionTx(tx model.Tx) (model.RetentionTx, error) {
+	t, ok := tx.(model.RetentionTx)
+	if !ok {
+		return nil, model.ErrPrecondition
+	}
+	return t, nil
+}
+func (s *Service) retentionMutation(ctx context.Context, c model.Caller, scope, kind, permission, target string, cmd model.Command, input any, event model.RetentionEvent, dispose bool) (model.CommitResult, error) {
+	return s.mutate(ctx, c, scope, kind, permission, cmd, input, func(tx model.Tx, out *model.CommitResult) error {
+		t, err := retentionTx(tx)
+		if err != nil {
+			return err
+		}
+		event.ID = id()
+		event.Tenant = c.Tenant
+		event.Scope = scope
+		event.Kind = kind
+		event.TargetID = target
+		event.Caller = c
+		event.Command = cmd
+		if dispose {
+			if err = t.DisposeEvidence(ctx, *event.Disposal); err != nil {
+				return err
+			}
+		}
+		out.ID = event.ID
+		return t.StageRetention(ctx, event)
+	})
+}
+func (s *Service) RegisterRetentionPolicy(ctx context.Context, c model.Caller, r model.RetentionPolicyRequest) (model.CommitResult, error) {
+	p := r.Policy
+	if !model.ValidID(p.ID) || !model.ValidID(p.Scope) || p.RecordClass != "evidence_bytes" || p.Purpose == "" || len(p.Purpose) > 256 || !model.ValidID(p.Jurisdiction) || p.MinimumAgeSeconds < 0 || p.MinimumAgeSeconds > 100*366*86400 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	return s.retentionMutation(ctx, c, p.Scope, "register_retention_policy", "can_manage_retention", p.ID, r.Command, r, model.RetentionEvent{Policy: &p}, false)
+}
+func (s *Service) PlaceLegalHold(ctx context.Context, c model.Caller, r model.LegalHoldRequest) (model.CommitResult, error) {
+	if !model.ValidID(r.ID) || r.Reason == "" || len(r.Reason) > 1024 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	return s.retentionMutation(ctx, c, r.Scope, "place_legal_hold", "can_manage_legal_hold", r.ID, r.Command, r, model.RetentionEvent{Hold: &r}, false)
+}
+func (s *Service) ReleaseLegalHold(ctx context.Context, c model.Caller, r model.ReleaseLegalHoldRequest) (model.CommitResult, error) {
+	if !model.ValidID(r.ID) || r.Reason == "" || len(r.Reason) > 1024 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	return s.retentionMutation(ctx, c, r.Scope, "release_legal_hold", "can_manage_legal_hold", r.ID, r.Command, r, model.RetentionEvent{Release: &r}, false)
+}
+func (s *Service) DisposeEvidence(ctx context.Context, c model.Caller, r model.EvidenceDisposalRequest) (model.CommitResult, error) {
+	if !model.ValidID(r.EvidenceID) || !model.ValidID(r.PolicyID) || !model.ValidID(r.Jurisdiction) || r.Reason == "" || len(r.Reason) > 1024 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, r.Scope, "can_dispose", r.Command); err != nil {
+		return model.CommitResult{}, err
+	}
+	// The initial disposal adapter operates only on PostgreSQL evidence in the
+	// very same retention domain as the ledger. External stores fail closed.
+	ledger, ok := s.ledger.(model.RetentionDomain)
+	if !ok {
+		return model.CommitResult{}, model.ErrPrecondition
+	}
+	store, ok := s.evidence.(model.RetentionDomain)
+	if !ok {
+		return model.CommitResult{}, model.ErrPrecondition
+	}
+	a, err := ledger.RetentionDomain(ctx)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
+	b, err := store.RetentionDomain(ctx)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
+	if a == "" || a != b {
+		return model.CommitResult{}, model.ErrPrecondition
+	}
+	return s.retentionMutation(ctx, c, r.Scope, "dispose_evidence", "can_dispose", r.EvidenceID, r.Command, r, model.RetentionEvent{Disposal: &r, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy", "referenced_payloads_require_coordinated_disposal"}}, true)
+}
+func (s *Service) GetRetentionStatus(ctx context.Context, c model.Caller, q model.RetentionStatusQuery) (model.RetentionStatus, error) {
+	if !model.ValidID(q.EvidenceID) {
+		return model.RetentionStatus{}, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, q.Scope, "can_manage_retention", model.Command{Purpose: q.Purpose}); err != nil {
+		return model.RetentionStatus{}, err
+	}
+	var status model.RetentionStatus
+	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		t, err := retentionTx(tx)
+		if err != nil {
+			return err
+		}
+		status, err = t.RetentionStatus(ctx, q.Scope, q.EvidenceID)
+		return err
+	})
+	if errors.Is(err, model.ErrNotFound) {
+		err = model.ErrDenied
+	}
+	if err != nil {
+		return model.RetentionStatus{}, err
+	}
+	return status, nil
+}

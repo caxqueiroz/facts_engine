@@ -66,6 +66,63 @@
         "auditor": {
           "this": {}
         },
+        "retention_administrator": {
+          "this": {}
+        },
+        "legal_custodian": {
+          "this": {}
+        },
+        "disposal_operator": {
+          "this": {}
+        },
+        "can_manage_retention": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "retention_administrator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_manage_legal_hold": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "legal_custodian"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_dispose": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "disposal_operator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "operator": {
           "this": {}
         },
@@ -393,6 +450,36 @@
             ]
           },
           "auditor": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "retention_administrator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "legal_custodian": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "disposal_operator": {
             "directly_related_user_types": [
               {
                 "type": "user"

@@ -48,7 +48,15 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 		return ref, err
 	}
 	err = s.transaction(ctx, tenant, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO evidence_objects VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, tenant, id, ref.Version, b)
+		var disposed bool
+		err := tx.QueryRow(ctx, `INSERT INTO retention_objects(tenant_id,locator,object_version,epoch) VALUES($1,$2,$3,1) ON CONFLICT(tenant_id,locator,object_version) DO UPDATE SET epoch=retention_objects.epoch+1 RETURNING disposed`, tenant, id, ref.Version).Scan(&disposed)
+		if err != nil {
+			return err
+		}
+		if disposed {
+			return model.ErrPrecondition
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO evidence_objects VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, tenant, id, ref.Version, b)
 		return err
 	})
 	if err != nil {
@@ -79,4 +87,10 @@ func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef)
 		return nil, model.ErrPrecondition
 	}
 	return p, nil
+}
+
+func (s *Postgres) RetentionDomain(ctx context.Context) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx, `SELECT 'postgres:'||identity::text FROM retention_domain WHERE id`).Scan(&id)
+	return id, err
 }

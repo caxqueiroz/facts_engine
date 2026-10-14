@@ -31,7 +31,12 @@ func (t *transaction) DecisionRun(ctx context.Context, application, run string) 
 	err := t.read(ctx, &r, `SELECT payload FROM decision_receipts WHERE tenant_id=$1 AND application_id=$2 AND external_decision_id=$3`, t.tenant, application, run)
 	return r, err
 }
-func (t *transaction) StageDecision(_ context.Context, r model.DecisionRecord, scopes map[model.VersionReference]string) error {
+func (t *transaction) StageDecision(ctx context.Context, r model.DecisionRecord, scopes map[model.VersionReference]string) error {
+	for _, ref := range model.DecisionArtifacts(r.Receipt) {
+		if err := t.guardEvidenceReference(ctx, ref.EvidenceID); err != nil {
+			return err
+		}
+	}
 	if r.Tenant != t.tenant {
 		return model.ErrInvalid
 	}

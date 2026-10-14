@@ -206,6 +206,15 @@ type EvidenceObject struct {
 	Payload       []byte
 }
 
+type EvidenceRetention struct {
+	TenantID      string
+	EvidenceID    string
+	ScopeID       string
+	Locator       string
+	ObjectVersion string
+	RegisteredAt  pgtype.Timestamptz
+}
+
 type FactSnapshot struct {
 	TenantID          string
 	ID                string
@@ -233,6 +242,18 @@ type LedgerEvent struct {
 	ScopeID        string
 	Payload        []byte
 	RecordedAt     pgtype.Timestamptz
+}
+
+type LegalHold struct {
+	TenantID string
+	ScopeID  string
+	ID       string
+}
+
+type LegalHoldRelease struct {
+	TenantID string
+	ScopeID  string
+	ID       string
 }
 
 type Outbox struct {
@@ -312,6 +333,42 @@ type RejectedVersion struct {
 	RecordID       string
 	VersionID      string
 	LedgerRevision int64
+}
+
+type RetentionDomain struct {
+	ID       bool
+	Identity pgtype.UUID
+}
+
+type RetentionEvent struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	Kind           string
+	TargetID       string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type RetentionObject struct {
+	TenantID      string
+	Locator       string
+	ObjectVersion string
+	Epoch         int64
+	Disposed      bool
+}
+
+type RetentionPolicy struct {
+	TenantID string
+	ScopeID  string
+	ID       string
+	Payload  []byte
+}
+
+type RetentionScope struct {
+	TenantID string
+	ScopeID  string
+	Epoch    int64
 }
 
 type TenantRevision struct {

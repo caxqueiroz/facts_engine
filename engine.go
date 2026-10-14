@@ -180,3 +180,19 @@ type ContextQuery = model.ContextQuery
 type DecisionReceipt = model.DecisionReceipt
 type DecisionRecord = model.DecisionRecord
 type DecisionQuery = model.DecisionQuery
+
+func (e *Engine) RegisterRetentionPolicy(ctx context.Context, c Caller, r model.RetentionPolicyRequest) (CommitResult, error) {
+	return e.service.RegisterRetentionPolicy(ctx, c, r)
+}
+func (e *Engine) PlaceLegalHold(ctx context.Context, c Caller, r model.LegalHoldRequest) (CommitResult, error) {
+	return e.service.PlaceLegalHold(ctx, c, r)
+}
+func (e *Engine) ReleaseLegalHold(ctx context.Context, c Caller, r model.ReleaseLegalHoldRequest) (CommitResult, error) {
+	return e.service.ReleaseLegalHold(ctx, c, r)
+}
+func (e *Engine) DisposeEvidence(ctx context.Context, c Caller, r model.EvidenceDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeEvidence(ctx, c, r)
+}
+func (e *Engine) GetRetentionStatus(ctx context.Context, c Caller, q model.RetentionStatusQuery) (model.RetentionStatus, error) {
+	return e.service.GetRetentionStatus(ctx, c, q)
+}

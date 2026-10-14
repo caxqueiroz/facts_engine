@@ -107,6 +107,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
+			{"retention", `SELECT id,payload FROM retention_events WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"context", `SELECT id,payload FROM context_manifests WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"decision", `SELECT id,payload FROM decision_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"snapshot", `SELECT id,payload FROM fact_snapshots WHERE tenant_id=$1 AND creation_revision=$2`},
