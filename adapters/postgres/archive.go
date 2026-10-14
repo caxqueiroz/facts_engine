@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"sort"
 )
@@ -16,7 +17,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		t := tx.(*transaction)
 		p = model.ArchivePayload{}
 		var b []byte
-		if err := t.tx.QueryRow(ctx, `SELECT payload,recorded_at FROM ledger_events WHERE tenant_id=$1 AND id=$2 AND ledger_revision=$3`, d.Key.Tenant, d.Event.ID, d.Event.LedgerRevision).Scan(&b, &p.Event.RecordedAt); err != nil {
+		if err := t.tx.QueryRow(ctx, ledgerdb.GetArchiveEvent, d.Key.Tenant, d.Event.ID, d.Event.LedgerRevision).Scan(&b, &p.Event.RecordedAt); err != nil {
 			return err
 		}
 		at := p.Event.RecordedAt
@@ -180,25 +181,25 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
-			{"scope_identity", `SELECT scope_id||'/'||revision::text,payload FROM scope_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"subject_identity", `SELECT subject_id||'/'||revision::text,payload FROM subject_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"memory_timeline", `SELECT record_id||'/'||ordinal::text,payload FROM memory_timeline_history WHERE tenant_id=$1 AND ledger_revision=$2 ORDER BY record_id,ordinal`},
-			{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"extraction_attempt", `SELECT id,payload FROM extraction_attempts WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"extraction_result", `SELECT attempt_id,payload FROM extraction_results WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"extraction_job", `SELECT id,payload FROM extraction_jobs WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"extraction_retry", `SELECT id,payload FROM extraction_retry_events WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"conversation", `SELECT id,payload FROM conversations WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"retention", `SELECT id,payload FROM retention_events WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"context", `SELECT id,payload FROM context_manifests WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"decision", `SELECT id,payload FROM decision_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"snapshot", `SELECT id,payload FROM fact_snapshots WHERE tenant_id=$1 AND creation_revision=$2`},
-			{"calculation", `SELECT id,payload FROM calculation_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"memory_attestation", `SELECT a.id,a.payload FROM memory_attestations a WHERE a.tenant_id=$1 AND (a.ledger_revision=$2 OR EXISTS(SELECT 1 FROM memory_attestation_events w WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND w.ledger_revision=$2))`},
-			{"attestation", `SELECT id,payload FROM attestations WHERE tenant_id=$1 AND ledger_revision=$2`},
-			{"timeline", `SELECT record_id||'/'||ordinal::text,payload FROM timeline_history WHERE tenant_id=$1 AND ledger_revision=$2 ORDER BY record_id,ordinal`},
-			{"audit_export", `SELECT id,payload FROM audit_exports WHERE tenant_id=$1 AND ledger_revision=$2`},
+			{"scope_identity", ledgerdb.ListArchiveScopeIdentity},
+			{"subject_identity", ledgerdb.ListArchiveSubjectIdentity},
+			{"memory_timeline", ledgerdb.ListArchiveMemoryTimeline},
+			{"memory_type", ledgerdb.ListArchiveMemoryType},
+			{"memory_version", ledgerdb.ListArchiveMemoryVersion},
+			{"extraction_attempt", ledgerdb.ListArchiveExtractionAttempt},
+			{"extraction_result", ledgerdb.ListArchiveExtractionResult},
+			{"extraction_job", ledgerdb.ListArchiveExtractionJob},
+			{"extraction_retry", ledgerdb.ListArchiveExtractionRetry},
+			{"conversation", ledgerdb.ListArchiveConversation},
+			{"retention", ledgerdb.ListArchiveRetention},
+			{"context", ledgerdb.ListArchiveContext},
+			{"decision", ledgerdb.ListArchiveDecision},
+			{"snapshot", ledgerdb.ListArchiveSnapshot},
+			{"calculation", ledgerdb.ListArchiveCalculation},
+			{"memory_attestation", ledgerdb.ListArchiveMemoryAttestation},
+			{"attestation", ledgerdb.ListArchiveAttestation},
+			{"timeline", ledgerdb.ListArchiveTimeline},
+			{"audit_export", ledgerdb.ListArchiveAuditExport},
 		}
 		total := 0
 		for _, q := range queries {
@@ -315,7 +316,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				}
 				for _, id := range append([]string{calculation.Receipt.SnapshotID}, calculation.Receipt.ReferenceSnapshotIDs...) {
 					var snapshot model.FactSnapshot
-					if err := t.read(ctx, &snapshot, `SELECT payload FROM fact_snapshots WHERE tenant_id=$1 AND id=$2`, d.Key.Tenant, id); err != nil {
+					if err := t.read(ctx, &snapshot, ledgerdb.GetSnapshotPayload, d.Key.Tenant, id); err != nil {
 						return err
 					}
 					for _, item := range snapshot.Items {

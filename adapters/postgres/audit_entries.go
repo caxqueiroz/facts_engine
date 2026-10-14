@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"time"
 )
@@ -27,30 +28,30 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 		return nil
 	}
 	queries := []struct{ kind, query string }{
-		{"scope_identity", `SELECT scope_id||'/'||revision::text,payload FROM scope_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY revision`},
-		{"subject_identity", `SELECT subject_id||'/'||revision::text,payload FROM subject_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
-		{"memory_timeline", `SELECT h.record_id||'/'||h.ledger_revision::text||'/'||h.ordinal::text,h.payload FROM memory_timeline_history h JOIN records r ON r.tenant_id=h.tenant_id AND r.id=h.record_id WHERE h.tenant_id=$1 AND r.scope_id=$2 ORDER BY h.ledger_revision,h.record_id,h.ordinal`},
-		{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
-		{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
-		{"context", `SELECT c.id,c.payload FROM context_manifests c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM context_scopes s WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
-		{"decision", `SELECT c.id,c.payload FROM decision_receipts c WHERE c.tenant_id=$1 AND EXISTS(SELECT 1 FROM decision_scopes s WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id`},
-		{"extraction_attempt", `SELECT a.id,a.payload FROM extraction_attempts a JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1 FROM extraction_memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1 FROM memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY a.ledger_revision`},
-		{"extraction_result", `SELECT a.attempt_id,a.payload FROM extraction_results a JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1 FROM extraction_memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1 FROM memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY a.ledger_revision`},
-		{"extraction_retry", `SELECT r.id,r.payload FROM extraction_retry_events r JOIN extraction_jobs j ON j.tenant_id=r.tenant_id AND j.id=r.job_id WHERE r.tenant_id=$1 AND j.scope_id=$2 ORDER BY r.ledger_revision`},
-		{"extraction_job", `SELECT j.id,j.payload FROM extraction_jobs j WHERE j.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1 FROM extraction_memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1 FROM memory_dependencies d WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY j.ledger_revision`},
-		{"conversation", `SELECT id,payload FROM conversations WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
-		{"retention", `SELECT id,payload FROM retention_events WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
-		{"policy", `SELECT id,payload FROM policy_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
-		{"predicate", `SELECT predicate||'/'||version,payload FROM predicate_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY predicate,version`},
-		{"version", `SELECT id,payload FROM record_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
-		{"evidence", `SELECT id,payload FROM evidence WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
-		{"memory_attestation", `SELECT id,payload FROM memory_attestations WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
-		{"attestation", `SELECT id,payload FROM attestations WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
-		{"snapshot", `SELECT s.id,s.payload FROM fact_snapshots s WHERE s.tenant_id=$1 AND EXISTS(SELECT 1 FROM fact_snapshot_items i WHERE i.tenant_id=s.tenant_id AND i.snapshot_id=s.id AND i.scope_id=$2) ORDER BY s.id`},
-		{"calculation", `SELECT c.id,c.payload FROM calculation_receipts c WHERE c.tenant_id=$1 AND (c.scope_id=$2 OR EXISTS(SELECT 1 FROM calculation_snapshots cs JOIN fact_snapshot_items i ON i.tenant_id=cs.tenant_id AND i.snapshot_id=cs.snapshot_id WHERE cs.tenant_id=c.tenant_id AND cs.calculation_id=c.id AND i.scope_id=$2)) ORDER BY c.id`},
+		{"scope_identity", ledgerdb.ListAuditScopeIdentity},
+		{"subject_identity", ledgerdb.ListAuditSubjectIdentity},
+		{"memory_timeline", ledgerdb.ListAuditMemoryTimeline},
+		{"memory_type", ledgerdb.ListAuditMemoryType},
+		{"memory_version", ledgerdb.ListAuditMemoryVersion},
+		{"context", ledgerdb.ListAuditContext},
+		{"decision", ledgerdb.ListAuditDecision},
+		{"extraction_attempt", ledgerdb.ListAuditExtractionAttempt},
+		{"extraction_result", ledgerdb.ListAuditExtractionResult},
+		{"extraction_retry", ledgerdb.ListAuditExtractionRetry},
+		{"extraction_job", ledgerdb.ListAuditExtractionJob},
+		{"conversation", ledgerdb.ListAuditConversation},
+		{"retention", ledgerdb.ListAuditRetention},
+		{"policy", ledgerdb.ListAuditPolicy},
+		{"predicate", ledgerdb.ListAuditPredicate},
+		{"version", ledgerdb.ListAuditVersion},
+		{"evidence", ledgerdb.ListAuditEvidence},
+		{"memory_attestation", ledgerdb.ListAuditMemoryAttestation},
+		{"attestation", ledgerdb.ListAuditAttestation},
+		{"snapshot", ledgerdb.ListAuditSnapshot},
+		{"calculation", ledgerdb.ListAuditCalculation},
 	}
 	for _, q := range queries {
-		rows, err := t.tx.Query(ctx, q.query+" LIMIT 10001", t.tenant, scope)
+		rows, err := t.tx.Query(ctx, q.query, t.tenant, scope)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -79,7 +80,7 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 			return nil, nil, err
 		}
 	}
-	rows, err := t.tx.Query(ctx, `SELECT id,subject_id,predicate,discriminator,stream_revision,kind FROM records WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001`, t.tenant, scope)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListAuditRecords, t.tenant, scope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -99,7 +100,7 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 	if err != nil {
 		return nil, nil, err
 	}
-	rows, err = t.tx.Query(ctx, `SELECT payload,recorded_at FROM ledger_events WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001`, t.tenant, scope)
+	rows, err = t.tx.Query(ctx, ledgerdb.ListAuditEvents, t.tenant, scope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -126,7 +127,7 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 	if err != nil {
 		return nil, nil, err
 	}
-	rows, err = t.tx.Query(ctx, `SELECT h.record_id,h.ledger_revision,h.ordinal,h.payload FROM timeline_history h JOIN records r ON r.tenant_id=h.tenant_id AND r.id=h.record_id WHERE h.tenant_id=$1 AND r.scope_id=$2 ORDER BY h.record_id,h.ledger_revision,h.ordinal LIMIT 10001`, t.tenant, scope)
+	rows, err = t.tx.Query(ctx, ledgerdb.ListAuditFactTimeline, t.tenant, scope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,7 +161,7 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 	if err != nil {
 		return nil, nil, err
 	}
-	rows, err = t.tx.Query(ctx, `SELECT e.attestation_id,e.actor,e.recorded_at,e.ledger_revision FROM attestation_events e JOIN attestations a ON a.tenant_id=e.tenant_id AND a.id=e.attestation_id WHERE e.tenant_id=$1 AND a.scope_id=$2 ORDER BY e.attestation_id LIMIT 10001`, t.tenant, scope)
+	rows, err = t.tx.Query(ctx, ledgerdb.ListAuditAttestationWithdrawals, t.tenant, scope)
 	if err != nil {
 		return nil, nil, err
 	}

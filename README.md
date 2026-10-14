@@ -213,7 +213,7 @@ Tests cover exact copied bytes, malformed mappings, UTF-8 boundaries, policy/per
 
 | Query source | Converted operations |
 | --- | --- |
-| `sql/queries/ledger.sql` | Tenant binding and revision allocation, record locks/revisions, outbox insertion |
+| `sql/queries/ledger.sql` | Tenant binding and revision allocation, record locks/revisions, event append, current attestations, active predicates and outbox insertion |
 | `sql/queries/identities.sql` | Scope and subject history, revision locks, exact lookups, registration guards |
 | `sql/queries/commands.sql` | Command receipts, policy/predicate publication, evidence and fact-version registration, conversations, confirmation artifacts |
 | `sql/queries/memories.sql` | Memory definitions, proposals, evidence/dependency links, attestations |
@@ -224,14 +224,17 @@ Tests cover exact copied bytes, malformed mappings, UTF-8 boundaries, policy/per
 | `sql/queries/outbox.sql` | Consumer registration, delivery claims/renewals/acknowledgements/failures, operator retries and scoped change feeds |
 | `sql/queries/rebuild.sql` | Generation state, management locks, consumer pause/resume, active-generation cutover and legacy/paged verification inventories |
 | `sql/queries/retention.sql` | Retention locks/policies, legal holds, reference blockers, age checks and atomic unreferenced-evidence disposal |
+| `sql/queries/archive.sql` | Revision-bound event archives and scope-qualified audit enumeration, including retained artifact links |
+| `sql/queries/evidence.sql` | Encrypted development evidence-object storage and reads |
+| `sql/queries/runtime.sql` | Runtime role safety and migration readiness checks against explicitly qualified PostgreSQL catalogs |
 
-Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Query conversion is still incomplete; archive enumeration and other query families remain to be converted.
+Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Ledger and PostgreSQL evidence-store SQL is now centralized in these sources. Adapter orchestration still owns encryption, streaming limits, transaction ordering and authorization-related checks. CortexDB index SQL uses its separate upstream-managed schema and is outside this ledger query set.
 
 ## Remaining delivery work
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: full sqlc query coverage. Extraction concurrency, token and optional cost-reservation budgets are implemented. Human-review prerequisites and policy-controlled attestation expiry/maximum age are implemented. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
+1. Ledger and PostgreSQL evidence-store sqlc query coverage is implemented, including runtime catalog checks and archive enumeration. Extraction concurrency, token and optional cost-reservation budgets are implemented. Human-review prerequisites and policy-controlled attestation expiry/maximum age are implemented. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
 2. Complete redaction support for memory dependency payloads and memory refresh jobs. Conversation extraction supports required, policy-bound derivative substitution. Versioned omission-only evidence derivatives with parent mappings and retention guards are implemented. Explicit input ranges and authorized deterministic chunk planning are implemented. Conversation memory candidate extraction is implemented. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Complete workload tuning and other job types. Paginated rebuild verification with bounded memory is implemented. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,7 +31,7 @@ func (s *Postgres) transaction(ctx context.Context, tenant string, fn func(pgx.T
 		return err
 	}
 	defer tx.Rollback(context.WithoutCancel(ctx))
-	if _, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id',$1,true)`, tenant); err != nil {
+	if err = ledgerdb.New(tx).BindTenant(ctx, tenant); err != nil {
 		return err
 	}
 	if err = fn(tx); err != nil {
@@ -48,15 +49,14 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 		return ref, err
 	}
 	err = s.transaction(ctx, tenant, func(tx pgx.Tx) error {
-		var disposed bool
-		err := tx.QueryRow(ctx, `INSERT INTO retention_objects(tenant_id,locator,object_version,epoch) VALUES($1,$2,$3,1) ON CONFLICT(tenant_id,locator,object_version) DO UPDATE SET epoch=retention_objects.epoch+1 RETURNING disposed`, tenant, id, ref.Version).Scan(&disposed)
+		disposed, err := ledgerdb.New(tx).LockRetentionObject(ctx, ledgerdb.LockRetentionObjectParams{TenantID: tenant, Locator: id, ObjectVersion: ref.Version})
 		if err != nil {
 			return err
 		}
 		if disposed {
 			return model.ErrPrecondition
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO evidence_objects VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, tenant, id, ref.Version, b)
+		err = ledgerdb.New(tx).InsertEvidenceObject(ctx, ledgerdb.InsertEvidenceObjectParams{TenantID: tenant, Locator: id, ObjectVersion: ref.Version, Payload: b})
 		return err
 	})
 	if err != nil {
@@ -74,7 +74,9 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef) ([]byte, error) {
 	var b []byte
 	err := s.transaction(ctx, tenant, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT payload FROM evidence_objects WHERE tenant_id=$1 AND locator=$2 AND object_version=$3`, tenant, ref.Locator, ref.Version).Scan(&b)
+		var err error
+		b, err = ledgerdb.New(tx).GetEvidenceObjectPayload(ctx, ledgerdb.GetEvidenceObjectPayloadParams{TenantID: tenant, Locator: ref.Locator, ObjectVersion: ref.Version})
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("evidence unavailable: %w", model.ErrPrecondition)
@@ -90,7 +92,6 @@ func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef)
 }
 
 func (s *Postgres) RetentionDomain(ctx context.Context) (string, error) {
-	var id string
-	err := s.pool.QueryRow(ctx, `SELECT 'postgres:'||identity::text FROM retention_domain WHERE id`).Scan(&id)
+	id, err := ledgerdb.New(s.pool).GetRetentionDomain(ctx)
 	return id, err
 }

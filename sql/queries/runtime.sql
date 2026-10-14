@@ -1,0 +1,13 @@
+-- name: IsSafeLedgerRole :one
+SELECT NOT rolsuper AND NOT rolbypassrls AND NOT EXISTS (SELECT 1
+FROM pg_catalog.pg_tables
+WHERE schemaname='public' AND tablename='ledger_events' AND tableowner=current_user)
+FROM pg_catalog.pg_roles
+WHERE rolname=current_user;
+
+-- name: IsLedgerSchemaReady :one
+SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL AND to_regclass('public.subject_lookup') IS NOT NULL AND to_regclass('public.scope_versions') IS NOT NULL AND to_regclass('public.subject_versions') IS NOT NULL AND to_regclass('public.extraction_subjects') IS NOT NULL AND to_regclass('public.confirmation_artifacts') IS NOT NULL AND to_regclass('public.attestation_delegations') IS NOT NULL AND to_regclass('public.evidence_derivations') IS NOT NULL AND to_regclass('public.extraction_redactions') IS NOT NULL AND EXISTS(SELECT 1
+FROM pg_catalog.pg_attribute
+WHERE attrelid=to_regclass('public.projection_generations') AND attname='verification_version' AND NOT attisdropped) AND EXISTS(SELECT 1
+FROM pg_catalog.pg_attribute
+WHERE attrelid=to_regclass('public.extraction_quota') AND attname='reserved_cost_units' AND NOT attisdropped);

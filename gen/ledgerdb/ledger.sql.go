@@ -7,6 +7,8 @@ package ledgerdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const AllocateRevision = `-- name: AllocateRevision :one
@@ -38,6 +40,55 @@ func (q *Queries) EnsureTenant(ctx context.Context, tenantID string) error {
 	return err
 }
 
+const GetActivePredicate = `-- name: GetActivePredicate :one
+SELECT version FROM active_predicates WHERE tenant_id=$1 AND scope_id=$2 AND predicate=$3 FOR SHARE
+`
+
+type GetActivePredicateParams struct {
+	TenantID  string
+	ScopeID   string
+	Predicate string
+}
+
+func (q *Queries) GetActivePredicate(ctx context.Context, arg GetActivePredicateParams) (string, error) {
+	row := q.db.QueryRow(ctx, GetActivePredicate, arg.TenantID, arg.ScopeID, arg.Predicate)
+	var version string
+	err := row.Scan(&version)
+	return version, err
+}
+
+const GetAttestationKind = `-- name: GetAttestationKind :one
+SELECT kind FROM attestation_identities WHERE tenant_id=$1 AND id=$2
+`
+
+type GetAttestationKindParams struct {
+	TenantID string
+	ID       string
+}
+
+func (q *Queries) GetAttestationKind(ctx context.Context, arg GetAttestationKindParams) (string, error) {
+	row := q.db.QueryRow(ctx, GetAttestationKind, arg.TenantID, arg.ID)
+	var kind string
+	err := row.Scan(&kind)
+	return kind, err
+}
+
+const GetFactAttestationPayload = `-- name: GetFactAttestationPayload :one
+SELECT payload FROM attestations WHERE tenant_id=$1 AND id=$2
+`
+
+type GetFactAttestationPayloadParams struct {
+	TenantID string
+	ID       string
+}
+
+func (q *Queries) GetFactAttestationPayload(ctx context.Context, arg GetFactAttestationPayloadParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, GetFactAttestationPayload, arg.TenantID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
 const GetTenantRevision = `-- name: GetTenantRevision :one
 SELECT revision FROM tenant_revisions WHERE tenant_id=$1
 `
@@ -47,6 +98,94 @@ func (q *Queries) GetTenantRevision(ctx context.Context, tenantID string) (int64
 	var revision int64
 	err := row.Scan(&revision)
 	return revision, err
+}
+
+const InsertFactAttestationIdentity = `-- name: InsertFactAttestationIdentity :exec
+INSERT INTO attestation_identities (tenant_id,id,scope_id,kind) VALUES($1,$2,$3,'fact')
+`
+
+type InsertFactAttestationIdentityParams struct {
+	TenantID string
+	ID       string
+	ScopeID  string
+}
+
+func (q *Queries) InsertFactAttestationIdentity(ctx context.Context, arg InsertFactAttestationIdentityParams) error {
+	_, err := q.db.Exec(ctx, InsertFactAttestationIdentity, arg.TenantID, arg.ID, arg.ScopeID)
+	return err
+}
+
+const InsertFactRecordEvent = `-- name: InsertFactRecordEvent :exec
+INSERT INTO record_events (tenant_id,event_id,record_id,version_id,stream_revision) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertFactRecordEventParams struct {
+	TenantID       string
+	EventID        string
+	RecordID       string
+	VersionID      string
+	StreamRevision int64
+}
+
+func (q *Queries) InsertFactRecordEvent(ctx context.Context, arg InsertFactRecordEventParams) error {
+	_, err := q.db.Exec(ctx, InsertFactRecordEvent,
+		arg.TenantID,
+		arg.EventID,
+		arg.RecordID,
+		arg.VersionID,
+		arg.StreamRevision,
+	)
+	return err
+}
+
+const InsertLedgerEvent = `-- name: InsertLedgerEvent :one
+INSERT INTO ledger_events(tenant_id,id,ledger_revision,event_type,scope_id,payload) VALUES($1,$2,$3,$4,$5,$6) RETURNING recorded_at
+`
+
+type InsertLedgerEventParams struct {
+	TenantID       string
+	ID             string
+	LedgerRevision int64
+	EventType      string
+	ScopeID        string
+	Payload        []byte
+}
+
+func (q *Queries) InsertLedgerEvent(ctx context.Context, arg InsertLedgerEventParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, InsertLedgerEvent,
+		arg.TenantID,
+		arg.ID,
+		arg.LedgerRevision,
+		arg.EventType,
+		arg.ScopeID,
+		arg.Payload,
+	)
+	var recorded_at pgtype.Timestamptz
+	err := row.Scan(&recorded_at)
+	return recorded_at, err
+}
+
+const InsertMemoryRecordEvent = `-- name: InsertMemoryRecordEvent :exec
+INSERT INTO memory_record_events (tenant_id,event_id,record_id,version_id,stream_revision) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertMemoryRecordEventParams struct {
+	TenantID       string
+	EventID        string
+	RecordID       string
+	VersionID      string
+	StreamRevision int64
+}
+
+func (q *Queries) InsertMemoryRecordEvent(ctx context.Context, arg InsertMemoryRecordEventParams) error {
+	_, err := q.db.Exec(ctx, InsertMemoryRecordEvent,
+		arg.TenantID,
+		arg.EventID,
+		arg.RecordID,
+		arg.VersionID,
+		arg.StreamRevision,
+	)
+	return err
 }
 
 const InsertOutbox = `-- name: InsertOutbox :exec
@@ -62,6 +201,35 @@ type InsertOutboxParams struct {
 func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
 	_, err := q.db.Exec(ctx, InsertOutbox, arg.TenantID, arg.EventID, arg.LedgerRevision)
 	return err
+}
+
+const ListCurrentFactAttestations = `-- name: ListCurrentFactAttestations :many
+SELECT a.payload FROM attestations a WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id
+`
+
+type ListCurrentFactAttestationsParams struct {
+	TenantID  string
+	VersionID string
+}
+
+func (q *Queries) ListCurrentFactAttestations(ctx context.Context, arg ListCurrentFactAttestationsParams) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, ListCurrentFactAttestations, arg.TenantID, arg.VersionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var payload []byte
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		items = append(items, payload)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const LockRecord = `-- name: LockRecord :one

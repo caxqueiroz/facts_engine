@@ -23,14 +23,14 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, model.ErrInvalid
 	}
 	var safe bool
-	if err := pool.QueryRow(ctx, `SELECT NOT rolsuper AND NOT rolbypassrls AND NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='ledger_events' AND tableowner=current_user) FROM pg_roles WHERE rolname=current_user`).Scan(&safe); err != nil {
+	if err := pool.QueryRow(ctx, ledgerdb.IsSafeLedgerRole).Scan(&safe); err != nil {
 		return nil, fmt.Errorf("check runtime role: %w", err)
 	}
 	if !safe {
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL AND to_regclass('public.subject_lookup') IS NOT NULL AND to_regclass('public.scope_versions') IS NOT NULL AND to_regclass('public.subject_versions') IS NOT NULL AND to_regclass('public.extraction_subjects') IS NOT NULL AND to_regclass('public.confirmation_artifacts') IS NOT NULL AND to_regclass('public.attestation_delegations') IS NOT NULL AND to_regclass('public.evidence_derivations') IS NOT NULL AND to_regclass('public.extraction_redactions') IS NOT NULL AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('public.projection_generations') AND attname='verification_version' AND NOT attisdropped) AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('public.extraction_quota') AND attname='reserved_cost_units' AND NOT attisdropped)`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, ledgerdb.IsLedgerSchemaReady).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -338,7 +338,7 @@ func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error 
 	return nil
 }
 func (t *transaction) Attestations(ctx context.Context, version string) ([]model.Attestation, error) {
-	rows, err := t.tx.Query(ctx, `SELECT a.payload FROM attestations a WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id`, t.tenant, version)
+	rows, err := t.tx.Query(ctx, ledgerdb.ListCurrentFactAttestations, t.tenant, version)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func (t *transaction) InsertAttestation(ctx context.Context, a model.Attestation
 	if err := t.guardEvidenceReference(ctx, a.EvidenceID); err != nil {
 		return err
 	}
-	if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_identities VALUES($1,$2,$3,'fact')`, t.tenant, a.ID, a.Scope); err != nil {
+	if _, err := t.tx.Exec(ctx, ledgerdb.InsertFactAttestationIdentity, t.tenant, a.ID, a.Scope); err != nil {
 		return err
 	}
 	if err := t.stageConfirmation(ctx, a, "fact"); err != nil {
@@ -372,7 +372,7 @@ func (t *transaction) InsertAttestation(ctx context.Context, a model.Attestation
 }
 func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string, c model.Caller) (model.CommitResult, error) {
 	var kind string
-	if err := t.tx.QueryRow(ctx, `SELECT kind FROM attestation_identities WHERE tenant_id=$1 AND id=$2`, t.tenant, id).Scan(&kind); err != nil {
+	if err := t.tx.QueryRow(ctx, ledgerdb.GetAttestationKind, t.tenant, id).Scan(&kind); err != nil {
 		return model.CommitResult{}, translate(err)
 	}
 	if kind == "memory" {
@@ -380,7 +380,7 @@ func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string,
 	}
 	out := model.CommitResult{}
 	var a model.Attestation
-	if err := t.read(ctx, &a, `SELECT payload FROM attestations WHERE tenant_id=$1 AND id=$2`, t.tenant, id); err != nil {
+	if err := t.read(ctx, &a, ledgerdb.GetFactAttestationPayload, t.tenant, id); err != nil {
 		return out, err
 	}
 	if a.Scope != scope || a.Attestor != c {
@@ -433,7 +433,7 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	if err != nil {
 		return e, err
 	}
-	err = t.tx.QueryRow(ctx, `INSERT INTO ledger_events(tenant_id,id,ledger_revision,event_type,scope_id,payload) VALUES($1,$2,$3,$4,$5,$6) RETURNING recorded_at`, t.tenant, e.ID, e.LedgerRevision, e.Type, e.Scope, b).Scan(&e.RecordedAt)
+	err = t.tx.QueryRow(ctx, ledgerdb.InsertLedgerEvent, t.tenant, e.ID, e.LedgerRevision, e.Type, e.Scope, b).Scan(&e.RecordedAt)
 	if err != nil {
 		return e, err
 	}
@@ -447,12 +447,12 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 		return e, err
 	}
 	if e.RecordKind == "memory" {
-		_, err = t.tx.Exec(ctx, `INSERT INTO memory_record_events VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
+		_, err = t.tx.Exec(ctx, ledgerdb.InsertMemoryRecordEvent, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
 		if err != nil {
 			return e, err
 		}
 	} else if e.RecordID != "" {
-		_, err = t.tx.Exec(ctx, `INSERT INTO record_events VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
+		_, err = t.tx.Exec(ctx, ledgerdb.InsertFactRecordEvent, t.tenant, e.ID, e.RecordID, e.VersionID, e.StreamRevision)
 		if err != nil {
 			return e, err
 		}
@@ -492,7 +492,7 @@ func (t *transaction) Revision(ctx context.Context) (int64, error) {
 
 func (t *transaction) ActivePredicate(ctx context.Context, scope, predicate string) (string, error) {
 	var version string
-	err := t.tx.QueryRow(ctx, `SELECT version FROM active_predicates WHERE tenant_id=$1 AND scope_id=$2 AND predicate=$3 FOR SHARE`, t.tenant, scope, predicate).Scan(&version)
+	err := t.tx.QueryRow(ctx, ledgerdb.GetActivePredicate, t.tenant, scope, predicate).Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return version, model.ErrNotFound
 	}
