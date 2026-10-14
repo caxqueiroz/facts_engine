@@ -9,25 +9,27 @@ import (
 // Config contains deployment settings, never credentials. Secrets are supplied
 // through environment variables by the host's secret manager.
 type Config struct {
-	Extraction        *runtimeconfig.ExtractionScheduling `json:"extraction,omitempty"`
-	Retrieval         []runtimeconfig.LexicalRoute        `json:"retrieval"`
-	OperationsScope   string                              `json:"operations_scope"`
-	Listen            string                              `json:"listen"`
-	TLSCertificate    string                              `json:"tls_certificate"`
-	TLSKey            string                              `json:"tls_key"`
-	ClientCA          string                              `json:"client_ca"`
-	Identities        []mtlsidentity.Binding              `json:"identities"`
-	OpenFGAURL        string                              `json:"openfga_url"`
-	OpenFGAStore      string                              `json:"openfga_store"`
-	OpenFGAModel      string                              `json:"openfga_model"`
-	ReadinessScope    string                              `json:"readiness_scope"`
-	AuditKeyID        string                              `json:"audit_key_id"`
-	MaxConnections    int32                               `json:"max_connections"`
-	MaxConcurrent     int                                 `json:"max_concurrent"`
-	MaxRequestBytes   int                                 `json:"max_request_bytes"`
-	MaxResponseBytes  int                                 `json:"max_response_bytes"`
-	RPCTimeoutSeconds int                                 `json:"rpc_timeout_seconds"`
-	ShutdownSeconds   int                                 `json:"shutdown_seconds"`
+	AcceptTraceContext  bool                                `json:"accept_trace_context,omitempty"`
+	OpenFGATraceContext bool                                `json:"openfga_trace_context,omitempty"`
+	Extraction          *runtimeconfig.ExtractionScheduling `json:"extraction,omitempty"`
+	Retrieval           []runtimeconfig.LexicalRoute        `json:"retrieval"`
+	OperationsScope     string                              `json:"operations_scope"`
+	Listen              string                              `json:"listen"`
+	TLSCertificate      string                              `json:"tls_certificate"`
+	TLSKey              string                              `json:"tls_key"`
+	ClientCA            string                              `json:"client_ca"`
+	Identities          []mtlsidentity.Binding              `json:"identities"`
+	OpenFGAURL          string                              `json:"openfga_url"`
+	OpenFGAStore        string                              `json:"openfga_store"`
+	OpenFGAModel        string                              `json:"openfga_model"`
+	ReadinessScope      string                              `json:"readiness_scope"`
+	AuditKeyID          string                              `json:"audit_key_id"`
+	MaxConnections      int32                               `json:"max_connections"`
+	MaxConcurrent       int                                 `json:"max_concurrent"`
+	MaxRequestBytes     int                                 `json:"max_request_bytes"`
+	MaxResponseBytes    int                                 `json:"max_response_bytes"`
+	RPCTimeoutSeconds   int                                 `json:"rpc_timeout_seconds"`
+	ShutdownSeconds     int                                 `json:"shutdown_seconds"`
 }
 
 func LoadConfig(path string) (Config, error) {

@@ -17,10 +17,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caxqueiroz/facts_engine/internal/telemetry"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 type Config struct {
+	PropagateTraceContext         bool
 	URL, Token                    string
 	RootCAPEM                     []byte
 	AllowPlaintextLoopback        bool
@@ -28,6 +30,7 @@ type Config struct {
 	MaxInputBytes, MaxOutputBytes int
 }
 type Provider struct {
+	propagateTraceContext   bool
 	endpoint, token         string
 	client                  *http.Client
 	transport               *http.Transport
@@ -57,7 +60,7 @@ func New(c Config) (*Provider, error) {
 	}
 	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: c.Timeout, MaxResponseHeaderBytes: 16 << 10, MaxConnsPerHost: 1, MaxIdleConns: 1, MaxIdleConnsPerHost: 1, IdleConnTimeout: 30 * time.Second, DisableCompression: true}
 	client := &http.Client{Transport: transport, Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	return &Provider{u.String(), c.Token, client, transport, c.MaxInputBytes, c.MaxOutputBytes}, nil
+	return &Provider{propagateTraceContext: c.PropagateTraceContext, endpoint: u.String(), token: c.Token, client: client, transport: transport, inputLimit: c.MaxInputBytes, outputLimit: c.MaxOutputBytes}, nil
 }
 func (p *Provider) Close() { p.transport.CloseIdleConnections() }
 func (p *Provider) Extract(ctx context.Context, input []byte) (model.ExtractionResponse, error) {
@@ -73,6 +76,9 @@ func (p *Provider) Extract(ctx context.Context, input []byte) (model.ExtractionR
 	req.Header.Set("X-Facts-Extraction-Protocol", "v1")
 	if p.token != "" {
 		req.Header.Set("Authorization", "Bearer "+p.token)
+	}
+	if p.propagateTraceContext {
+		telemetry.InjectTraceParent(ctx, req.Header)
 	}
 	response, err := p.client.Do(req)
 	if err != nil {

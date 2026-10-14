@@ -59,7 +59,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if err != nil {
 		return errors.New("worker schema or role check failed")
 	}
-	auth, err := openfga.New(openfga.Config{URL: c.OpenFGAURL, StoreID: c.OpenFGAStore, ModelID: c.OpenFGAModel, Token: os.Getenv("MEMORY_OPENFGA_TOKEN")})
+	auth, err := openfga.New(openfga.Config{PropagateTraceContext: c.OpenFGATraceContext, URL: c.OpenFGAURL, StoreID: c.OpenFGAStore, ModelID: c.OpenFGAModel, Token: os.Getenv("MEMORY_OPENFGA_TOKEN")})
 	if err != nil {
 		return errors.New("invalid authorization configuration")
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/caxqueiroz/facts_engine/internal/telemetry"
 	"github.com/caxqueiroz/facts_engine/model"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 )
 
 type Config struct {
+	PropagateTraceContext        bool
 	URL, StoreID, ModelID, Token string
 	Client                       *http.Client
 }
@@ -70,6 +72,9 @@ func (a *Authorizer) Check(ctx context.Context, r model.AuthorizationRequest) (m
 	req.Header.Set("Content-Type", "application/json")
 	if a.config.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+a.config.Token)
+	}
+	if a.config.PropagateTraceContext {
+		telemetry.InjectTraceParent(ctx, req.Header)
 	}
 	resp, err := a.config.Client.Do(req)
 	if err != nil {

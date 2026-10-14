@@ -12,6 +12,7 @@ import (
 )
 
 type ExtractionGateway struct {
+	PropagateTraceContext  bool   `json:"propagate_trace_context,omitempty"`
 	ProfileID              string `json:"profile_id"`
 	URL                    string `json:"url"`
 	TokenEnv               string `json:"token_env,omitempty"`
@@ -84,7 +85,7 @@ func openExtractionGateways(c *ExtractionConfig) (model.ExtractionOptions, func(
 				return options, closeAll, errors.New("missing gateway credential")
 			}
 		}
-		p, err := extractionhttp.New(extractionhttp.Config{URL: g.URL, Token: token, RootCAPEM: roots, AllowPlaintextLoopback: g.AllowPlaintextLoopback, Timeout: approved.Profile.Timeout, MaxInputBytes: approved.Profile.MaxInputBytes, MaxOutputBytes: approved.Profile.MaxOutputBytes})
+		p, err := extractionhttp.New(extractionhttp.Config{PropagateTraceContext: g.PropagateTraceContext, URL: g.URL, Token: token, RootCAPEM: roots, AllowPlaintextLoopback: g.AllowPlaintextLoopback, Timeout: approved.Profile.Timeout, MaxInputBytes: approved.Profile.MaxInputBytes, MaxOutputBytes: approved.Profile.MaxOutputBytes})
 		if err != nil {
 			closeAll()
 			return options, closeAll, errors.New("invalid extraction gateway configuration")

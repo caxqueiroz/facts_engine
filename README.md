@@ -175,7 +175,11 @@ Outbox hosts can pass the same provider/logger options through `workers.Options.
 
 `facts.outbox.retries` counts claimed deliveries with attempt number greater than one. `facts.outbox.event_age` records seconds since the claimed event's retained timestamp, skipping absent timestamps and clamping future timestamps to zero. It measures age of claimed work, not queue depth or the age of an unclaimed queue head. These instruments label only bounded worker kind (and poll outcome where applicable). Spans/logs omit tenant, consumer, event, scope and command identifiers and handler/queue error text. Parent context reaches claim, handler, renewal and acknowledgement operations; no trace context is inferred from event payloads. SDK tests exercise acknowledgement, retries, idle polling, queue failures, cancellation and lease loss with privacy assertions.
 
-Projection/archive revision lag and queue-depth gauges, business outcome counters, full internal-stage coverage, outbound trace-context propagation and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
+Outbound OpenFGA and extraction-gateway adapters support `PropagateTraceContext: true`. They copy only a valid active W3C `traceparent` into their newly constructed requests, without reading global propagators or forwarding baggage/tracestate. Bearer credentials and retained request/response bytes are unchanged. Propagation is disabled by default and adds no header when the context has no valid span.
+
+For packaged runtimes, `memoryd` accepts `accept_trace_context: true` for incoming RPC trace parenting. Both `memoryd` and `memoryworker` accept `openfga_trace_context: true`; extraction gateway bindings accept `propagate_trace_context: true`. These are separate, default-off decisions for each boundary. They propagate an existing context and do not create SDK providers or configure exporters. Hosts remain responsible for trusted endpoints and sampling; trace metadata never establishes a caller identity.
+
+Projection/archive revision lag and queue-depth gauges, business outcome counters, full internal-stage coverage and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
 
 ## Standalone workers and lexical retrieval
 

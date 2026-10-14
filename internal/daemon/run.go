@@ -93,7 +93,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	if err != nil {
 		return errors.New("cannot initialize evidence store")
 	}
-	authz, err := openfga.New(openfga.Config{URL: c.OpenFGAURL, StoreID: c.OpenFGAStore, ModelID: c.OpenFGAModel, Token: os.Getenv("MEMORY_OPENFGA_TOKEN")})
+	authz, err := openfga.New(openfga.Config{PropagateTraceContext: c.OpenFGATraceContext, URL: c.OpenFGAURL, StoreID: c.OpenFGAStore, ModelID: c.OpenFGAModel, Token: os.Getenv("MEMORY_OPENFGA_TOKEN")})
 	if err != nil {
 		return errors.New("invalid authorization configuration")
 	}
@@ -148,7 +148,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		return errors.New("cannot initialize engine")
 	}
 	timeout := time.Duration(c.RPCTimeoutSeconds) * time.Second
-	handler, err := connectapi.NewHandler(engine, authn.Verify, connectapi.Limits{Timeout: timeout, MaxConcurrent: c.MaxConcurrent, MaxRequestBytes: c.MaxRequestBytes, MaxResponseBytes: c.MaxResponseBytes})
+	handler, err := connectapi.NewHandlerWithOptions(engine, authn.Verify, connectapi.Limits{Timeout: timeout, MaxConcurrent: c.MaxConcurrent, MaxRequestBytes: c.MaxRequestBytes, MaxResponseBytes: c.MaxResponseBytes}, connectapi.HandlerOptions{AcceptTraceContext: c.AcceptTraceContext})
 	if err != nil {
 		return errors.New("cannot initialize API")
 	}

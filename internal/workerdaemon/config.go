@@ -89,6 +89,7 @@ func (c *RefreshConfig) bindings() []model.MemoryRefreshBinding {
 }
 
 type Config struct {
+	OpenFGATraceContext    bool                       `json:"openfga_trace_context,omitempty"`
 	Extraction             *ExtractionConfig          `json:"extraction"`
 	Refresh                *RefreshConfig             `json:"refresh"`
 	Archive                *ArchiveConfig             `json:"archive"`
