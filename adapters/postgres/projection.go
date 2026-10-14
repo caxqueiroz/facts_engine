@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"sort"
 )
@@ -16,8 +17,8 @@ func (l *Ledger) ProjectionDocument(ctx context.Context, d model.Delivery, gener
 	err := l.Transact(ctx, d.Key.Tenant, func(tx model.Tx) error {
 		t := tx.(*transaction)
 		var e model.Event
-		var payload []byte
-		if err := t.tx.QueryRow(ctx, `SELECT payload FROM ledger_events WHERE tenant_id=$1 AND id=$2 AND ledger_revision=$3`, d.Key.Tenant, d.Event.ID, d.Event.LedgerRevision).Scan(&payload); err != nil {
+		payload, err := ledgerdb.New(t.tx).GetEventAtRevision(ctx, ledgerdb.GetEventAtRevisionParams{TenantID: d.Key.Tenant, ID: d.Event.ID, LedgerRevision: d.Event.LedgerRevision})
+		if err != nil {
 			return err
 		}
 		if err := t.decode(payload, &e); err != nil {

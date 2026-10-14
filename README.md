@@ -220,8 +220,10 @@ Tests cover exact copied bytes, malformed mappings, UTF-8 boundaries, policy/per
 | `sql/queries/temporal.sql` | Fact and memory timelines, rejection checks, historical attestations, revision reads, snapshots |
 | `sql/queries/context_audit.sql` | Context manifests, decision/calculation receipts, audit-export requests, claims and fenced completion |
 | `sql/queries/extraction.sql` | Extraction jobs, attempts/results, proposals, redaction/dependency bindings, retry/lease fencing and tenant token/cost reservations |
+| `sql/queries/reads.sql` | Known-at revision lookup, fact/history pagination, immutable event lookup and memory-refresh dependent discovery |
+| `sql/queries/outbox.sql` | Consumer registration, delivery claims/renewals/acknowledgements/failures, operator retries and scoped change feeds |
 
-Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Query conversion is still incomplete; retrieval, retention, projection, refresh scheduling and other query families remain to be converted.
+Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Query conversion is still incomplete; retention, rebuild coordination, archive enumeration and other query families remain to be converted.
 
 ## Remaining delivery work
 

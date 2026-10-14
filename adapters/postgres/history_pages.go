@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
@@ -17,9 +18,9 @@ func (t *transaction) recordHistoryPage(ctx context.Context, record string, thro
 	if through < 0 || after < 0 || limit < 1 || limit > 100 {
 		return nil, model.ErrInvalid
 	}
-	query := `SELECT e.payload,e.recorded_at FROM record_events r JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id WHERE r.tenant_id=$1 AND r.record_id=$2 AND r.stream_revision>$3 AND e.ledger_revision<=$4 ORDER BY r.stream_revision LIMIT $5`
+	query := ledgerdb.ListFactHistoryPage
 	if memory {
-		query = `SELECT e.payload,e.recorded_at FROM memory_record_events r JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id WHERE r.tenant_id=$1 AND r.record_id=$2 AND r.stream_revision>$3 AND e.ledger_revision<=$4 ORDER BY r.stream_revision LIMIT $5`
+		query = ledgerdb.ListMemoryHistoryPage
 	}
 	rows, err := t.tx.Query(ctx, query, t.tenant, record, after, through, limit)
 	if err != nil {
