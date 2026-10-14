@@ -24,6 +24,9 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// DefinitionServiceRegisterMemoryTypeProcedure is the procedure name of the DefinitionService's
+	// RegisterMemoryType RPC.
+	DefinitionServiceRegisterMemoryTypeProcedure = "/memory.v1.DefinitionService/RegisterMemoryType"
 	// DefinitionServiceRegisterAcceptancePolicyProcedure is the procedure name of the
 	// DefinitionService's RegisterAcceptancePolicy RPC.
 	DefinitionServiceRegisterAcceptancePolicyProcedure = "/memory.v1.DefinitionService/RegisterAcceptancePolicy"
@@ -33,6 +36,13 @@ const (
 )
 
 var (
+	definitionServiceRegisterMemoryTypeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_definitions_proto.Services().ByName("DefinitionService").Methods().ByName("RegisterMemoryType"),
+			Procedure:  DefinitionServiceRegisterMemoryTypeProcedure,
+		}
+	})
 	definitionServiceRegisterAcceptancePolicySpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -51,6 +61,7 @@ var (
 
 // DefinitionServiceClient is a client for the memory.v1.DefinitionService service.
 type DefinitionServiceClient interface {
+	RegisterMemoryType(context.Context, *v1.RegisterMemoryTypeRequest) (*v1.RegisterMemoryTypeResponse, error)
 	RegisterAcceptancePolicy(context.Context, *v1.RegisterAcceptancePolicyRequest) (*v1.RegisterAcceptancePolicyResponse, error)
 	RegisterPredicateVersion(context.Context, *v1.RegisterPredicateVersionRequest) (*v1.RegisterPredicateVersionResponse, error)
 }
@@ -63,6 +74,7 @@ func NewDefinitionServiceClient(client *connect.Client) DefinitionServiceClient 
 
 // DefinitionServiceHandler is an implementation of the memory.v1.DefinitionService service.
 type DefinitionServiceHandler interface {
+	RegisterMemoryType(context.Context, *v1.RegisterMemoryTypeRequest) (*v1.RegisterMemoryTypeResponse, error)
 	RegisterAcceptancePolicy(context.Context, *v1.RegisterAcceptancePolicyRequest) (*v1.RegisterAcceptancePolicyResponse, error)
 	RegisterPredicateVersion(context.Context, *v1.RegisterPredicateVersionRequest) (*v1.RegisterPredicateVersionResponse, error)
 }
@@ -72,6 +84,7 @@ type DefinitionServiceHandler interface {
 func RegisterDefinitionServiceHandler(server *connect.Server, svc DefinitionServiceHandler) {
 	adapter := definitionServiceHandler{svc: svc}
 	server.Register(
+		connect.Method{Spec: definitionServiceRegisterMemoryTypeSpec(), Handler: adapter.registerMemoryType},
 		connect.Method{Spec: definitionServiceRegisterAcceptancePolicySpec(), Handler: adapter.registerAcceptancePolicy},
 		connect.Method{Spec: definitionServiceRegisterPredicateVersionSpec(), Handler: adapter.registerPredicateVersion},
 	)
@@ -79,6 +92,10 @@ func RegisterDefinitionServiceHandler(server *connect.Server, svc DefinitionServ
 
 // UnimplementedDefinitionServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedDefinitionServiceHandler struct{}
+
+func (UnimplementedDefinitionServiceHandler) RegisterMemoryType(context.Context, *v1.RegisterMemoryTypeRequest) (*v1.RegisterMemoryTypeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.DefinitionService.RegisterMemoryType is not implemented")
+}
 
 func (UnimplementedDefinitionServiceHandler) RegisterAcceptancePolicy(context.Context, *v1.RegisterAcceptancePolicyRequest) (*v1.RegisterAcceptancePolicyResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.DefinitionService.RegisterAcceptancePolicy is not implemented")
@@ -90,6 +107,14 @@ func (UnimplementedDefinitionServiceHandler) RegisterPredicateVersion(context.Co
 
 type definitionServiceClient struct {
 	client *connect.Client
+}
+
+func (c *definitionServiceClient) RegisterMemoryType(ctx context.Context, req *v1.RegisterMemoryTypeRequest) (*v1.RegisterMemoryTypeResponse, error) {
+	var res v1.RegisterMemoryTypeResponse
+	if err := c.client.CallUnary(ctx, definitionServiceRegisterMemoryTypeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *definitionServiceClient) RegisterAcceptancePolicy(ctx context.Context, req *v1.RegisterAcceptancePolicyRequest) (*v1.RegisterAcceptancePolicyResponse, error) {
@@ -109,6 +134,18 @@ func (c *definitionServiceClient) RegisterPredicateVersion(ctx context.Context, 
 }
 
 type definitionServiceHandler struct{ svc DefinitionServiceHandler }
+
+func (h definitionServiceHandler) registerMemoryType(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RegisterMemoryTypeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RegisterMemoryType(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
 
 func (h definitionServiceHandler) registerAcceptancePolicy(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.RegisterAcceptancePolicyRequest

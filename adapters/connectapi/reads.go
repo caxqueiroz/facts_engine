@@ -15,6 +15,7 @@ type Engine interface {
 	EvidenceEngine
 	DefinitionEngine
 	AttestationEngine
+	MemoryEngine
 }
 
 type SnapshotEngine interface {

@@ -8,6 +8,7 @@ import (
 )
 
 type DefinitionEngine interface {
+	RegisterMemoryType(context.Context, model.Caller, model.MemoryTypeRequest) (model.CommitResult, error)
 	RegisterAcceptancePolicy(context.Context, model.Caller, model.PolicyRequest) (model.CommitResult, error)
 	RegisterPredicateVersion(context.Context, model.Caller, model.PredicateRequest) (model.CommitResult, error)
 }
@@ -54,4 +55,17 @@ func optionalInt(value *int32) *int {
 	}
 	result := int(*value)
 	return &result
+}
+
+func (s *definitionService) RegisterMemoryType(ctx context.Context, r *v1.RegisterMemoryTypeRequest) (*v1.RegisterMemoryTypeResponse, error) {
+	d := r.Definition
+	definition := model.MemoryType{Scope: d.Scope, Subtype: d.Subtype, Version: d.Version, PolicyID: d.PolicyId, Classification: d.Classification}
+	if d.Migration != nil {
+		definition.Migration = &model.PredicateMigration{FromVersion: d.Migration.FromVersion, Mode: d.Migration.Mode, Reason: d.Migration.Reason}
+	}
+	out, err := s.engine.RegisterMemoryType(ctx, callerFrom(ctx), model.MemoryTypeRequest{Command: command(r.Command), Definition: definition})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.RegisterMemoryTypeResponse{Result: commit(out)}, nil
 }

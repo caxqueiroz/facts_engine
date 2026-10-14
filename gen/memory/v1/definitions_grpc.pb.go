@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	DefinitionService_RegisterMemoryType_FullMethodName       = "/memory.v1.DefinitionService/RegisterMemoryType"
 	DefinitionService_RegisterAcceptancePolicy_FullMethodName = "/memory.v1.DefinitionService/RegisterAcceptancePolicy"
 	DefinitionService_RegisterPredicateVersion_FullMethodName = "/memory.v1.DefinitionService/RegisterPredicateVersion"
 )
@@ -27,6 +28,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DefinitionServiceClient interface {
+	RegisterMemoryType(ctx context.Context, in *RegisterMemoryTypeRequest, opts ...grpc.CallOption) (*RegisterMemoryTypeResponse, error)
 	RegisterAcceptancePolicy(ctx context.Context, in *RegisterAcceptancePolicyRequest, opts ...grpc.CallOption) (*RegisterAcceptancePolicyResponse, error)
 	RegisterPredicateVersion(ctx context.Context, in *RegisterPredicateVersionRequest, opts ...grpc.CallOption) (*RegisterPredicateVersionResponse, error)
 }
@@ -37,6 +39,16 @@ type definitionServiceClient struct {
 
 func NewDefinitionServiceClient(cc grpc.ClientConnInterface) DefinitionServiceClient {
 	return &definitionServiceClient{cc}
+}
+
+func (c *definitionServiceClient) RegisterMemoryType(ctx context.Context, in *RegisterMemoryTypeRequest, opts ...grpc.CallOption) (*RegisterMemoryTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterMemoryTypeResponse)
+	err := c.cc.Invoke(ctx, DefinitionService_RegisterMemoryType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *definitionServiceClient) RegisterAcceptancePolicy(ctx context.Context, in *RegisterAcceptancePolicyRequest, opts ...grpc.CallOption) (*RegisterAcceptancePolicyResponse, error) {
@@ -63,6 +75,7 @@ func (c *definitionServiceClient) RegisterPredicateVersion(ctx context.Context, 
 // All implementations must embed UnimplementedDefinitionServiceServer
 // for forward compatibility.
 type DefinitionServiceServer interface {
+	RegisterMemoryType(context.Context, *RegisterMemoryTypeRequest) (*RegisterMemoryTypeResponse, error)
 	RegisterAcceptancePolicy(context.Context, *RegisterAcceptancePolicyRequest) (*RegisterAcceptancePolicyResponse, error)
 	RegisterPredicateVersion(context.Context, *RegisterPredicateVersionRequest) (*RegisterPredicateVersionResponse, error)
 	mustEmbedUnimplementedDefinitionServiceServer()
@@ -75,6 +88,9 @@ type DefinitionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedDefinitionServiceServer struct{}
 
+func (UnimplementedDefinitionServiceServer) RegisterMemoryType(context.Context, *RegisterMemoryTypeRequest) (*RegisterMemoryTypeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterMemoryType not implemented")
+}
 func (UnimplementedDefinitionServiceServer) RegisterAcceptancePolicy(context.Context, *RegisterAcceptancePolicyRequest) (*RegisterAcceptancePolicyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterAcceptancePolicy not implemented")
 }
@@ -100,6 +116,24 @@ func RegisterDefinitionServiceServer(s grpc.ServiceRegistrar, srv DefinitionServ
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&DefinitionService_ServiceDesc, srv)
+}
+
+func _DefinitionService_RegisterMemoryType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterMemoryTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DefinitionServiceServer).RegisterMemoryType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DefinitionService_RegisterMemoryType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DefinitionServiceServer).RegisterMemoryType(ctx, req.(*RegisterMemoryTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DefinitionService_RegisterAcceptancePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -145,6 +179,10 @@ var DefinitionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "memory.v1.DefinitionService",
 	HandlerType: (*DefinitionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterMemoryType",
+			Handler:    _DefinitionService_RegisterMemoryType_Handler,
+		},
 		{
 			MethodName: "RegisterAcceptancePolicy",
 			Handler:    _DefinitionService_RegisterAcceptancePolicy_Handler,

@@ -38,11 +38,9 @@ func (s *factService) ProposeFact(ctx context.Context, r *v1.ProposeFactRequest)
 		return nil, err
 	}
 	q := model.FactProposal{Command: command(r.Command), Key: factKey(r.Key), SchemaVersion: r.SchemaVersion, Value: value, Valid: interval(r.Valid), ExpectedRevision: r.ExpectedRevision}
-	for _, span := range r.Sources {
-		if span.Start > int64(int(^uint(0)>>1)) || span.End > int64(int(^uint(0)>>1)) {
-			return nil, model.ErrInvalid
-		}
-		q.Sources = append(q.Sources, model.SourceSpan{EvidenceID: span.EvidenceId, Start: int(span.Start), End: int(span.End), Quote: span.Quote})
+	q.Sources, err = sourcesFromProto(r.Sources)
+	if err != nil {
+		return nil, err
 	}
 	out, err := s.engine.ProposeFact(ctx, callerFrom(ctx), q)
 	if err != nil {

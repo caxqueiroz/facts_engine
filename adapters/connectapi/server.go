@@ -42,6 +42,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.RegisterMemoryTypeRequest{}, &v1.GetMemoryRequest{}, &v1.ProposeMemoryRequest{}, &v1.ApproveMemoryRequest{}, &v1.AcceptMemoryRequest{}, &v1.RejectMemoryRequest{}, &v1.RetractMemoryRequest{}, &v1.DisputeMemoryRequest{}, &v1.ResolveMemoryDisputeRequest{}, &v1.SupersedeMemoryRequest{}, &v1.GetMemoryVersionRequest{}, &v1.GetMemoryHistoryRequest{},
 		&v1.RegisterAcceptancePolicyRequest{}, &v1.RegisterPredicateVersionRequest{}, &v1.RecordAttestationRequest{}, &v1.RecordDelegatedAttestationRequest{}, &v1.WithdrawAttestationRequest{},
 		&v1.RegisterEvidenceRequest{}, &v1.RegisterRedactedEvidenceRequest{}, &v1.GetEvidenceMetadataRequest{}, &v1.GetEvidenceContentRequest{},
 		&v1.ListFactsRequest{}, &v1.GetFactHistoryRequest{},
@@ -83,6 +84,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterEvidenceServiceHandler(server, &evidenceService{engine: engine})
 	memoryv1connect.RegisterDefinitionServiceHandler(server, &definitionService{engine: engine})
 	memoryv1connect.RegisterAttestationServiceHandler(server, &attestationService{engine: engine})
+	memoryv1connect.RegisterMemoryServiceHandler(server, &memoryService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil

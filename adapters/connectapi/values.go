@@ -95,3 +95,14 @@ func valueToProto(value model.Value) (*v1.Value, error) {
 	}
 	return out, nil
 }
+
+func sourcesFromProto(sources []*v1.SourceSpan) ([]model.SourceSpan, error) {
+	var out []model.SourceSpan
+	for _, span := range sources {
+		if span.Start > int64(int(^uint(0)>>1)) || span.End > int64(int(^uint(0)>>1)) {
+			return nil, model.ErrInvalid
+		}
+		out = append(out, model.SourceSpan{EvidenceID: span.EvidenceId, Start: int(span.Start), End: int(span.End), Quote: span.Quote})
+	}
+	return out, nil
+}

@@ -675,6 +675,194 @@ func (x *ValueConstraints) GetUnits() []string {
 	return nil
 }
 
+type RegisterMemoryTypeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command       *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Definition    *MemoryType            `protobuf:"bytes,3,opt,name=definition,proto3" json:"definition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterMemoryTypeRequest) Reset() {
+	*x = RegisterMemoryTypeRequest{}
+	mi := &file_memory_v1_definitions_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterMemoryTypeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterMemoryTypeRequest) ProtoMessage() {}
+
+func (x *RegisterMemoryTypeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_definitions_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterMemoryTypeRequest.ProtoReflect.Descriptor instead.
+func (*RegisterMemoryTypeRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_definitions_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RegisterMemoryTypeRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *RegisterMemoryTypeRequest) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *RegisterMemoryTypeRequest) GetDefinition() *MemoryType {
+	if x != nil {
+		return x.Definition
+	}
+	return nil
+}
+
+type RegisterMemoryTypeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *CommitResult          `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterMemoryTypeResponse) Reset() {
+	*x = RegisterMemoryTypeResponse{}
+	mi := &file_memory_v1_definitions_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterMemoryTypeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterMemoryTypeResponse) ProtoMessage() {}
+
+func (x *RegisterMemoryTypeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_definitions_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterMemoryTypeResponse.ProtoReflect.Descriptor instead.
+func (*RegisterMemoryTypeResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_definitions_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RegisterMemoryTypeResponse) GetResult() *CommitResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type MemoryType struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Scope          string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Subtype        string                 `protobuf:"bytes,2,opt,name=subtype,proto3" json:"subtype,omitempty"`
+	Version        string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	PolicyId       string                 `protobuf:"bytes,4,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Classification string                 `protobuf:"bytes,5,opt,name=classification,proto3" json:"classification,omitempty"`
+	Migration      *PredicateMigration    `protobuf:"bytes,6,opt,name=migration,proto3" json:"migration,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *MemoryType) Reset() {
+	*x = MemoryType{}
+	mi := &file_memory_v1_definitions_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemoryType) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemoryType) ProtoMessage() {}
+
+func (x *MemoryType) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_definitions_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemoryType.ProtoReflect.Descriptor instead.
+func (*MemoryType) Descriptor() ([]byte, []int) {
+	return file_memory_v1_definitions_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MemoryType) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *MemoryType) GetSubtype() string {
+	if x != nil {
+		return x.Subtype
+	}
+	return ""
+}
+
+func (x *MemoryType) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *MemoryType) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *MemoryType) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *MemoryType) GetMigration() *PredicateMigration {
+	if x != nil {
+		return x.Migration
+	}
+	return nil
+}
+
 var File_memory_v1_definitions_proto protoreflect.FileDescriptor
 
 const file_memory_v1_definitions_proto_rawDesc = "" +
@@ -750,8 +938,26 @@ const file_memory_v1_definitions_proto_rawDesc = "" +
 	"\f_max_integerB\x0e\n" +
 	"\f_min_decimalB\x0e\n" +
 	"\f_max_decimalB\x11\n" +
-	"\x0f_decimal_places2\xfd\x01\n" +
-	"\x11DefinitionService\x12s\n" +
+	"\x0f_decimal_places\"\xd3\x01\n" +
+	"\x19RegisterMemoryTypeRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
+	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12=\n" +
+	"\n" +
+	"definition\x18\x03 \x01(\v2\x15.memory.v1.MemoryTypeB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"definition\"M\n" +
+	"\x1aRegisterMemoryTypeResponse\x12/\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\x90\x03\n" +
+	"\n" +
+	"MemoryType\x12?\n" +
+	"\x05scope\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12C\n" +
+	"\asubtype\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\asubtype\x12C\n" +
+	"\aversion\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\aversion\x12F\n" +
+	"\tpolicy_id\x18\x04 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\bpolicyId\x122\n" +
+	"\x0eclassification\x18\x05 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\x02R\x0eclassification\x12;\n" +
+	"\tmigration\x18\x06 \x01(\v2\x1d.memory.v1.PredicateMigrationR\tmigration2\xe0\x02\n" +
+	"\x11DefinitionService\x12a\n" +
+	"\x12RegisterMemoryType\x12$.memory.v1.RegisterMemoryTypeRequest\x1a%.memory.v1.RegisterMemoryTypeResponse\x12s\n" +
 	"\x18RegisterAcceptancePolicy\x12*.memory.v1.RegisterAcceptancePolicyRequest\x1a+.memory.v1.RegisterAcceptancePolicyResponse\x12s\n" +
 	"\x18RegisterPredicateVersion\x12*.memory.v1.RegisterPredicateVersionRequest\x1a+.memory.v1.RegisterPredicateVersionResponseB;Z9github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1b\x06proto3"
 
@@ -767,7 +973,7 @@ func file_memory_v1_definitions_proto_rawDescGZIP() []byte {
 	return file_memory_v1_definitions_proto_rawDescData
 }
 
-var file_memory_v1_definitions_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_memory_v1_definitions_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_memory_v1_definitions_proto_goTypes = []any{
 	(*RegisterAcceptancePolicyRequest)(nil),  // 0: memory.v1.RegisterAcceptancePolicyRequest
 	(*RegisterAcceptancePolicyResponse)(nil), // 1: memory.v1.RegisterAcceptancePolicyResponse
@@ -778,30 +984,39 @@ var file_memory_v1_definitions_proto_goTypes = []any{
 	(*PredicateVersion)(nil),                 // 6: memory.v1.PredicateVersion
 	(*PredicateMigration)(nil),               // 7: memory.v1.PredicateMigration
 	(*ValueConstraints)(nil),                 // 8: memory.v1.ValueConstraints
-	(*Command)(nil),                          // 9: memory.v1.Command
-	(*CommitResult)(nil),                     // 10: memory.v1.CommitResult
-	(*Value)(nil),                            // 11: memory.v1.Value
+	(*RegisterMemoryTypeRequest)(nil),        // 9: memory.v1.RegisterMemoryTypeRequest
+	(*RegisterMemoryTypeResponse)(nil),       // 10: memory.v1.RegisterMemoryTypeResponse
+	(*MemoryType)(nil),                       // 11: memory.v1.MemoryType
+	(*Command)(nil),                          // 12: memory.v1.Command
+	(*CommitResult)(nil),                     // 13: memory.v1.CommitResult
+	(*Value)(nil),                            // 14: memory.v1.Value
 }
 var file_memory_v1_definitions_proto_depIdxs = []int32{
-	9,  // 0: memory.v1.RegisterAcceptancePolicyRequest.command:type_name -> memory.v1.Command
+	12, // 0: memory.v1.RegisterAcceptancePolicyRequest.command:type_name -> memory.v1.Command
 	4,  // 1: memory.v1.RegisterAcceptancePolicyRequest.policy:type_name -> memory.v1.AcceptancePolicy
-	10, // 2: memory.v1.RegisterAcceptancePolicyResponse.result:type_name -> memory.v1.CommitResult
-	9,  // 3: memory.v1.RegisterPredicateVersionRequest.command:type_name -> memory.v1.Command
+	13, // 2: memory.v1.RegisterAcceptancePolicyResponse.result:type_name -> memory.v1.CommitResult
+	12, // 3: memory.v1.RegisterPredicateVersionRequest.command:type_name -> memory.v1.Command
 	6,  // 4: memory.v1.RegisterPredicateVersionRequest.definition:type_name -> memory.v1.PredicateVersion
-	10, // 5: memory.v1.RegisterPredicateVersionResponse.result:type_name -> memory.v1.CommitResult
+	13, // 5: memory.v1.RegisterPredicateVersionResponse.result:type_name -> memory.v1.CommitResult
 	5,  // 6: memory.v1.AcceptancePolicy.required:type_name -> memory.v1.AttestationRequirement
 	7,  // 7: memory.v1.PredicateVersion.migration:type_name -> memory.v1.PredicateMigration
 	8,  // 8: memory.v1.PredicateVersion.constraints:type_name -> memory.v1.ValueConstraints
-	11, // 9: memory.v1.ValueConstraints.allowed_values:type_name -> memory.v1.Value
-	0,  // 10: memory.v1.DefinitionService.RegisterAcceptancePolicy:input_type -> memory.v1.RegisterAcceptancePolicyRequest
-	2,  // 11: memory.v1.DefinitionService.RegisterPredicateVersion:input_type -> memory.v1.RegisterPredicateVersionRequest
-	1,  // 12: memory.v1.DefinitionService.RegisterAcceptancePolicy:output_type -> memory.v1.RegisterAcceptancePolicyResponse
-	3,  // 13: memory.v1.DefinitionService.RegisterPredicateVersion:output_type -> memory.v1.RegisterPredicateVersionResponse
-	12, // [12:14] is the sub-list for method output_type
-	10, // [10:12] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	14, // 9: memory.v1.ValueConstraints.allowed_values:type_name -> memory.v1.Value
+	12, // 10: memory.v1.RegisterMemoryTypeRequest.command:type_name -> memory.v1.Command
+	11, // 11: memory.v1.RegisterMemoryTypeRequest.definition:type_name -> memory.v1.MemoryType
+	13, // 12: memory.v1.RegisterMemoryTypeResponse.result:type_name -> memory.v1.CommitResult
+	7,  // 13: memory.v1.MemoryType.migration:type_name -> memory.v1.PredicateMigration
+	9,  // 14: memory.v1.DefinitionService.RegisterMemoryType:input_type -> memory.v1.RegisterMemoryTypeRequest
+	0,  // 15: memory.v1.DefinitionService.RegisterAcceptancePolicy:input_type -> memory.v1.RegisterAcceptancePolicyRequest
+	2,  // 16: memory.v1.DefinitionService.RegisterPredicateVersion:input_type -> memory.v1.RegisterPredicateVersionRequest
+	10, // 17: memory.v1.DefinitionService.RegisterMemoryType:output_type -> memory.v1.RegisterMemoryTypeResponse
+	1,  // 18: memory.v1.DefinitionService.RegisterAcceptancePolicy:output_type -> memory.v1.RegisterAcceptancePolicyResponse
+	3,  // 19: memory.v1.DefinitionService.RegisterPredicateVersion:output_type -> memory.v1.RegisterPredicateVersionResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_definitions_proto_init() }
@@ -817,7 +1032,7 @@ func file_memory_v1_definitions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_definitions_proto_rawDesc), len(file_memory_v1_definitions_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

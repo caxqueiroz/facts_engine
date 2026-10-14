@@ -1,0 +1,244 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+
+service MemoryService {
+  rpc GetMemory(GetMemoryRequest) returns (GetMemoryResponse);
+  rpc ProposeMemory(ProposeMemoryRequest) returns (ProposeMemoryResponse);
+  rpc ApproveMemory(ApproveMemoryRequest) returns (ApproveMemoryResponse);
+  rpc AcceptMemory(AcceptMemoryRequest) returns (AcceptMemoryResponse);
+  rpc RejectMemory(RejectMemoryRequest) returns (RejectMemoryResponse);
+  rpc RetractMemory(RetractMemoryRequest) returns (RetractMemoryResponse);
+  rpc DisputeMemory(DisputeMemoryRequest) returns (DisputeMemoryResponse);
+  rpc ResolveMemoryDispute(ResolveMemoryDisputeRequest) returns (ResolveMemoryDisputeResponse);
+  rpc SupersedeMemory(SupersedeMemoryRequest) returns (SupersedeMemoryResponse);
+  rpc GetMemoryVersion(GetMemoryVersionRequest) returns (GetMemoryVersionResponse);
+  rpc GetMemoryHistory(GetMemoryHistoryRequest) returns (GetMemoryHistoryResponse);
+}
+message GetMemoryRequest {
+  option (buf.validate.message).cel = {
+    id: "memory_query.knowledge_boundary"
+    message: "known_at and knowledge_revision cannot both be specified"
+    expression: "!has(this.known_at) || this.knowledge_revision == 0"
+  };
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  MemoryKey key = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp valid_at = 4 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 5 [(buf.validate.field).int64.gte = 0];
+  google.protobuf.Timestamp known_at = 6;
+}
+message GetMemoryResponse {
+  MemoryResult result = 1;
+}
+message ApproveMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+}
+message ApproveMemoryResponse {
+  CommitResult result = 1;
+}
+message AcceptMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+}
+message AcceptMemoryResponse {
+  CommitResult result = 1;
+}
+message RejectMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+}
+message RejectMemoryResponse {
+  CommitResult result = 1;
+}
+message RetractMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message RetractMemoryResponse {
+  CommitResult result = 1;
+}
+message DisputeMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message DisputeMemoryResponse {
+  CommitResult result = 1;
+}
+message ResolveMemoryDisputeRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message ResolveMemoryDisputeResponse {
+  CommitResult result = 1;
+}
+message SupersedeMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+  repeated string replaced_version_ids = 9 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 1000
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  bool automated = 10;
+}
+message SupersedeMemoryResponse {
+  CommitResult result = 1;
+}
+message GetMemoryHistoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int32 limit = 5 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  string page_token = 6 [(buf.validate.field).string.max_bytes = 4096];
+}
+message GetMemoryHistoryResponse {
+  repeated Event events = 1;
+  int64 ledger_revision = 2;
+  int64 stream_revision = 3;
+  string next_page_token = 4;
+}
+// Memory identity is application-issued and independent of fact selectors.
+message MemoryKey {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message MemoryDependency {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string content_digest = 4 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string label = 5 [(buf.validate.field).string = {
+    in: [
+      "assertion",
+      "uncertain",
+      "disputed"
+    ]
+  }];
+}
+message MemoryProposal {
+  Command command = 1 [(buf.validate.field).required = true];
+  MemoryKey key = 2 [(buf.validate.field).required = true];
+  string subtype = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string schema_version = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string body = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 65536
+  }];
+  Interval valid = 6 [(buf.validate.field).required = true];
+  repeated SourceSpan sources = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  repeated MemoryDependency dependencies = 8 [(buf.validate.field).repeated.max_items = 64];
+  int64 expected_revision = 9 [(buf.validate.field).int64.gte = 0];
+}
+message ProposeMemoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  MemoryProposal proposal = 2 [(buf.validate.field).required = true];
+}
+message ProposeMemoryResponse {
+  CommitResult result = 1;
+}
+message MemoryResult {
+  string state = 1;
+  string record_id = 2;
+  string version_id = 3;
+  string body = 4;
+  int64 stream_revision = 5;
+  int64 ledger_revision = 6;
+  repeated MemoryDependency dependencies = 7;
+}
+message GetMemoryVersionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetMemoryVersionResponse {
+  MemoryVersion version = 1;
+}
+message MemoryVersion {
+  string id = 1;
+  string record_id = 2;
+  string digest = 3;
+  string policy_id = 4;
+  RetainedMemoryProposal proposal = 5;
+  Caller proposer = 6;
+  int64 ledger_revision = 7;
+  repeated AuthorizationDecision authorization = 8;
+}
+
+// Retained content is not a write command. Command identity is in event history.
+message RetainedMemoryProposal {
+  string purpose = 1;
+  MemoryKey key = 2;
+  string subtype = 3;
+  string schema_version = 4;
+  string body = 5;
+  Interval valid = 6;
+  repeated SourceSpan sources = 7;
+  repeated MemoryDependency dependencies = 8;
+  int64 expected_revision = 9;
+  string correlation_id = 10;
+}

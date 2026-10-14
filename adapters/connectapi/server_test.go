@@ -314,3 +314,28 @@ func TestGovernanceRequestValidation(t *testing.T) {
 		t.Fatalf("withdrawal tenant: %v", err)
 	}
 }
+
+func TestMemoryRequestValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewMemoryServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	request := &v1.ProposeMemoryRequest{Tenant: "tenant", Proposal: &v1.MemoryProposal{Command: &v1.Command{Key: "proposal", Purpose: "review"}, Key: &v1.MemoryKey{Scope: "scope", Id: "memory"}, Subtype: "summary", SchemaVersion: "v1", Valid: &v1.Interval{}, Sources: []*v1.SourceSpan{{EvidenceId: "source", End: 1, Quote: "x"}}}}
+	if _, err := client.ProposeMemory(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("empty body: %v", err)
+	}
+	request.Proposal.Body = "summary"
+	request.Proposal.Dependencies = []*v1.MemoryDependency{{Scope: "scope", RecordId: "record", VersionId: "version", ContentDigest: strings.Repeat("a", 64), Label: "invented"}}
+	if _, err := client.ProposeMemory(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("dependency label: %v", err)
+	}
+	request.Proposal.Dependencies = nil
+	request.Proposal.Command = nil
+	if _, err := client.ProposeMemory(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing nested command: %v", err)
+	}
+	if _, err := client.GetMemoryHistory(context.Background(), &v1.GetMemoryHistoryRequest{Tenant: "tenant", Scope: "scope", RecordId: "record", Purpose: "review", Limit: 101}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("history size: %v", err)
+	}
+	if _, err := client.GetMemoryVersion(context.Background(), &v1.GetMemoryVersionRequest{Tenant: "other", Scope: "scope", RecordId: "record", VersionId: "version", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("version tenant: %v", err)
+	}
+}

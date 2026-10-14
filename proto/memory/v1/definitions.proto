@@ -6,6 +6,7 @@ import "memory/v1/common.proto";
 
 option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 service DefinitionService {
+  rpc RegisterMemoryType(RegisterMemoryTypeRequest) returns (RegisterMemoryTypeResponse);
   rpc RegisterAcceptancePolicy(RegisterAcceptancePolicyRequest) returns (RegisterAcceptancePolicyResponse);
   rpc RegisterPredicateVersion(RegisterPredicateVersionRequest) returns (RegisterPredicateVersionResponse);
 }
@@ -141,4 +142,24 @@ message ValueConstraints {
       string: {max_bytes: 32}
     }
   }];
+}
+
+message RegisterMemoryTypeRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  MemoryType definition = 3 [(buf.validate.field).required = true];
+}
+message RegisterMemoryTypeResponse {
+  CommitResult result = 1;
+}
+message MemoryType {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string subtype = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string classification = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  PredicateMigration migration = 6;
 }
