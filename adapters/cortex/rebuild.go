@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/caxqueiroz/facts_engine/model"
-	"math"
 	"sort"
 )
 
@@ -100,40 +99,9 @@ func (i *Index) VerifyProjection(ctx context.Context, k model.GenerationKey, fen
 			rows.Close()
 			return check, model.ErrPrecondition
 		}
-		wantContent, wantMetadata, err := projectionContent(d)
-		if err != nil {
+		if err = i.verifyProjectionRow(d, digest, content, metadata, vector); err != nil {
 			rows.Close()
 			return check, err
-		}
-		var actual map[string]string
-		if err = json.Unmarshal(metadata, &actual); err != nil {
-			rows.Close()
-			return check, err
-		}
-		if content != string(wantContent) || model.Digest(actual) != model.Digest(wantMetadata) {
-			rows.Close()
-			return check, model.ErrPrecondition
-		}
-		var numbers []float32
-		if err = json.Unmarshal([]byte(vector), &numbers); err != nil {
-			rows.Close()
-			return check, err
-		}
-		if len(numbers) != i.config.Dimensions {
-			rows.Close()
-			return check, model.ErrPrecondition
-		}
-		nonzero := false
-		for _, n := range numbers {
-			if math.IsNaN(float64(n)) || math.IsInf(float64(n), 0) {
-				rows.Close()
-				return check, model.ErrPrecondition
-			}
-			nonzero = nonzero || n != 0
-		}
-		if !nonzero {
-			rows.Close()
-			return check, model.ErrPrecondition
 		}
 		count++
 	}

@@ -8,6 +8,7 @@ type ActiveProjection struct {
 	Epoch      int64
 }
 type RebuildStatus struct {
+	VerificationVersion               string `json:",omitempty"`
 	Key                               GenerationKey
 	State                             string
 	Fence, ThroughRevision, BaseEpoch int64
@@ -16,8 +17,9 @@ type RebuildStatus struct {
 	Digest                            string
 }
 type ProjectionCheck struct {
-	Count  int
-	Digest string
+	Version string `json:",omitempty"`
+	Count   int
+	Digest  string
 }
 
 // RebuildActor is a trusted operator identity supplied by the host. The

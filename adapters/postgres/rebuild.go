@@ -14,7 +14,7 @@ func validGeneration(k model.GenerationKey) bool {
 }
 func (t *transaction) generation(ctx context.Context, k model.GenerationKey) (model.RebuildStatus, error) {
 	s := model.RebuildStatus{Key: k}
-	err := t.tx.QueryRow(ctx, `SELECT state,fence,through_revision,base_epoch,previous_generation,entry_count,digest FROM projection_generations WHERE tenant_id=$1 AND generation=$2`, k.Tenant, k.Generation).Scan(&s.State, &s.Fence, &s.ThroughRevision, &s.BaseEpoch, &s.PreviousGeneration, &s.Count, &s.Digest)
+	err := t.tx.QueryRow(ctx, `SELECT state,fence,through_revision,base_epoch,previous_generation,entry_count,digest,verification_version FROM projection_generations WHERE tenant_id=$1 AND generation=$2`, k.Tenant, k.Generation).Scan(&s.State, &s.Fence, &s.ThroughRevision, &s.BaseEpoch, &s.PreviousGeneration, &s.Count, &s.Digest, &s.VerificationVersion)
 	return s, err
 }
 func (t *transaction) activeProjection(ctx context.Context) (model.ActiveProjection, error) {
@@ -55,7 +55,7 @@ func (l *Ledger) rebuild(ctx context.Context, k model.GenerationKey, a model.Reb
 	return s, err
 }
 func (t *transaction) saveGeneration(ctx context.Context, s model.RebuildStatus, a model.RebuildActor, operation string) error {
-	if _, err := t.tx.Exec(ctx, `UPDATE projection_generations SET state=$3,fence=$4,through_revision=$5,base_epoch=$6,previous_generation=$7,entry_count=$8,digest=$9 WHERE tenant_id=$1 AND generation=$2`, s.Key.Tenant, s.Key.Generation, s.State, s.Fence, s.ThroughRevision, s.BaseEpoch, s.PreviousGeneration, s.Count, s.Digest); err != nil {
+	if _, err := t.tx.Exec(ctx, `UPDATE projection_generations SET state=$3,fence=$4,through_revision=$5,base_epoch=$6,previous_generation=$7,entry_count=$8,digest=$9,verification_version=$10 WHERE tenant_id=$1 AND generation=$2`, s.Key.Tenant, s.Key.Generation, s.State, s.Fence, s.ThroughRevision, s.BaseEpoch, s.PreviousGeneration, s.Count, s.Digest, s.VerificationVersion); err != nil {
 		return err
 	}
 	b, err := t.encode(struct {
@@ -145,7 +145,7 @@ func (l *Ledger) FreezeRebuild(ctx context.Context, k model.GenerationKey, a mod
 	})
 }
 func (l *Ledger) VerifyRebuild(ctx context.Context, k model.GenerationKey, a model.RebuildActor, fence int64, check model.ProjectionCheck) (model.RebuildStatus, error) {
-	if check.Count < 0 || len(check.Digest) != 64 {
+	if check.Count < 0 || len(check.Digest) != 64 || (check.Version != "" && check.Version != model.ProjectionInventoryV2) {
 		return model.RebuildStatus{}, model.ErrInvalid
 	}
 	return l.rebuild(ctx, k, a, func(t *transaction) (model.RebuildStatus, error) {
@@ -157,7 +157,7 @@ func (l *Ledger) VerifyRebuild(ctx context.Context, k model.GenerationKey, a mod
 			return s, model.ErrRevision
 		}
 		if s.State == "verified" {
-			if s.Count != check.Count || s.Digest != check.Digest {
+			if s.Count != check.Count || s.Digest != check.Digest || s.VerificationVersion != check.Version {
 				return s, model.ErrConflict
 			}
 			return s, nil
@@ -168,6 +168,7 @@ func (l *Ledger) VerifyRebuild(ctx context.Context, k model.GenerationKey, a mod
 		s.State = "verified"
 		s.Count = check.Count
 		s.Digest = check.Digest
+		s.VerificationVersion = check.Version
 		return s, t.saveGeneration(ctx, s, a, "verify")
 	})
 }
@@ -189,6 +190,7 @@ func (l *Ledger) ResumeRebuild(ctx context.Context, k model.GenerationKey, a mod
 		s.State = "resuming"
 		s.Fence++
 		s.Digest = ""
+		s.VerificationVersion = ""
 		s.Count = 0
 		s.ThroughRevision = 0
 		return s, t.saveGeneration(ctx, s, a, "resume")

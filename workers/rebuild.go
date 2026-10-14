@@ -37,14 +37,33 @@ func (r *Rebuild) Verify(ctx context.Context, k model.GenerationKey) (model.Rebu
 	if err = r.index.SetProjectionGate(ctx, k, s.Fence, true); err != nil {
 		return s, err
 	}
-	docs, err := r.store.ProjectionDocuments(ctx, k, s.ThroughRevision)
+	var check model.ProjectionCheck
+	pages, sourcePaged := r.store.(model.PagedRebuildStore)
+	verifier, indexPaged := r.index.(model.PagedRebuildIndex)
+	// Already verified legacy generations keep their original digest contract.
+	// Resume/freeze upgrades them to paged verification without changing a proof.
+	legacyProof := s.State == "verified" && s.VerificationVersion == ""
+	if sourcePaged && indexPaged && !legacyProof {
+		check, err = verifier.VerifyProjectionPages(ctx, k, s.Fence, func(ctx context.Context, after model.ProjectionCursor) (model.ProjectionPage, error) {
+			return pages.ProjectionDocumentPage(ctx, k, s.Fence, s.ThroughRevision, after, 100)
+		})
+		if err == nil && check.Version != model.ProjectionInventoryV2 {
+			return s, model.ErrPrecondition
+		}
+	} else {
+		if s.VerificationVersion != "" {
+			return s, model.ErrPrecondition
+		}
+		var docs []model.ProjectionDocument
+		docs, err = r.store.ProjectionDocuments(ctx, k, s.ThroughRevision)
+		if err == nil {
+			check, err = r.index.VerifyProjection(ctx, k, s.Fence, docs)
+		}
+	}
 	if err != nil {
 		return s, err
 	}
-	check, err := r.index.VerifyProjection(ctx, k, s.Fence, docs)
-	if err != nil {
-		return s, err
-	}
+
 	return r.store.VerifyRebuild(ctx, k, r.actor, s.Fence, check)
 }
 func (r *Rebuild) Resume(ctx context.Context, k model.GenerationKey, fence int64) (model.RebuildStatus, error) {

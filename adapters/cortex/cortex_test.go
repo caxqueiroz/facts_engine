@@ -66,7 +66,7 @@ func TestPostgresContract(t *testing.T) {
 		return index, db
 	}
 	a, admin := setup(dsn, "bank-a")
-	b, _ := setup(dsn2, "bank-b")
+	b, otherAdmin := setup(dsn2, "bank-b")
 	text := "canonical accepted fact"
 	d := model.ProjectionDocument{Tenant: "bank-a", Generation: "g1", RecordID: "record", VersionID: "version", VersionDigest: model.BytesDigest([]byte(text)), PolicyID: "policy", Classification: "confidential", Key: model.FactKey{Scope: "scope1", Subject: "subject", Predicate: "predicate"}, Value: model.Value{Kind: model.Text, Text: &text}}
 	if err := a.Put(ctx, d); err != nil {
@@ -128,4 +128,6 @@ func TestPostgresContract(t *testing.T) {
 	if _, err := a.Candidates(ctx, "bank-a", "g1", "scope1", "fact", 10); err != nil {
 		t.Fatal("adapter unexpectedly closed host pool", err)
 	}
+	testPagedProjectionVerification(t, ctx, b, otherAdmin)
+
 }

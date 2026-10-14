@@ -571,15 +571,16 @@ type PredicateVersion struct {
 }
 
 type ProjectionGeneration struct {
-	TenantID           string
-	Generation         string
-	State              string
-	Fence              int64
-	ThroughRevision    int64
-	BaseEpoch          int64
-	PreviousGeneration string
-	EntryCount         int32
-	Digest             string
+	TenantID            string
+	Generation          string
+	State               string
+	Fence               int64
+	ThroughRevision     int64
+	BaseEpoch           int64
+	PreviousGeneration  string
+	EntryCount          int32
+	Digest              string
+	VerificationVersion string
 }
 
 type ProjectionRebuildEvent struct {

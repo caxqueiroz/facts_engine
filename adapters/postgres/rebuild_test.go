@@ -118,6 +118,46 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Exhaust the frozen source through small pages; no accepted version may
+	// disappear or repeat at the fact/memory boundary.
+	for _, limit := range []int{1, 3, model.MaxProjectionPageDocuments} {
+		cursor := model.ProjectionCursor{}
+		seen := map[string]bool{}
+		for {
+			page, err := registry.ProjectionDocumentPage(ctx, oldKey, status.Fence, status.ThroughRevision, cursor, limit)
+			if err != nil || len(page.Documents) > limit {
+				t.Fatal("source page", page, err)
+			}
+			for _, document := range page.Documents {
+				id := model.ProjectionID(document)
+				if seen[id] {
+					t.Fatal("duplicate paged document", id)
+				}
+				seen[id] = true
+			}
+			if page.Next == nil {
+				break
+			}
+			if !cursor.Before(*page.Next) {
+				t.Fatal("cursor failed to advance")
+			}
+			cursor = *page.Next
+		}
+		if len(seen) != len(docs) {
+			t.Fatal("incomplete paged inventory", len(seen), len(docs))
+		}
+		for _, document := range docs {
+			if !seen[model.ProjectionID(document)] {
+				t.Fatal("missing paged document")
+			}
+		}
+	}
+	if _, err := registry.ProjectionDocumentPage(ctx, oldKey, status.Fence+1, status.ThroughRevision, model.ProjectionCursor{}, 1); !errors.Is(err, model.ErrRevision) {
+		t.Fatal("stale source fence", err)
+	}
+	if _, err := registry.ProjectionDocumentPage(ctx, oldKey, status.Fence, status.ThroughRevision+1, model.ProjectionCursor{}, 1); !errors.Is(err, model.ErrRevision) {
+		t.Fatal("changed source revision", err)
+	}
 	for _, d := range docs {
 		raw, err := json.Marshal(struct {
 			Key   model.FactKey
@@ -133,9 +173,28 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 			t.Fatal(err)
 		}
 	}
+	legacyCheck, err := old.VerifyProjection(ctx, oldKey, status.Fence, docs)
+	if err != nil {
+		t.Fatal("legacy verifier", err)
+	}
+	legacyVerified, err := registry.VerifyRebuild(ctx, oldKey, actor, status.Fence, legacyCheck)
+	if err != nil || legacyVerified.VerificationVersion != "" {
+		t.Fatal("legacy proof", legacyVerified, err)
+	}
+	legacyRetry, err := manager.Verify(ctx, oldKey)
+	if err != nil || legacyRetry != legacyVerified {
+		t.Fatal("legacy retry changed digest contract", legacyRetry, err)
+	}
+	if _, err := manager.Resume(ctx, oldKey, legacyVerified.Fence); err != nil {
+		t.Fatal("resume legacy proof", err)
+	}
 	verified, err := manager.Verify(ctx, oldKey)
-	if err != nil || verified.Count != len(docs) {
+	if err != nil || verified.Count != len(docs) || verified.VerificationVersion != model.ProjectionInventoryV2 {
 		t.Fatal(verified, err)
+	}
+	repeated, err := manager.Verify(ctx, oldKey)
+	if err != nil || repeated != verified {
+		t.Fatal("paged verify retry", repeated, err)
 	}
 	initial, err := manager.Activate(ctx, oldKey, verified.Fence)
 	if err != nil || initial.State != "active" {
