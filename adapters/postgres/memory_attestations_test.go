@@ -109,4 +109,18 @@ func testMemoryAttestations(t *testing.T, ctx context.Context, engine *facts.Eng
 	if err != nil || current.State != "resolved" || current.VersionID != next.VersionID {
 		t.Fatal(current, err)
 	}
+	history, err := engine.GetMemoryHistory(ctx, reviewer, model.HistoryPageQuery{HistoryQuery: model.HistoryQuery{Scope: request.Key.Scope, RecordID: version.RecordID, Purpose: "memory-history"}, Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	withdrawalFound := false
+	for _, event := range history.Events {
+		if event.Type == "withdraw_attestation" && event.EntityID == att.Attestation.ID {
+			withdrawalFound = true
+		}
+	}
+	if !withdrawalFound {
+		t.Fatal("memory history lost attestation withdrawal")
+	}
+
 }

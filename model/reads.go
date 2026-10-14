@@ -44,3 +44,8 @@ type HistoryPageTx interface {
 	Tx
 	HistoryPage(context.Context, string, int64, int64, int) ([]Event, error)
 }
+
+type MemoryHistoryPageTx interface {
+	Tx
+	MemoryHistoryPage(context.Context, string, int64, int64, int) ([]Event, error)
+}

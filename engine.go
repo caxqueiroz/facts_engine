@@ -320,3 +320,7 @@ func (e *Engine) GetMemory(ctx context.Context, c Caller, q model.MemoryQuery) (
 
 type MemoryQuery = model.MemoryQuery
 type MemoryResult = model.MemoryResult
+
+func (e *Engine) GetMemoryHistory(ctx context.Context, c Caller, q model.HistoryPageQuery) (model.HistoryPage, error) {
+	return e.service.GetMemoryHistory(ctx, c, q)
+}

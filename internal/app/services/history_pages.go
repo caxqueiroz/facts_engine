@@ -9,6 +9,12 @@ import (
 )
 
 func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.HistoryPageQuery) (model.HistoryPage, error) {
+	return s.listRecordHistory(ctx, c, q, "fact")
+}
+func (s *Service) GetMemoryHistory(ctx context.Context, c model.Caller, q model.HistoryPageQuery) (model.HistoryPage, error) {
+	return s.listRecordHistory(ctx, c, q, "memory")
+}
+func (s *Service) listRecordHistory(ctx context.Context, c model.Caller, q model.HistoryPageQuery, kind string) (model.HistoryPage, error) {
 	empty := model.HistoryPage{}
 	if len(s.reads.PaginationKey) != 32 {
 		return empty, model.ErrPrecondition
@@ -26,7 +32,7 @@ func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.H
 	binding := q
 	binding.PageToken = ""
 	now := time.Now().UTC()
-	token := factPageToken{Version: "fact-history-page-v1", CallerDigest: model.Digest(c), QueryDigest: model.Digest(binding), ExpiresAt: now.Add(s.reads.TokenLifetime), EvaluatedAt: now}
+	token := factPageToken{Version: kind + "-history-page-v1", CallerDigest: model.Digest(c), QueryDigest: model.Digest(binding), ExpiresAt: now.Add(s.reads.TokenLifetime), EvaluatedAt: now}
 	after := int64(0)
 	if q.PageToken != "" {
 		var err error
@@ -41,19 +47,15 @@ func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.H
 	}
 	out := model.HistoryPage{}
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
-		t, ok := tx.(model.HistoryPageTx)
-		if !ok {
-			return model.ErrPrecondition
-		}
 		record, err := tx.Record(ctx, q.RecordID)
 		if err != nil {
 			return err
 		}
-		if record.Kind == "memory" {
-			return model.ErrPrecondition
-		}
 		if record.Key.Scope != q.Scope {
 			return model.ErrDenied
+		}
+		if (kind == "memory") != (record.Kind == "memory") {
+			return model.ErrPrecondition
 		}
 		head, err := tx.Revision(ctx)
 		if err != nil {
@@ -66,7 +68,20 @@ func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.H
 		if head < token.Revision || record.Revision < token.StreamRevision {
 			return model.ErrPrecondition
 		}
-		events, err := t.HistoryPage(ctx, q.RecordID, token.Revision, after, q.Limit)
+		var events []model.Event
+		if kind == "memory" {
+			t, ok := tx.(model.MemoryHistoryPageTx)
+			if !ok {
+				return model.ErrPrecondition
+			}
+			events, err = t.MemoryHistoryPage(ctx, q.RecordID, token.Revision, after, q.Limit)
+		} else {
+			t, ok := tx.(model.HistoryPageTx)
+			if !ok {
+				return model.ErrPrecondition
+			}
+			events, err = t.HistoryPage(ctx, q.RecordID, token.Revision, after, q.Limit)
+		}
 		if err != nil {
 			return err
 		}
@@ -76,7 +91,7 @@ func (s *Service) ListFactHistory(ctx context.Context, c model.Caller, q model.H
 		expected := after
 		for _, event := range events {
 			expected++
-			if event.RecordID != q.RecordID || event.Scope != q.Scope || event.StreamRevision != expected || event.LedgerRevision > token.Revision || event.StreamRevision > token.StreamRevision {
+			if (kind == "memory") != (event.RecordKind == "memory") || event.RecordID != q.RecordID || event.Scope != q.Scope || event.StreamRevision != expected || event.LedgerRevision > token.Revision || event.StreamRevision > token.StreamRevision {
 				return model.ErrPrecondition
 			}
 		}

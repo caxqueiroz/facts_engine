@@ -171,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
-2. Complete memory dependency refresh jobs, retrieval/context integration, pagination and history. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
+2. Complete memory dependency refresh jobs and retrieval/context integration. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
@@ -430,7 +430,7 @@ The engine verifies source bytes/spans, dependency ownership/digests, active sub
 
 Memory proposals and subtype definitions participate in scoped signed audits and event archives. Metadata-only audits withhold memory bodies because they may quote evidence. A scoped audit also withholds a memory version with dependencies outside that scope; archive workers authorize every dependency scope. Memory evidence links block uncoordinated byte disposal.
 
-Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Refresh jobs, paginated memory history and recall/context delivery remain in progress. Memory records do not yet enter searchable or prepared context results. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
+Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Refresh jobs and recall/context delivery remain in progress. Memory records do not yet enter searchable or prepared context results. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
 
 
 ### Memory acceptance, lifecycle and dependency eligibility
@@ -461,3 +461,23 @@ Only the recorded attestor can withdraw its attestation through an authorized, i
 Memory attestations and withdrawals participate in signed audit/export and event archive coverage. Their evidence references block disposal, and resolved memory reads verify bound attestation evidence before disclosure. Presentation/response artifacts for client confirmation and delegated external identity flows remain separate unfinished requirements; this API authenticates the recording attestor through the host's trusted caller boundary.
 
 Integration tests cover forged attestors, wrong/obsolete digests, expired submissions, cross-kind ID collisions, idempotent recording/withdrawal, unauthorized withdrawal, acceptance with valid prerequisites, current ineligibility after withdrawal, preserved historical eligibility and a separately validated replacement.
+
+
+### Paginated memory history
+
+`GetMemoryHistory` uses `HistoryPageQuery` and `HistoryPage`, with the same `EngineOptions.Reads` signing key and 1–100 page-size bounds as fact history. Pass the memory record ID returned by `ProposeMemory`, its scope, a purpose, and the prior page's `NextPageToken` when continuing. The first page pins both ledger and stream revisions; new proposals or lifecycle changes appear only in a fresh traversal.
+
+```go
+page, err := engine.GetMemoryHistory(ctx, caller, model.HistoryPageQuery{
+    HistoryQuery: model.HistoryQuery{
+        Scope: scope, RecordID: memoryRecordID, Purpose: "review_history",
+    },
+    Limit: 50,
+})
+```
+
+Pages contain proposal, acceptance, supersession, rejection, dispute/resolution, retraction and attestation-withdrawal events that advance the memory record stream. Exact bodies remain available through authorized `GetMemoryVersion` reads. Standalone attestation recording and subtype publication do not advance a record stream; those events remain in the tenant change feed and signed audit exports.
+
+Continuation tokens are bound to the authenticated caller, tenant, scope, record, purpose, page size, pinned revisions and record kind. Memory tokens cannot be used with `ListFactHistory`, or transferred to another principal. Current history permission is checked before reading and before disclosure. Missing or inconsistent stream events fail explicitly. No additional database migration is required.
+
+Real PostgreSQL tests verify that a concurrent proposal stays outside an existing page sequence, a fresh traversal includes it, withdrawals remain visible, and tokens cannot cross caller or fact/memory boundaries.

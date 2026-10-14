@@ -1,6 +1,7 @@
 package postgres_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -17,7 +18,7 @@ import (
 
 func testMemoryProposals(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres, c model.Caller, source model.FactProposal, fact model.CommitResult) {
 	t.Helper()
-	engine, err := facts.New(l, allow{}, store)
+	engine, err := facts.NewWithReads(l, allow{}, store, model.ReadOptions{PaginationKey: bytes.Repeat([]byte{6}, 32)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,6 +229,50 @@ func testMemoryProposals(t *testing.T, ctx context.Context, l model.Ledger, stor
 		} else if err != nil {
 			t.Fatal("configured automatic acceptance failed", err)
 		}
+	}
+	historyQuery := model.HistoryPageQuery{HistoryQuery: model.HistoryQuery{Scope: query.Scope, RecordID: result.RecordID, Purpose: "memory-history"}, Limit: 2}
+	firstPage, err := engine.GetMemoryHistory(ctx, reviewer, historyQuery)
+	if err != nil || len(firstPage.Events) != 2 || firstPage.StreamRevision != 9 || firstPage.NextPageToken == "" {
+		t.Fatal(firstPage, err)
+	}
+	changed.Command = cmd("memory-history-later-proposal")
+	changed.ExpectedRevision = 9
+	if _, err = engine.ProposeMemory(ctx, c, changed); err != nil {
+		t.Fatal(err)
+	}
+	historyQuery.PageToken = firstPage.NextPageToken
+	if _, err = engine.ListFactHistory(ctx, reviewer, historyQuery); !errors.Is(err, model.ErrInvalid) {
+		t.Fatal("memory token accepted by fact history", err)
+	}
+	otherReader := reviewer
+	otherReader.Principal = "different-reader"
+	if _, err = engine.GetMemoryHistory(ctx, otherReader, historyQuery); !errors.Is(err, model.ErrInvalid) {
+		t.Fatal("memory token transferred between principals", err)
+	}
+	count := 2
+	for historyQuery.PageToken != "" {
+		page, err := engine.GetMemoryHistory(ctx, reviewer, historyQuery)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.LedgerRevision != firstPage.LedgerRevision || page.StreamRevision != 9 {
+			t.Fatal("memory history boundary moved", page)
+		}
+		for _, event := range page.Events {
+			count++
+			if event.StreamRevision != int64(count) || event.RecordKind != "memory" {
+				t.Fatal(event)
+			}
+		}
+		historyQuery.PageToken = page.NextPageToken
+	}
+	if count != 9 {
+		t.Fatal("history skipped an event", count)
+	}
+	historyQuery.Limit = 100
+	fresh, err := engine.GetMemoryHistory(ctx, reviewer, historyQuery)
+	if err != nil || len(fresh.Events) != 10 {
+		t.Fatal("new traversal omitted later event", fresh, err)
 	}
 	status, err := engine.GetRetentionStatus(ctx, c, model.RetentionStatusQuery{Scope: request.Key.Scope, EvidenceID: source.Sources[0].EvidenceID, Purpose: "memory-review"})
 	if err != nil || (!slices.Contains(status.Blockers, "memory_versions") || !slices.Contains(status.Blockers, "memory_attestations")) {
