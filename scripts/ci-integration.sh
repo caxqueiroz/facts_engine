@@ -1,6 +1,12 @@
 #!/bin/sh
 # Own a disposable Compose project; never reset a developer's existing services.
 set -eu
+case "${1:-}" in
+  "") ;;
+  --benchmark) export RUN_LEDGER_BENCHMARK=1 ;;
+  *) printf 'Usage: sh scripts/ci-integration.sh [--benchmark]\n' >&2; exit 1 ;;
+esac
+[ "$#" -le 1 ] || exit 1
 ci_project="facts-ci-$(date +%s)-$$"
 compose() {
   docker compose -p "$ci_project" -f compose.yaml -f compose.ci.yaml "$@"

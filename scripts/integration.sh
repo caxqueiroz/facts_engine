@@ -28,3 +28,7 @@ go test -race ./... -count=1 -timeout 10m
 # Quiescent fixture backup, separate restore and fresh derived-index rebuild.
 export TEST_POSTGRES_CONTAINER TEST_POSTGRES_PORT TEST_CORTEX_CONTAINER TEST_CORTEX_PORT
 sh scripts/restore-drill.sh "$test_database"
+
+if [ "${RUN_LEDGER_BENCHMARK:-0}" = 1 ]; then
+  TEST_BENCH_DATABASE_URL="$TEST_DATABASE_URL" go test ./adapters/postgres -run '^$' -bench '^BenchmarkLedgerWorkload$' -benchtime "${BENCH_TIME:-3s}" -count "${BENCH_COUNT:-3}" -timeout 30m
+fi

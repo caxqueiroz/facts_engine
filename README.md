@@ -162,6 +162,34 @@ To enable remote extraction scheduling, start from [examples/memoryd-extraction.
 
 For profiles requiring approved redaction, configure `extraction.redaction_policy_versions` with the exact approved version identifiers. This allows the engine to validate previously registered derivatives and their provenance; it does not create redacted evidence, establish a redaction service, or waive evidence permissions. Refresh profiles continue to reject redaction settings that their parser does not support. Use the same pinned profiles and budget configuration on the separate executor. Clients can schedule jobs, inspect status and retained artifacts, and retry jobs with operational permission; they cannot cause this API process to invoke a model. The mTLS integration test verifies a configured profile creates a pending refresh job, an unapproved profile is rejected, and retries preserve job identity and the authenticated caller.
 
+## Ledger contention benchmark
+
+`make ci-benchmark` creates an owned disposable Compose stack, runs integration and restore checks, then runs `BenchmarkLedgerWorkload` without the race detector for timing. The stack is removed on exit. Normal `make ci-integration` does not run performance measurements.
+
+```sh
+BENCH_TENANTS=1 BENCH_CONCURRENCY=8 BENCH_CONNECTIONS=8 \
+  BENCH_READ_PERCENT=0 BENCH_SCOPES_PER_TENANT=1 \
+  BENCH_TIME=3s BENCH_COUNT=3 make ci-benchmark
+```
+
+| Setting | Default | Supported range |
+| --- | --- | --- |
+| `BENCH_TENANTS` | 1 | 1–1024 |
+| `BENCH_CONCURRENCY` | 8 | 1–256 concurrent callers |
+| `BENCH_CONNECTIONS` | 8 | 1–64 runtime database connections |
+| `BENCH_READ_PERCENT` | 0 | 0–100 percent read selection |
+| `BENCH_SCOPES_PER_TENANT` | 1 | 1–10000 pre-seeded scopes per tenant |
+| `BENCH_TIME` | `3s` | Go benchmark duration or iteration count, such as `100x` |
+| `BENCH_COUNT` | 3 | Go benchmark repetition count |
+
+Each run uses new tenant IDs and encrypted test payloads. Writes create independent scopes through `Engine.PutScope`, contending on the real per-tenant ledger append path; reads use `Engine.GetScope` against the seeded corpus. The deterministic operation selection distributes tenants independently of the requested read percentage. The workload includes the reference in-process authorizer, PostgreSQL transactions and bounded internal retries, encryption, command receipts, and atomic outbox writes. It excludes external authorization latency, fact validation/acceptance, retrieval, model execution and production network topology. It is an append-contention diagnostic, not a complete bank workload.
+
+Output reports successful `commits/s` and `reads/s`, `conflicts/op`, unexpected `failures/op`, and `p50-upper-us`, `p95-upper-us`, `p99-upper-us`. Percentiles are upper bounds from fixed power-of-two nanosecond buckets, not exact sample percentiles. Latency includes pool waiting and internal retries; all outcomes, including failed attempts, contribute to latency and Go's `ns/op`. Conflict rates must therefore be reviewed alongside throughput. Unexpected failures invalidate the run. Requests have a 30-second deadline; the runner caps the benchmark process at 30 minutes. Setup and final invariant checks are excluded from timing. After each sample, every tenant's committed write count must match its contiguous ledger revisions and outbox row count.
+
+For an already initialized **disposable** integration database, set `TEST_BENCH_DATABASE_URL` and invoke `go test ./adapters/postgres -run '^$' -bench '^BenchmarkLedgerWorkload$' -benchtime 3s -count 3`. This requires the fixture schema/roles and a connection authorized for its runtime role and final inventory checks. It writes new benchmark tenants and does not delete them; never point it at a production database.
+
+Compare a single hot tenant with multiple tenants, vary connection/concurrency limits and read mix, and retain the exact command, Go/PostgreSQL versions, CPU/memory/storage/container settings, dataset size and raw results. The operations owner must supply representative production workloads and approved latency/capacity targets. No development benchmark result establishes an approved service limit or substitutes for fact/search/model workload evaluations.
+
 ## Disposable restore drill
 
 `make ci-integration` now finishes with [scripts/restore-drill.sh](scripts/restore-drill.sh). After the ordinary integration fixture stops writing, it adds a dedicated accepted fact and encrypted evidence, takes a PostgreSQL custom-format logical dump, and restores it into a newly created database. It uses `pg_dump` and `pg_restore` from the same PostgreSQL container, fails on restore errors, and never uses `--clean` or resets an existing database. A separate fresh Cortex database receives the rebuilt search state. The surrounding CI runner owns and removes the entire disposable Compose project.

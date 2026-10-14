@@ -51,3 +51,7 @@ containers:
 
 container-smoke:
 	sh scripts/container-smoke.sh
+
+.PHONY: ci-benchmark
+ci-benchmark:
+	sh scripts/ci-integration.sh --benchmark
