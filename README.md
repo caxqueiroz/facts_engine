@@ -170,7 +170,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details.
+1. Finish foundation contracts: scope/subject administration, explicit schema migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints and temporal precision.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, remaining memory-specific pagination and history contracts. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -339,3 +339,24 @@ if errors.As(err, &conflict) {
 The reported revision is the state observed while the record was locked, not a reservation: it can change again before a retry. The engine never automatically overwrites intervening work. Reusing a committed command with identical input still returns its original receipt; a revised intent needs a new command key. Conflict details contain no fact values, evidence text or other callers' commands, and the error's text stays generic. Mutation authorization is rechecked before returning the details; denial or an authorization outage withholds them. Operational lease/fence conflicts continue to use the generic `ErrRevision` contract and should be handled through the corresponding job/consumer status API.
 
 The real PostgreSQL concurrent-approval test verifies that the losing command receives the winning stream revision. Disclosure tests verify that authorization revocation suppresses typed conflict details.
+
+
+### Registered predicate constraints
+
+`PredicateVersion` supports optional immutable `Constraints`, `Cardinality` and `TemporalPrecision` fields. These are retained with the encrypted definition and included in extraction inputs and audit/archive payloads. No new database migration is needed: the fields extend the existing versioned payload. Omitted fields preserve earlier behavior and serialization; explicit `Cardinality` currently accepts only `single`, matching the engine's one-value-per-fact-key contract. Separate memberships still require explicit discriminators.
+
+`model.ValueConstraints` supports:
+
+- `AllowUnknown`: optional boolean; omission permits explicit unknown values, while false rejects them. Unknown remains distinct from false, zero and absence.
+- `AllowedValues`: up to 64 exact typed values. Unknown is controlled separately. Enumerations also obey the other declared constraints.
+- `MinTextRunes` / `MaxTextRunes`: inclusive Unicode code-point counts, independent of UTF-8 byte length; the existing 64 KiB text byte limit still applies.
+- `MinInteger` / `MaxInteger`: inclusive signed integer bounds.
+- `MinDecimal` / `MaxDecimal`: inclusive canonical decimal bounds, compared exactly without binary floating point.
+- `DecimalPlaces`: maximum fractional digits in the canonical decimal representation. Trailing-zero strings remain invalid under the existing canonical-value contract.
+- `Units`: an allowlist for decimal units/currencies, including an explicit empty string if unitless values are permitted. Numeric bounds apply in each allowed unit; the engine does not convert currencies or units.
+
+Constraint definitions are limited to 64 KiB. Wrong-type constraints, inverted bounds, duplicate enumeration values/units, invalid canonical decimals and unsupported cardinalities are rejected at publication. Manual proposals and extracted candidates share `ValidateFact`; invalid extracted values become review issues. Acceptance rechecks the bound immutable definition. Register a new schema version for changes; existing accepted versions retain their original schema and history. Explicit migration planning and transformation rules remain delivery work.
+
+`TemporalPrecision` accepts `microsecond`, `second` or `day`. It applies to effective interval boundaries and instant values; `day` requires UTC midnight. It never rounds timestamps or infers a local timezone. Omission retains the existing interval microsecond contract without adding a restriction to instant values. Lifecycle changes also validate their affected intervals against the version's declared precision.
+
+Tests cover exact decimal comparisons beyond floating-point precision, Unicode lengths, ranges, units, enumerations, unknown values, time boundaries, legacy serialization, persisted definitions and extraction filtering. A PostgreSQL scenario rejects an invalid proposal without consuming its command key, then accepts a valid proposal through the ordinary review policy.

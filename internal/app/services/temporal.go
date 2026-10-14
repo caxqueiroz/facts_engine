@@ -61,6 +61,13 @@ func (s *Service) acceptanceChecks(ctx context.Context, tx model.Tx, c model.Cal
 	if active != v.Proposal.SchemaVersion {
 		return p, nil, model.ErrPrecondition
 	}
+	definition, err := tx.Predicate(ctx, v.Proposal.Key.Scope, v.Proposal.Key.Predicate, v.Proposal.SchemaVersion)
+	if err != nil {
+		return p, nil, err
+	}
+	if definition.ValidateFact(v.Proposal.Value, v.Proposal.Valid) != nil {
+		return p, nil, model.ErrPrecondition
+	}
 	p, err = tx.Policy(ctx, v.Proposal.Key.Scope, v.PolicyID)
 	if err != nil {
 		return p, nil, err
@@ -188,6 +195,15 @@ func (s *Service) change(ctx context.Context, c model.Caller, r model.LifecycleC
 		}
 		if v.Proposal.Key.Scope != r.Scope {
 			return model.ErrDenied
+		}
+		if op != "reject_fact" {
+			definition, err := tx.Predicate(ctx, r.Scope, v.Proposal.Key.Predicate, v.Proposal.SchemaVersion)
+			if err != nil {
+				return err
+			}
+			if definition.ValidateFact(v.Proposal.Value, r.Valid) != nil {
+				return model.ErrInvalid
+			}
 		}
 		rec, err := tx.LockRecord(ctx, v.Proposal.Key)
 		if err != nil {

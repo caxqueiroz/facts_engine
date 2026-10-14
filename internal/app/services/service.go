@@ -143,7 +143,7 @@ func (s *Service) RegisterAcceptancePolicy(ctx context.Context, c model.Caller, 
 }
 func (s *Service) RegisterPredicateVersion(ctx context.Context, c model.Caller, r model.PredicateRequest) (model.CommitResult, error) {
 	d := r.Definition
-	if !model.ValidID(d.Predicate) || !model.ValidID(d.Version) || !model.ValidID(d.PolicyID) || d.Classification == "" || !slices.Contains([]model.ValueKind{model.Text, model.Boolean, model.Integer, model.Decimal, model.Date, model.Instant, model.Entity}, d.Kind) {
+	if !model.ValidID(d.Predicate) || !model.ValidID(d.Version) || !model.ValidID(d.PolicyID) || d.Classification == "" || d.ValidateSchema() != nil || !slices.Contains([]model.ValueKind{model.Text, model.Boolean, model.Integer, model.Decimal, model.Date, model.Instant, model.Entity}, d.Kind) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	return s.mutate(ctx, c, d.Scope, "register_predicate", "can_manage_definitions", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
@@ -244,7 +244,7 @@ func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Ca
 	if err != nil {
 		return err
 	}
-	if r.Value.Kind != model.Unknown && r.Value.Kind != d.Kind {
+	if d.ValidateFact(r.Value, r.Valid) != nil {
 		return model.ErrInvalid
 	}
 	rec, err := tx.LockRecord(ctx, r.Key)

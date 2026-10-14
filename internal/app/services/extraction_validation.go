@@ -46,7 +46,7 @@ func candidateIssue(c model.ExtractionCandidate, input model.ExtractionInput) st
 	if c.Uncertainty != "asserted" {
 		return "uncertain_or_nonaffirmative_assertion"
 	}
-	if c.Value.Validate() != nil || (c.Value.Kind != model.Unknown && c.Value.Kind != definition.Kind) {
+	if definition.ValidateFact(c.Value, c.Valid) != nil {
 		return "invalid_value"
 	}
 	if c.Valid.Validate() != nil {

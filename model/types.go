@@ -159,6 +159,9 @@ type PredicateVersion struct {
 	Scope, Predicate, Version, PolicyID string
 	Kind                                ValueKind
 	Classification                      string
+	Constraints                         *ValueConstraints `json:",omitempty"`
+	Cardinality                         string            `json:",omitempty"`
+	TemporalPrecision                   string            `json:",omitempty"`
 }
 type AttestationRequirement struct {
 	Kind       string

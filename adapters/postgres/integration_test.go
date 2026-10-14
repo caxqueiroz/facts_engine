@@ -109,6 +109,45 @@ func TestPostgresLedger(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	value := "tea"
 	q := model.FactProposal{Command: cmd("proposal"), Key: model.FactKey{Scope: "case1", Subject: "subject1", Predicate: "preference"}, SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &now}, Sources: []model.SourceSpan{{EvidenceID: "ev1", Start: 9, End: 12, Quote: "tea"}}}
+	t.Run("predicate value constraints", func(t *testing.T) {
+		maximum := 3
+		restricted := def
+		restricted.Command = cmd("restricted-schema")
+		restricted.Definition.Predicate = "restricted-preference"
+		restricted.Definition.Cardinality = "single"
+		restricted.Definition.Constraints = &model.ValueConstraints{MaxTextRunes: &maximum, AllowedValues: []model.Value{q.Value}}
+		if _, err := engine.RegisterPredicateVersion(ctx, caller, restricted); err != nil {
+			t.Fatal(err)
+		}
+		request := q
+		request.Command = cmd("restricted-proposal")
+		request.Key.Predicate = restricted.Definition.Predicate
+		bad := "coffee"
+		request.Value = model.Value{Kind: model.Text, Text: &bad}
+		if _, err := engine.ProposeFact(ctx, caller, request); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal("schema bypass", err)
+		}
+		request.Value = q.Value
+		accepted, err := engine.ProposeFact(ctx, caller, request)
+		if err != nil {
+			t.Fatal("invalid request persisted receipt", err)
+		}
+		if _, err = engine.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("restricted-approval"), Scope: "case1", RecordID: accepted.RecordID, VersionID: accepted.VersionID, ExpectedRevision: accepted.StreamRevision}); err != nil {
+			t.Fatal(err)
+		}
+		if err = ledger.Transact(ctx, caller.Tenant, func(tx model.Tx) error {
+			stored, err := tx.Predicate(ctx, "case1", restricted.Definition.Predicate, "v1")
+			if err != nil {
+				return err
+			}
+			if model.Digest(stored) != model.Digest(restricted.Definition) {
+				t.Fatal("schema constraints not retained")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
 	proposal, err := engine.ProposeFact(ctx, caller, q)
 	if err != nil {
 		t.Fatal(err)

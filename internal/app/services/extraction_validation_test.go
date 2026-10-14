@@ -46,3 +46,13 @@ func TestExtractionAuditReportsMissingAndPartialResponses(t *testing.T) {
 		t.Fatalf("metadata out=%v gaps=%v err=%v", out, gaps, err)
 	}
 }
+
+func TestExtractionUsesPredicateConstraints(t *testing.T) {
+	maximum := 3
+	value := "coffee"
+	input := model.ExtractionInput{Subjects: []string{"subject"}, Predicates: []model.PredicateVersion{{Predicate: "preference", Version: "v1", Kind: model.Text, Constraints: &model.ValueConstraints{MaxTextRunes: &maximum}}}}
+	candidate := model.ExtractionCandidate{Subject: "subject", Predicate: "preference", SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Uncertainty: "asserted"}
+	if issue := candidateIssue(candidate, input); issue != "invalid_value" {
+		t.Fatal("schema constraint bypass", issue)
+	}
+}
