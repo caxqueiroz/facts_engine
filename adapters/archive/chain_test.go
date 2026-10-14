@@ -26,7 +26,7 @@ func (source) ArchivePayload(_ context.Context, d model.Delivery) (model.Archive
 type auth struct{ denied string }
 
 func (a auth) Check(_ context.Context, r model.AuthorizationRequest) (model.AuthorizationDecision, error) {
-	return model.AuthorizationDecision{Allowed: r.Scope != a.denied, CheckedAt: time.Now()}, nil
+	return model.AuthorizationDecision{Allowed: r.Scope != a.denied, ModelID: "model", Consistency: "HIGHER_CONSISTENCY", CheckedAt: time.Now()}, nil
 }
 func TestArchiveChainRecovery(t *testing.T) {
 	ctx := context.Background()

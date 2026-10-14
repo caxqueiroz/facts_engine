@@ -39,16 +39,20 @@ func (a *AuditExport) Handle(ctx context.Context, d model.Delivery) error {
 	if d.Fence < 1 || !model.ValidID(d.Event.ID) || !model.ValidID(d.Event.EntityID) || !model.ValidID(d.Event.Scope) {
 		return model.ErrInvalid
 	}
+	checks := []model.AuthorizationDecision{}
 	for _, permission := range []string{"can_operate", "can_export_audit"} {
 		check, err := a.auth.Check(ctx, model.AuthorizationRequest{Caller: a.caller, Scope: d.Event.Scope, Permission: permission, Purpose: "audit_export_delivery"})
 		if err != nil {
 			return model.ErrUnavailable
 		}
-		if !check.Allowed {
-			return model.ErrDenied
+		if err := validateWorkerAuthorization(check); err != nil {
+			return err
 		}
-		if check.ModelID == "" || check.Consistency != "HIGHER_CONSISTENCY" || time.Since(check.CheckedAt) > 30*time.Second || check.CheckedAt.After(time.Now().Add(time.Second)) {
-			return model.ErrUnavailable
+		checks = append(checks, check)
+	}
+	for _, check := range checks {
+		if err := validateWorkerAuthorization(check); err != nil {
+			return err
 		}
 	}
 	// RunAuditExport matches this original caller against the retained job and

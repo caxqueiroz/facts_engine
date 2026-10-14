@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/caxqueiroz/facts_engine/adapters/archive"
 	"github.com/caxqueiroz/facts_engine/model"
-	"time"
 )
 
 type Archive struct {
@@ -51,11 +50,8 @@ func (a *Archive) Handle(ctx context.Context, d model.Delivery) error {
 			if err != nil {
 				return model.ErrUnavailable
 			}
-			if !decision.Allowed {
-				return model.ErrDenied
-			}
-			if time.Since(decision.CheckedAt) > 30*time.Second {
-				return model.ErrUnavailable
+			if err := validateWorkerAuthorization(decision); err != nil {
+				return err
 			}
 			checks = append(checks, decision)
 		}
@@ -106,8 +102,8 @@ func (a *Archive) Handle(ctx context.Context, d model.Delivery) error {
 		previous = &ref
 	}
 	for _, check := range checks {
-		if time.Since(check.CheckedAt) > 30*time.Second {
-			return model.ErrUnavailable
+		if err := validateWorkerAuthorization(check); err != nil {
+			return err
 		}
 	}
 	ref, err := a.store.Put(ctx, a.caller.Tenant, archive.PayloadKey(a.stream, revision), raw)
@@ -132,8 +128,8 @@ func (a *Archive) Handle(ctx context.Context, d model.Delivery) error {
 		return err
 	}
 	for _, check := range checks {
-		if time.Since(check.CheckedAt) > 30*time.Second {
-			return model.ErrUnavailable
+		if err := validateWorkerAuthorization(check); err != nil {
+			return err
 		}
 	}
 	_, err = a.store.Put(ctx, a.caller.Tenant, archive.ManifestKey(a.stream, revision), b)

@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"github.com/caxqueiroz/facts_engine/model"
-	"time"
 )
 
 type Projection struct {
@@ -33,8 +32,8 @@ func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
 	if err != nil {
 		return model.ErrUnavailable
 	}
-	if !decision.Allowed {
-		return model.ErrDenied
+	if err := validateWorkerAuthorization(decision); err != nil {
+		return err
 	}
 	doc, err := p.source.ProjectionDocument(ctx, d, p.generation)
 	if err != nil {
@@ -43,6 +42,7 @@ func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
 	if doc == nil {
 		return nil
 	}
+	checks := []model.AuthorizationDecision{decision}
 	if doc.Memory != nil {
 		scopes := map[string]bool{doc.Memory.Key.Scope: true}
 		for _, dependency := range doc.Memory.Dependencies {
@@ -54,17 +54,17 @@ func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
 				if err != nil {
 					return model.ErrUnavailable
 				}
-				if !check.Allowed {
-					return model.ErrDenied
+				if err := validateWorkerAuthorization(check); err != nil {
+					return err
 				}
-				if check.Consistency != "HIGHER_CONSISTENCY" || check.ModelID == "" || time.Since(check.CheckedAt) > 30*time.Second || check.CheckedAt.After(time.Now().Add(time.Second)) {
-					return model.ErrUnavailable
-				}
+				checks = append(checks, check)
 			}
 		}
 	}
-	if time.Since(decision.CheckedAt) > 30*time.Second {
-		return model.ErrUnavailable
+	for _, check := range checks {
+		if err := validateWorkerAuthorization(check); err != nil {
+			return err
+		}
 	}
 	return p.index.Put(ctx, *doc)
 }
