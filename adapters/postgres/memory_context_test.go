@@ -17,7 +17,8 @@ import (
 func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgres.Ledger, store *evidence.Postgres, c model.Caller, index model.RetrievalIndex, input, output model.ArtifactReference) model.ContextManifest {
 	t.Helper()
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "review"} }
-	r := model.ContextRequest{Command: cmd("mixed-context"), Scope: "case1", IncludeMemories: true, Query: model.RecallRequest{Scopes: []string{"case1"}, Query: "memory", Purpose: "review", ValidAt: time.Now().UTC(), Limit: 20}}
+	// This query instant is reused as the dispute interval boundary.
+	r := model.ContextRequest{Command: cmd("mixed-context"), Scope: "case1", IncludeMemories: true, Query: model.RecallRequest{Scopes: []string{"case1"}, Query: "memory", Purpose: "review", ValidAt: time.Now().UTC().Truncate(time.Microsecond), Limit: 20}}
 	m, err := e.PrepareContext(ctx, c, r)
 	if err != nil || len(m.Memories) != 1 || len(m.Items) == 0 || len(m.Order) != len(m.Items)+len(m.Memories) || m.CanonicalVersion != "context-manifest-v2" {
 		t.Fatal("mixed manifest", m, err)

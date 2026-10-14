@@ -12,7 +12,8 @@ import (
 func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, caller model.Caller, query model.RecallRequest) {
 	t.Helper()
 	query.Query = "preference"
-	query.ValidAt = time.Now().UTC()
+	// Reused below as a PostgreSQL lifecycle interval boundary.
+	query.ValidAt = time.Now().UTC().Truncate(time.Microsecond)
 	result, err := engine.RecallMemories(ctx, caller, query)
 	if err != nil || len(result.Items) != 1 || result.Items[0].Key.ID != "memory-auto" || result.Items[0].Memory.Body != "Customer discussed a preference for tea." {
 		t.Fatal("canonical memory recall", result, err)
