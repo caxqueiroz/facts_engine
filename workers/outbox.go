@@ -17,32 +17,46 @@ type HandlerFunc func(context.Context, model.Delivery) error
 
 func (f HandlerFunc) Handle(ctx context.Context, d model.Delivery) error { return f(ctx, d) }
 
-type Options struct{ Lease, PollInterval, MinBackoff, MaxBackoff time.Duration }
+type Options struct {
+	Lease, PollInterval, MinBackoff, MaxBackoff time.Duration
+	Telemetry                                   model.TelemetryOptions
+}
 type Worker struct {
-	queue   model.Outbox
-	key     model.ConsumerKey
-	handler Handler
-	options Options
+	telemetry *outboxTelemetry
+	queue     model.Outbox
+	key       model.ConsumerKey
+	handler   Handler
+	options   Options
 }
 
 func NewOutbox(queue model.Outbox, key model.ConsumerKey, handler Handler, o Options) (*Worker, error) {
 	if queue == nil || handler == nil || !model.ValidID(key.Tenant) || !model.ValidID(key.Consumer) || o.Lease < 3*time.Second || o.Lease > 5*time.Minute || o.PollInterval < time.Millisecond || o.PollInterval > time.Minute || o.MinBackoff < time.Millisecond || o.MaxBackoff < o.MinBackoff || o.MaxBackoff > 24*time.Hour {
 		return nil, model.ErrInvalid
 	}
-	return &Worker{queue, key, handler, o}, nil
+	observer, err := newOutboxTelemetry(o.Telemetry, handler)
+	if err != nil {
+		return nil, err
+	}
+	return &Worker{telemetry: observer, queue: queue, key: key, handler: handler, options: o}, nil
 }
 
 // ProcessOne handles at most one event. False means no event was claimable.
-// A handler failure is durably scheduled for retry; database/lease errors return
-// to the host. Handlers must honor cancellation and deduplicate external effects.
+// A handler failure is durably recorded and may schedule a retry or exhaust
+// attempts; database/lease errors return to the host. Handlers must honor
+// cancellation and deduplicate external effects.
 func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
+	ctx, observation := w.telemetry.start(ctx)
+	outcome := "claim_error"
+	defer observation.end(&outcome)
 	d, err := w.queue.ClaimDelivery(ctx, w.key, w.options.Lease)
 	if errors.Is(err, model.ErrNotFound) {
+		outcome = "idle"
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
+	observation.claimed(d)
 	work, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stopHeartbeat := make(chan struct{})
@@ -74,9 +88,11 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 	close(stopHeartbeat)
 	renewErr := <-done
 	if ctx.Err() != nil {
+		outcome = "canceled"
 		return true, ctx.Err()
 	}
 	if renewErr != nil {
+		outcome = "lease_error"
 		return true, renewErr
 	}
 	if handlerErr != nil {
@@ -85,9 +101,19 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 		if errors.As(handlerErr, &retry) {
 			delay = max(delay, retry.delay)
 		}
-		return true, w.queue.FailDelivery(ctx, d, delay)
+		err = w.queue.FailDelivery(ctx, d, delay)
+		outcome = "failure_recorded"
+		if err != nil {
+			outcome = "failure_record_error"
+		}
+		return true, err
 	}
-	return true, w.queue.AcknowledgeDelivery(ctx, d)
+	err = w.queue.AcknowledgeDelivery(ctx, d)
+	outcome = "acknowledged"
+	if err != nil {
+		outcome = "ack_error"
+	}
+	return true, err
 }
 func (w *Worker) backoff(attempt int) time.Duration {
 	cap := w.options.MinBackoff
