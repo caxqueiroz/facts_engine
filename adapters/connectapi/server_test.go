@@ -285,3 +285,32 @@ func TestEvidenceRequestValidation(t *testing.T) {
 		t.Fatalf("evidence tenant: %v", err)
 	}
 }
+
+func TestGovernanceRequestValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	transport := connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL))
+	definitions := memoryv1connect.NewDefinitionServiceClient(transport)
+	attestations := memoryv1connect.NewAttestationServiceClient(transport)
+	command := &v1.Command{Key: "command", Purpose: "review"}
+	policy := &v1.RegisterAcceptancePolicyRequest{Tenant: "tenant", Command: command, Policy: &v1.AcceptancePolicy{Id: "policy", Scope: "scope", SourceClasses: []string{"customer", "customer"}}}
+	if _, err := definitions.RegisterAcceptancePolicy(context.Background(), policy); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("duplicate source classes: %v", err)
+	}
+	negative := int32(-1)
+	schema := &v1.RegisterPredicateVersionRequest{Tenant: "tenant", Command: command, Definition: &v1.PredicateVersion{Scope: "scope", Predicate: "name", Version: "v1", PolicyId: "policy", Kind: "text", Classification: "confidential", Constraints: &v1.ValueConstraints{MaxTextRunes: &negative}}}
+	if _, err := definitions.RegisterPredicateVersion(context.Background(), schema); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("negative constraint: %v", err)
+	}
+	attestation := &v1.AttestationInput{Id: "attestation", Scope: "scope", RecordId: "record", VersionId: "version", Kind: "client_confirmation", ContentDigest: strings.Repeat("a", 64), EvidenceId: "response", Confirmation: &v1.ClientConfirmation{}}
+	if _, err := attestations.RecordAttestation(context.Background(), &v1.RecordAttestationRequest{Tenant: "tenant", Command: command, Attestation: attestation}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing confirmation artifacts: %v", err)
+	}
+	attestation.Kind = "human_review"
+	attestation.Confirmation = nil
+	if _, err := attestations.RecordDelegatedAttestation(context.Background(), &v1.RecordDelegatedAttestationRequest{Tenant: "tenant", Command: command, Attestation: attestation, AttestorPrincipal: "client"}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing grant: %v", err)
+	}
+	if _, err := attestations.WithdrawAttestation(context.Background(), &v1.WithdrawAttestationRequest{Tenant: "other", Command: command, Scope: "scope", AttestationId: "attestation"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("withdrawal tenant: %v", err)
+	}
+}

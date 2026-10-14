@@ -101,6 +101,7 @@ func TestPostgresLedger(t *testing.T) {
 	t.Run("redacted extraction", func(t *testing.T) { testExtractionRedaction(t, ctx, ledger, store) })
 	t.Run("redacted evidence", func(t *testing.T) { testEvidenceDerivation(t, ctx, ledger, store) })
 	t.Run("extraction cost budget", func(t *testing.T) { testExtractionCost(t, ctx, ledger, store, admin) })
+	t.Run("remote governance", func(t *testing.T) { testRemoteGovernance(t, ctx, ledger, store) })
 	t.Run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })
 	t.Run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
 	t.Run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })

@@ -1,0 +1,72 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service AttestationService {
+  rpc RecordAttestation(RecordAttestationRequest) returns (RecordAttestationResponse);
+  rpc WithdrawAttestation(WithdrawAttestationRequest) returns (WithdrawAttestationResponse);
+  rpc RecordDelegatedAttestation(RecordDelegatedAttestationRequest) returns (RecordDelegatedAttestationResponse);
+}
+// Actor and retained verification receipts are assigned by trusted server code.
+message AttestationInput {
+  string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string content_digest = 5 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string kind = 6 [(buf.validate.field).string = {
+    in: [
+      "client_confirmation",
+      "source_verification",
+      "application_validation",
+      "human_review"
+    ]
+  }];
+  string evidence_id = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  google.protobuf.Timestamp expires_at = 8;
+  ClientConfirmation confirmation = 9;
+}
+message ArtifactReference {
+  string evidence_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string digest = 2 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+}
+message ClientConfirmation {
+  ArtifactReference presentation = 1 [(buf.validate.field).required = true];
+  ArtifactReference response = 2 [(buf.validate.field).required = true];
+  string presentation_version = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  google.protobuf.Timestamp presented_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp responded_at = 5 [(buf.validate.field).required = true];
+}
+message RecordAttestationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  AttestationInput attestation = 3 [(buf.validate.field).required = true];
+}
+message RecordAttestationResponse {
+  CommitResult result = 1;
+}
+// attestor_principal is an untrusted claim, independently bound to grant_id by
+// the configured engine AttestationIdentityVerifier. This is not caller identity.
+message RecordDelegatedAttestationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  AttestationInput attestation = 3 [(buf.validate.field).required = true];
+  string attestor_principal = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string grant_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message RecordDelegatedAttestationResponse {
+  CommitResult result = 1;
+}
+message WithdrawAttestationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string attestation_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message WithdrawAttestationResponse {
+  CommitResult result = 1;
+}

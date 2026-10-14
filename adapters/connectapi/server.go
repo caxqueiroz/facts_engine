@@ -34,7 +34,7 @@ type Limits struct {
 	MaxResponseBytes int
 }
 
-// NewHandler registers the fact, snapshot and evidence services without opening sockets or starting
+// NewHandler registers the implemented engine services without opening sockets or starting
 // goroutines. HTTP/2 is required for gRPC. The host must set HTTP server read,
 // write and idle deadlines in addition to the per-RPC timeout.
 func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Handler, error) {
@@ -42,6 +42,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.RegisterAcceptancePolicyRequest{}, &v1.RegisterPredicateVersionRequest{}, &v1.RecordAttestationRequest{}, &v1.RecordDelegatedAttestationRequest{}, &v1.WithdrawAttestationRequest{},
 		&v1.RegisterEvidenceRequest{}, &v1.RegisterRedactedEvidenceRequest{}, &v1.GetEvidenceMetadataRequest{}, &v1.GetEvidenceContentRequest{},
 		&v1.ListFactsRequest{}, &v1.GetFactHistoryRequest{},
 		&v1.CreateFactSnapshotRequest{}, &v1.GetFactSnapshotRequest{},
@@ -80,6 +81,8 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterFactServiceHandler(server, &factService{engine: engine})
 	memoryv1connect.RegisterSnapshotServiceHandler(server, &snapshotService{engine: engine})
 	memoryv1connect.RegisterEvidenceServiceHandler(server, &evidenceService{engine: engine})
+	memoryv1connect.RegisterDefinitionServiceHandler(server, &definitionService{engine: engine})
+	memoryv1connect.RegisterAttestationServiceHandler(server, &attestationService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil

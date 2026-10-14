@@ -13,6 +13,8 @@ type Engine interface {
 	FactEngine
 	SnapshotEngine
 	EvidenceEngine
+	DefinitionEngine
+	AttestationEngine
 }
 
 type SnapshotEngine interface {

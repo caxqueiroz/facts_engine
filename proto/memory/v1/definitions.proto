@@ -1,0 +1,144 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service DefinitionService {
+  rpc RegisterAcceptancePolicy(RegisterAcceptancePolicyRequest) returns (RegisterAcceptancePolicyResponse);
+  rpc RegisterPredicateVersion(RegisterPredicateVersionRequest) returns (RegisterPredicateVersionResponse);
+}
+message RegisterAcceptancePolicyRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  AcceptancePolicy policy = 3 [(buf.validate.field).required = true];
+}
+message RegisterAcceptancePolicyResponse {
+  CommitResult result = 1;
+}
+message RegisterPredicateVersionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  PredicateVersion definition = 3 [(buf.validate.field).required = true];
+}
+message RegisterPredicateVersionResponse {
+  CommitResult result = 1;
+}
+message AcceptancePolicy {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string mode = 3 [(buf.validate.field).string = {
+    in: [
+      "",
+      "manual",
+      "automated"
+    ]
+  }];
+  repeated string accepting_services = 4 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  repeated string source_classes = 5 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+    min_items: 1
+  }];
+  repeated AttestationRequirement required = 6 [(buf.validate.field).repeated.max_items = 4];
+}
+message AttestationRequirement {
+  string kind = 1 [(buf.validate.field).string = {
+    in: [
+      "client_confirmation",
+      "source_verification",
+      "application_validation",
+      "human_review"
+    ]
+  }];
+  repeated string principals = 2 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+    min_items: 1
+  }];
+  bool require_expiry = 3;
+  int64 max_age_seconds = 4 [(buf.validate.field).int64 = {
+    gte: 0
+    lte: 31536000
+  }];
+}
+message PredicateVersion {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string predicate = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string kind = 5 [(buf.validate.field).string = {
+    in: [
+      "text",
+      "boolean",
+      "integer",
+      "decimal",
+      "date",
+      "instant",
+      "entity"
+    ]
+  }];
+  string classification = 6 [(buf.validate.field).string.min_bytes = 1];
+  PredicateMigration migration = 7;
+  ValueConstraints constraints = 8;
+  string cardinality = 9 [(buf.validate.field).string = {
+    in: [
+      "",
+      "single"
+    ]
+  }];
+  string temporal_precision = 10 [(buf.validate.field).string = {
+    in: [
+      "",
+      "microsecond",
+      "second",
+      "day"
+    ]
+  }];
+}
+message PredicateMigration {
+  string from_version = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string mode = 2 [(buf.validate.field).string.const = "preserve_history_repropose"];
+  string reason = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+// Optional scalars preserve an explicit false or zero bound.
+message ValueConstraints {
+  optional bool allow_unknown = 1;
+  repeated Value allowed_values = 2 [(buf.validate.field).repeated.max_items = 64];
+  optional int32 min_text_runes = 3 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 65536
+  }];
+  optional int32 max_text_runes = 4 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 65536
+  }];
+  optional int64 min_integer = 5;
+  optional int64 max_integer = 6;
+  optional string min_decimal = 7 [(buf.validate.field).string.max_bytes = 128];
+  optional string max_decimal = 8 [(buf.validate.field).string.max_bytes = 128];
+  optional int32 decimal_places = 9 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 127
+  }];
+  repeated string units = 10 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {max_bytes: 32}
+    }
+  }];
+}

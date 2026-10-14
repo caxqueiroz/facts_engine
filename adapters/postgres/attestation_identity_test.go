@@ -143,6 +143,9 @@ func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Le
 		if err != nil || again != committed {
 			t.Fatal("delegated retry", again, err)
 		}
+		t.Run(kind+" remote delegated attestation", func(t *testing.T) {
+			testRemoteDelegation(t, ctx, e, base, recorder, request, committed)
+		})
 		// Binding IDs are single-use even if a verifier erroneously approves changed
 		// input. Fresh artifacts prevent response replay protection from hiding this check.
 		replay := request
