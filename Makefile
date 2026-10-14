@@ -1,4 +1,4 @@
-.PHONY: test integration vet lint generate migrate tools
+.PHONY: test integration vet lint vuln generate migrate tools
 
 test:
 	go test -race ./...
@@ -12,6 +12,9 @@ vet:
 
 lint:
 	golangci-lint run
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
 generate:
 	sqlc generate

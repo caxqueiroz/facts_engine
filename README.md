@@ -23,7 +23,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 
 ## Local setup
 
-Requires Go 1.25 or newer, Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
+The library minimum is Go 1.25; use a currently patched, supported toolchain (verified with Go 1.27.2), Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
 
 ```sh
 docker compose up -d
@@ -52,10 +52,11 @@ Run `go run ./examples/go/embedded`. The example prints only the resolution stat
 make test
 make vet
 make lint
+make vuln
 make generate
 ```
 
-`make generate` uses sqlc v1.31.1 and regenerates the OpenFGA JSON model from its restricted DSL. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0).
+`make generate` uses sqlc v1.31.1 and regenerates the OpenFGA JSON model from its restricted DSL. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
 
 Real PostgreSQL tests require a **fresh disposable database**. They refuse a database containing ledger tables, apply migrations, and exercise the restricted runtime role. They do not drop existing databases.
 
