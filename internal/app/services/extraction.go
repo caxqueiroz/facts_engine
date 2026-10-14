@@ -10,7 +10,7 @@ import (
 
 func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	if len(o.Profiles) == 0 {
-		if o.MaxConcurrentPerTenant != 0 || o.DailyTokenBudget != 0 {
+		if o.MaxConcurrentPerTenant != 0 || o.DailyTokenBudget != 0 || o.CostUnit != "" || o.DailyCostBudgetUnits != 0 {
 			return model.ErrInvalid
 		}
 		return nil
@@ -18,9 +18,15 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	if len(o.Profiles) > 32 || o.MaxConcurrentPerTenant < 1 || o.MaxConcurrentPerTenant > 32 || o.DailyTokenBudget < 1 {
 		return model.ErrInvalid
 	}
+	if (o.CostUnit == "" && o.DailyCostBudgetUnits != 0) || (o.CostUnit != "" && (!model.ValidID(o.CostUnit) || o.DailyCostBudgetUnits < 1)) {
+		return model.ErrInvalid
+	}
 	s.extractors = map[string]model.ApprovedExtractor{}
 	for _, approved := range o.Profiles {
 		p := approved.Profile
+		if p.CostUnit != o.CostUnit || (o.CostUnit == "" && p.MaxCostUnitsPerAttempt != 0) || (o.CostUnit != "" && (p.MaxCostUnitsPerAttempt < 1 || p.MaxCostUnitsPerAttempt > o.DailyCostBudgetUnits)) {
+			return model.ErrInvalid
+		}
 		if approved.Provider == nil || !model.ValidID(p.ID) || !model.ValidID(p.ProviderID) || !model.ValidID(p.RequestedModel) || !model.ValidID(p.PromptVersion) || (p.ParserVersion != "facts-extraction-json-v1" && p.ParserVersion != "memory-refresh-json-v1" && p.ParserVersion != "memory-extraction-json-v1") || !model.ValidID(p.ApplicationBuild) || len(p.Prompt) == 0 || len(p.Prompt) > 64<<10 || model.BytesDigest(p.Prompt) != p.PromptDigest || len(p.Parameters) > 16<<10 || !json.Valid(p.Parameters) || p.Timeout < time.Second || p.Timeout > 2*time.Minute || p.MaxInputBytes < 1 || p.MaxInputBytes > 16<<20 || p.MaxOutputBytes < 1 || p.MaxOutputBytes > 2<<20 || p.MaxCandidates < 1 || p.MaxCandidates > 64 || p.MaxAttempts < 1 || p.MaxAttempts > 10 || p.RetryDelay < time.Second || p.RetryDelay > time.Hour || p.MaxTokensPerAttempt < 1 || p.MaxTokensPerAttempt > o.DailyTokenBudget {
 			return model.ErrInvalid
 		}
@@ -32,7 +38,7 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 		approved.Profile = p
 		s.extractors[p.ID] = approved
 	}
-	s.extractionLimits = model.ExtractionOptions{MaxConcurrentPerTenant: o.MaxConcurrentPerTenant, DailyTokenBudget: o.DailyTokenBudget}
+	s.extractionLimits = model.ExtractionOptions{CostUnit: o.CostUnit, DailyCostBudgetUnits: o.DailyCostBudgetUnits, MaxConcurrentPerTenant: o.MaxConcurrentPerTenant, DailyTokenBudget: o.DailyTokenBudget}
 	return nil
 }
 func extractionTx(tx model.Tx) (model.ExtractionTx, error) {

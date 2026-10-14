@@ -18,6 +18,8 @@ type ExtractionResponse struct {
 	InputTokens, OutputTokens int64
 }
 type ExtractionProfile struct {
+	CostUnit                                                                                     string `json:",omitempty"`
+	MaxCostUnitsPerAttempt                                                                       int64  `json:",omitempty"`
 	ID, ProviderID, RequestedModel, PromptVersion, PromptDigest, ParserVersion, ApplicationBuild string
 	Prompt                                                                                       []byte
 	Parameters                                                                                   json.RawMessage
@@ -31,6 +33,8 @@ type ApprovedExtractor struct {
 	Provider ExtractionProvider
 }
 type ExtractionOptions struct {
+	CostUnit               string
+	DailyCostBudgetUnits   int64
 	Profiles               []ApprovedExtractor
 	MaxConcurrentPerTenant int
 	DailyTokenBudget       int64
@@ -124,8 +128,9 @@ type ExtractedProposal struct {
 	RecordID, VersionID string
 }
 type ExtractionAttempt struct {
-	ContentScopes                                                      []string `json:",omitempty"`
-	RefreshScopes                                                      []string `json:",omitempty"`
+	Reservation                                                        *ExtractionReservation `json:",omitempty"`
+	ContentScopes                                                      []string               `json:",omitempty"`
+	RefreshScopes                                                      []string               `json:",omitempty"`
 	ID, Tenant, Scope, JobID, OwnerNonce, ProfileDigest, RequestDigest string
 	Caller                                                             Caller
 	Fence, LedgerRevision                                              int64
@@ -161,7 +166,7 @@ type ExtractionRun struct {
 type ExtractionRunTx interface {
 	ExtractionTx
 	TemporalTx
-	BeginExtraction(context.Context, string, string, int, int64, int64, time.Duration) (JobStatus, error)
+	BeginExtraction(context.Context, string, string, int, int64, int64, time.Duration, ExtractionCostBudget) (ExtractionAdmission, error)
 	FailExpiredExtraction(context.Context, string, int64) error
 	RejectExtractionInput(context.Context, string) error
 	StageExtractionAttempt(context.Context, ExtractionAttempt) error

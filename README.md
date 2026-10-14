@@ -171,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: configurable workload/cost quotas and full sqlc query coverage. Human-review prerequisites and policy-controlled attestation expiry/maximum age are implemented. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
+1. Finish foundation contracts: full sqlc query coverage. Extraction concurrency, token and optional cost-reservation budgets are implemented. Human-review prerequisites and policy-controlled attestation expiry/maximum age are implemented. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
 2. Complete extraction input chunking and redaction policies. Conversation memory candidate extraction is implemented. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -789,3 +789,36 @@ An omitted policy `Mode` now canonicalizes to `manual`; missing policy definitio
 No SQL migration is needed for these additive encrypted payload fields. **Upgrade every engine reader and writer before publishing policies with the new controls.** Older binaries cannot enforce fields or attestation kinds they do not understand. Existing policies without the new fields retain their original lifetime rules. Publish a new policy ID and use the existing governed predicate/memory-type migration mechanism to bind new proposals to it; callers cannot choose a weaker policy at acceptance.
 
 Tests cover manual defaults and canonical retries, required review before automated fact/memory acceptance, proposer separation, review permission denial, mandatory expiry, maximum-age expiration despite a later explicit expiry, historical eligibility, exact expiry boundaries, legacy timestamps and replacement-version isolation. The domain/risk owner must approve permitted reviewers and lifetime values; operational clock synchronization remains necessary for time-based controls.
+
+
+## Extraction cost reservations
+
+Apply forward-only migration `00025_extraction_cost.sql` before starting the updated PostgreSQL adapter. Token reservations and concurrent-lease limits now report `ErrQuota` when admission would exceed a configured limit; provider/dependency failures remain `ErrUnavailable`. Cost budgeting adds a separate integer reservation to the same atomic tenant admission transaction:
+
+```go
+profile.CostUnit = "USD-microunits" // Host-defined unit; no built-in pricing or FX.
+profile.MaxCostUnitsPerAttempt = approvedWorstCaseCost
+options.Extraction = model.ExtractionOptions{
+    Profiles: []model.ApprovedExtractor{{Profile: profile, Provider: provider}},
+    MaxConcurrentPerTenant: 4,
+    DailyTokenBudget: approvedDailyTokenLimit,
+    CostUnit: profile.CostUnit,
+    DailyCostBudgetUnits: approvedDailyCostLimit,
+}
+```
+
+The cost unit and positive per-attempt cap are pinned into the approved profile digest and durable job. When cost budgeting is enabled, every configured profile must use that unit and have a cap no greater than the daily cost limit. Empty unit and zero cost fields retain token/concurrency-only operation for tenants that have never enabled a cost meter. A profile price/cap change changes its digest: queued jobs cannot silently adopt new pricing. Use a new approved profile and new jobs when the old bound is no longer valid.
+
+Each provider attempt reserves its maximum token allowance and cost cap **before** the external call. Tokens, cost, active-lease admission, attempt identity, ledger event and command receipt commit together. Concurrent workers share the tenant row lock and cannot admit spending beyond the configured bound. A rejected admission rolls back without consuming a job attempt or calling the provider. Failed calls, malformed responses, timeouts and abandoned leases retain their reservations because they may already have incurred a charge. A new attempt reserves again; a completed-job or identical committed-command retry does not.
+
+Budgets are independent per tenant and aggregate all extraction scopes/profiles, including fact extraction, memory extraction and memory refresh. Counters reset on the first admitted transaction of a new UTC day. The budget belongs to the attempt's admission day; provider billing dates can differ. `GetExtractionRun` exposes the immutable attempt's `Reservation`, including the canonical UTC day, token/cost amounts, accounting unit and applied limits. These fields are retained in the ordinary encrypted attempt, audit and archive records. They are reserved capacity, not reported invoice amounts.
+
+An enabled tenant meter rejects attempts from an unpriced worker or a different cost unit, even after daily rollover. Enabling a cost meter after unpriced attempts in the same day is rejected; begin on a fresh UTC day so unmeasured earlier calls are not represented as cost-controlled spending. The accounting unit cannot be changed through ordinary extraction calls. Changing units requires an explicitly planned administrative migration and reconciliation.
+
+Daily limits and concurrency limits remain trusted host configuration, applied at admission rather than chosen by callers. Keep those values consistent across replicas. A reviewed configuration increase can admit previously quota-blocked work. Budget rejection leaves the extraction job pending; the outbox consumer still follows its existing backoff/attempt-limit policy and may need an operator retry after capacity becomes available. This change does not introduce automatic daily consumer resets or refunds.
+
+Upgrade every extraction worker before enabling cost accounting; older workers do not implement these checks. Existing runtime table grants cover the added quota columns. Custom `ExtractionRunTx` adapters must implement the updated `BeginExtraction` contract with `ExtractionCostBudget` and return `ExtractionAdmission` with its exact reservation metadata.
+
+Integration tests cover failure reservations, exact completed retries, quota rejection without attempt consumption, budget increases, tenant isolation, concurrent admission, UTC rollover, activation after an unpriced day, incompatible/disabled meters and integer-overflow boundaries. Configuration tests reject missing, mismatched, negative and oversized caps and verify profile-digest pinning.
+
+The model/provider and cost-policy owners must approve the accounting unit, per-attempt upper bounds, daily limits and provider-side enforcement. Include input/output pricing, fixed fees and retry behavior in a conservative bound, and reconcile actual billing externally. The engine cannot guarantee an invoice ceiling if a provider exceeds its approved bound or continues charging after cancellation. No production prices, provider adapter or billing reconciliation service are configured here.

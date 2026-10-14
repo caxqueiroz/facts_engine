@@ -8,38 +8,45 @@ import (
 	"time"
 )
 
-func (t *transaction) BeginExtraction(ctx context.Context, id, attempt string, concurrent int, daily, reservation int64, lease time.Duration) (model.JobStatus, error) {
-	if concurrent < 1 || concurrent > 32 || reservation < 1 || daily < reservation || lease < time.Second || lease > 5*time.Minute {
-		return model.JobStatus{}, model.ErrInvalid
+func (t *transaction) BeginExtraction(ctx context.Context, id, attempt string, concurrent int, daily, reservation int64, lease time.Duration, cost model.ExtractionCostBudget) (model.ExtractionAdmission, error) {
+	if concurrent < 1 || concurrent > 32 || reservation < 1 || daily < reservation || lease < time.Second || lease > 5*time.Minute || (cost.Unit == "" && (cost.DailyLimit != 0 || cost.PerAttempt != 0)) || (cost.Unit != "" && (!model.ValidID(cost.Unit) || cost.PerAttempt < 1 || cost.DailyLimit < cost.PerAttempt)) {
+		return model.ExtractionAdmission{}, model.ErrInvalid
 	}
-	// A tenant-wide row serializes quota reservations and active-lease admission.
-	var reserved int64
-	err := t.tx.QueryRow(ctx, `INSERT INTO extraction_quota(tenant_id,day,reserved_tokens,epoch) VALUES($1,(clock_timestamp() AT TIME ZONE 'UTC')::date,0,1) ON CONFLICT(tenant_id) DO UPDATE SET epoch=extraction_quota.epoch+1,day=EXCLUDED.day,reserved_tokens=CASE WHEN extraction_quota.day=EXCLUDED.day THEN extraction_quota.reserved_tokens ELSE 0 END RETURNING reserved_tokens`, t.tenant).Scan(&reserved)
+	var reserved, reservedCost int64
+	var unit, day string
+	// One tenant row serializes token/cost reservations and live-lease admission.
+	err := t.tx.QueryRow(ctx, `INSERT INTO extraction_quota(tenant_id,day,reserved_tokens,epoch) VALUES($1,(clock_timestamp() AT TIME ZONE 'UTC')::date,0,1) ON CONFLICT(tenant_id) DO UPDATE SET epoch=extraction_quota.epoch+1,day=EXCLUDED.day,reserved_tokens=CASE WHEN extraction_quota.day=EXCLUDED.day THEN extraction_quota.reserved_tokens ELSE 0 END,reserved_cost_units=CASE WHEN extraction_quota.day=EXCLUDED.day THEN extraction_quota.reserved_cost_units ELSE 0 END RETURNING reserved_tokens,reserved_cost_units,cost_unit,to_char(day,'YYYY-MM-DD')`, t.tenant).Scan(&reserved, &reservedCost, &unit, &day)
 	if err != nil {
-		return model.JobStatus{}, err
+		return model.ExtractionAdmission{}, err
 	}
-	if reserved > daily-reservation {
-		return model.JobStatus{}, model.ErrUnavailable
+	// Never mix units or allow an unpriced worker to bypass an enabled meter.
+	// Enabling cost accounting after unpriced attempts requires a new UTC day.
+	if (unit != "" && unit != cost.Unit) || (unit == "" && cost.Unit != "" && reserved > 0) {
+		return model.ExtractionAdmission{}, model.ErrPrecondition
+	}
+	if reserved > daily-reservation || (cost.Unit != "" && reservedCost > cost.DailyLimit-cost.PerAttempt) {
+		return model.ExtractionAdmission{}, model.ErrQuota
 	}
 	var active int
 	if err = t.tx.QueryRow(ctx, `SELECT count(*) FROM extraction_job_state WHERE tenant_id=$1 AND state='running' AND lease_until>clock_timestamp()`, t.tenant).Scan(&active); err != nil {
-		return model.JobStatus{}, err
+		return model.ExtractionAdmission{}, err
 	}
 	if active >= concurrent {
-		return model.JobStatus{}, model.ErrUnavailable
+		return model.ExtractionAdmission{}, model.ErrQuota
 	}
 	var claimed string
 	err = t.tx.QueryRow(ctx, `UPDATE extraction_job_state SET state='running',fence=fence+1,attempts=attempts+1,attempt_id=$3,lease_until=clock_timestamp()+$4::bigint*interval '1 millisecond',last_failure_code='' WHERE tenant_id=$1 AND id=$2 AND attempts<max_attempts AND ((state='pending' AND available_at<=clock_timestamp()) OR (state='running' AND lease_until<=clock_timestamp())) RETURNING id`, t.tenant, id, attempt, lease.Milliseconds()).Scan(&claimed)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.JobStatus{}, model.ErrUnavailable
+		return model.ExtractionAdmission{}, model.ErrUnavailable
 	}
 	if err != nil {
-		return model.JobStatus{}, err
+		return model.ExtractionAdmission{}, err
 	}
-	if _, err = t.tx.Exec(ctx, `UPDATE extraction_quota SET reserved_tokens=reserved_tokens+$2 WHERE tenant_id=$1`, t.tenant, reservation); err != nil {
-		return model.JobStatus{}, err
+	if _, err = t.tx.Exec(ctx, `UPDATE extraction_quota SET reserved_tokens=reserved_tokens+$2,reserved_cost_units=reserved_cost_units+$3,cost_unit=$4 WHERE tenant_id=$1`, t.tenant, reservation, cost.PerAttempt, cost.Unit); err != nil {
+		return model.ExtractionAdmission{}, err
 	}
-	return t.ExtractionJobStatus(ctx, id)
+	status, err := t.ExtractionJobStatus(ctx, id)
+	return model.ExtractionAdmission{JobStatus: status, Reservation: model.ExtractionReservation{Day: day, Tokens: reservation, DailyTokenLimit: daily, ConcurrentLimit: concurrent, CostUnit: cost.Unit, CostUnits: cost.PerAttempt, DailyCostLimit: cost.DailyLimit}}, err
 }
 func (t *transaction) StageExtractionAttempt(_ context.Context, a model.ExtractionAttempt) error {
 	if a.Tenant != t.tenant {

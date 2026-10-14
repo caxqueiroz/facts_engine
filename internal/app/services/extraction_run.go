@@ -167,7 +167,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		if err != nil {
 			return err
 		}
-		claim, err := t.BeginExtraction(ctx, job.ID, attempt.ID, s.extractionLimits.MaxConcurrentPerTenant, s.extractionLimits.DailyTokenBudget, job.Profile.MaxTokensPerAttempt, job.Profile.Timeout+30*time.Second)
+		claim, err := t.BeginExtraction(ctx, job.ID, attempt.ID, s.extractionLimits.MaxConcurrentPerTenant, s.extractionLimits.DailyTokenBudget, job.Profile.MaxTokensPerAttempt, job.Profile.Timeout+30*time.Second, model.ExtractionCostBudget{Unit: job.Profile.CostUnit, DailyLimit: s.extractionLimits.DailyCostBudgetUnits, PerAttempt: job.Profile.MaxCostUnitsPerAttempt})
 		if err != nil {
 			return err
 		}
@@ -176,6 +176,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 				return model.ErrUnavailable
 			}
 		}
+		attempt.Reservation = &claim.Reservation
 		attempt.Fence = claim.Fence
 		attempt.Number = claim.Attempts
 		attempt.LeaseUntil = *claim.LeaseUntil

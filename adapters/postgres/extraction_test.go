@@ -169,7 +169,7 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		t.Fatal("changed profile executed", err)
 	}
 	lowBudget := configured(valid, profile, 1000)
-	if _, err = run(lowBudget, pending, "extract-quota"); !errors.Is(err, model.ErrUnavailable) {
+	if _, err = run(lowBudget, pending, "extract-quota"); !errors.Is(err, model.ErrQuota) {
 		t.Fatal("daily token budget bypassed", err)
 	}
 	// Concurrent deliveries of one command may not both call the provider.
@@ -189,7 +189,7 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	otherJob := start(engine, "extract-concurrent-other")
 	_, admissionErr := run(engine, otherJob, "extract-concurrent-other-run")
 	close(release)
-	if !errors.Is(admissionErr, model.ErrUnavailable) {
+	if !errors.Is(admissionErr, model.ErrQuota) {
 		t.Fatal("tenant concurrency limit bypassed", admissionErr)
 	}
 	firstErr := <-finished

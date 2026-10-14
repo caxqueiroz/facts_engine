@@ -71,6 +71,7 @@ var (
 	ErrConflict     = model.ErrConflict
 	ErrRevision     = model.ErrRevision
 	ErrPrecondition = model.ErrPrecondition
+	ErrQuota        = model.ErrQuota
 	ErrUnavailable  = model.ErrUnavailable
 )
 
@@ -384,3 +385,7 @@ type AttestationIdentityVerifier = model.AttestationIdentityVerifier
 type AttestationIdentityReceipt = model.AttestationIdentityReceipt
 type AttestationIdentityOptions = model.AttestationIdentityOptions
 type AttestationDelegation = model.AttestationDelegation
+
+type ExtractionCostBudget = model.ExtractionCostBudget
+type ExtractionReservation = model.ExtractionReservation
+type ExtractionAdmission = model.ExtractionAdmission

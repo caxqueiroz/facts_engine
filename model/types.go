@@ -20,6 +20,7 @@ var (
 	ErrConflict     = errors.New("command identity conflict")
 	ErrRevision     = errors.New("stream revision conflict")
 	ErrPrecondition = errors.New("precondition failed")
+	ErrQuota        = errors.New("quota exhausted")
 	ErrUnavailable  = errors.New("dependency unavailable")
 )
 

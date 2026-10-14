@@ -357,10 +357,12 @@ type ExtractionProposal struct {
 }
 
 type ExtractionQuotum struct {
-	TenantID       string
-	Day            pgtype.Date
-	ReservedTokens int64
-	Epoch          int64
+	TenantID          string
+	Day               pgtype.Date
+	ReservedTokens    int64
+	Epoch             int64
+	CostUnit          string
+	ReservedCostUnits int64
 }
 
 type ExtractionRefreshTrigger struct {
