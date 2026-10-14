@@ -1,4 +1,4 @@
-.PHONY: test integration vet lint vuln generate migrate tools
+.PHONY: test integration ci-integration check vet lint vuln generate migrate tools
 
 test:
 	go test -race ./...
@@ -6,6 +6,12 @@ test:
 integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo 'Set TEST_DATABASE_URL to a fresh disposable PostgreSQL database'; exit 1)
 	go test -race ./adapters/postgres -run TestPostgresLedger -count=1 -v
+
+check:
+	sh scripts/check.sh
+
+ci-integration:
+	sh scripts/ci-integration.sh
 
 vet:
 	go vet ./...
@@ -27,3 +33,5 @@ migrate:
 tools:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 	go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+	go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12

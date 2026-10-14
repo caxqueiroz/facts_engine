@@ -22,4 +22,4 @@ for suffix in a b pipeline rebuild lexical; do
     rebuild) export TEST_REBUILD_DATABASE_URL="$cortex_url" ;;
   esac
 done
-go test -race ./... -count=1
+go test -race ./... -count=1 -timeout 10m

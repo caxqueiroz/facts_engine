@@ -1,0 +1,12 @@
+# Compose >=2.24.4: replace development ports, rather than appending to them.
+# Images, health checks and fixture credentials remain pinned in compose.yaml.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1::5432"
+  openfga:
+    ports: !override
+      - "127.0.0.1::8080"
+  cortex:
+    ports: !override
+      - "127.0.0.1::5432"

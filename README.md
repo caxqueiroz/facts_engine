@@ -65,6 +65,24 @@ make generate
 
 `make generate` uses sqlc v1.31.1 and regenerates the OpenFGA JSON model from its restricted DSL. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
 
+The [CI workflow](.github/workflows/ci.yml) runs on pushes to `master`, pull requests and manual dispatch. It uses Go 1.27.2 from [.go-version](.go-version), Ubuntu 24.04, commit-pinned GitHub Actions, read-only repository permissions and no deployment secrets. Three independent checks run: source/migration/generated-file checks, the full race-enabled integration suite, and reachable Go vulnerability scanning. Duplicate runs for the same branch or pull request are cancelled.
+
+Reproduce the checks locally from the repository root:
+
+```sh
+make tools
+export PATH="$(go env GOPATH)/bin:$PATH"
+make check
+make ci-integration
+make vuln
+```
+
+`make tools` installs pinned sqlc, goose, golangci-lint and actionlint v1.7.12. `make check` checks Go formatting, module integrity, vet, lint, migration syntax and workflow syntax, then regenerates sqlc/OpenFGA outputs and rejects changed or untracked generated files. Changes to generated outputs must be reviewed and committed with their source changes. Keep the Go/tool versions and digest-pinned service images updated through reviewed changes.
+
+`make check` also requires Python 3. `make ci-integration` requires Docker, curl, and Compose 2.24.4 or newer. It creates its own uniquely named Compose project with ephemeral loopback ports using [compose.ci.yaml](compose.ci.yaml), waits for PostgreSQL/pgvector and OpenFGA readiness, creates fresh databases, and runs every package with the race detector and a ten-minute test timeout. It removes only its own containers, network and anonymous volumes on completion or failure. This works alongside the regular development services. Service logs are printed on failure; the runner contains synthetic test fixtures only. Compose's [`!override` merge behavior](https://docs.docker.com/reference/compose-file/merge/#replace-value) replaces the development port bindings.
+
+The workflow reports checks; it does not configure branch protection, deploy services or publish packages. A repository owner must decide which checks are required for merges and keep runner/action policies enabled. Passing CI does not establish production model quality, restore readiness, workload capacity, external identity integration or regulatory acceptance; those still require the named owners and production evidence described below.
+
 Real PostgreSQL tests require **fresh disposable databases**. They refuse a database containing ledger tables, apply migrations, and exercise the restricted runtime role. They do not drop existing databases.
 
 ```sh
@@ -190,7 +208,7 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
-6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
+6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, and operational packaging. GitHub Actions CI with reproducible code, integration and vulnerability checks is implemented.
 
 The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. CortexDB and encrypted local archive adapters are exercised in integration tests. No remote engine API, production embedding/extraction model, independently administered immutable archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
 
