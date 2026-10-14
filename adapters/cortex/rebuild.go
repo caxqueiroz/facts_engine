@@ -181,3 +181,17 @@ func (r *Generations) DescribeRetrieval(ctx context.Context, t, g string) (model
 	}
 	return i.DescribeRetrieval(ctx, t, g)
 }
+
+// CheckConnectivity checks configured pools only. It does not establish search
+// coverage, active-generation selection, index integrity or embedding health.
+func (r *Generations) CheckConnectivity(ctx context.Context) error {
+	if len(r.indexes) == 0 {
+		return model.ErrUnavailable
+	}
+	for _, index := range r.indexes {
+		if err := index.db.PingContext(ctx); err != nil {
+			return model.ErrUnavailable
+		}
+	}
+	return nil
+}

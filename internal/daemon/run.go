@@ -113,12 +113,14 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		}
 		options.Audit.Signer = signer
 	}
+	var retrievalProbe func(context.Context) error
 	if len(c.Retrieval) > 0 {
 		routes, closeRoutes, err := runtimeconfig.OpenLexical(startup, c.Retrieval)
 		if err != nil {
 			return err
 		}
 		defer closeRoutes()
+		retrievalProbe = routes.CheckConnectivity
 		options.Retrieval = model.RetrievalOptions{Index: routes, Registry: ledger, Progress: ledger}
 		if c.OperationsScope != "" {
 			dsn := os.Getenv("MEMORY_OPERATIONS_DATABASE_URL")
@@ -166,5 +168,12 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		}
 	}
 	defer listener.Close()
-	return Serve(ctx, listener, tlsConfig, handler, authn.Wrap, probe, timeout, time.Duration(c.ShutdownSeconds)*time.Second, logger)
+	componentsProbe := func(ctx context.Context) map[string]bool {
+		components := map[string]bool{}
+		if retrievalProbe != nil {
+			components["retrieval"] = retrievalProbe(ctx) == nil
+		}
+		return components
+	}
+	return serve(ctx, listener, tlsConfig, handler, authn.Wrap, probe, componentsProbe, timeout, time.Duration(c.ShutdownSeconds)*time.Second, logger)
 }

@@ -159,6 +159,15 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	if err != nil || ready.StatusCode != http.StatusOK || !bytes.Contains(data, []byte(`"authorization":true`)) || ready.ProtoMajor != 2 {
 		t.Fatalf("readiness: %d %s %v", ready.StatusCode, data, err)
 	}
+	components, err := client.Get(base + "/componentsz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	componentData, readErr := io.ReadAll(components.Body)
+	components.Body.Close()
+	if readErr != nil || components.StatusCode != http.StatusOK || !bytes.Contains(componentData, []byte(`"retrieval":true`)) || components.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("optional components: %d %s %v", components.StatusCode, componentData, readErr)
+	}
 	identity := memoryv1connect.NewIdentityServiceClient(connect.NewClient(connecthttp.NewTransport(client, base)))
 	request := &v1.PutScopeRequest{Tenant: tenant, Command: &v1.Command{Key: "create-scope", Purpose: "integration"}, Definition: &v1.ScopeDefinition{Id: scope, Label: "Service scope"}, Reason: "Integration fixture"}
 	written, err := identity.PutScope(ctx, request)

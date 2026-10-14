@@ -39,12 +39,19 @@ func TestServeReadinessAndGracefulShutdown(t *testing.T) {
 		}
 	})
 	var healthy atomic.Bool
+	var retrievalHealthy atomic.Bool
+	var probeTimeout atomic.Bool
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		done <- Serve(ctx, listener, &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{serverCert.TLS}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: authority.Roots}, handler, auth.Wrap, func(context.Context) map[string]bool {
+		done <- serve(ctx, listener, &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{serverCert.TLS}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: authority.Roots}, handler, auth.Wrap, func(context.Context) map[string]bool {
 			return map[string]bool{"ledger": healthy.Load(), "authorization": true}
+		}, func(ctx context.Context) map[string]bool {
+			if probeTimeout.Load() {
+				<-ctx.Done()
+			}
+			return map[string]bool{"retrieval": retrievalHealthy.Load()}
 		}, time.Second, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 	check := func(path string, want int, contains string) {
@@ -63,6 +70,16 @@ func TestServeReadinessAndGracefulShutdown(t *testing.T) {
 	check("/readyz", http.StatusServiceUnavailable, "\"ledger\":false")
 	healthy.Store(true)
 	check("/readyz", http.StatusOK, "\"ready\":true")
+	check("/componentsz", http.StatusServiceUnavailable, "\"retrieval\":false")
+	check("/livez", http.StatusOK, "true")
+	check("/readyz", http.StatusOK, "\"ready\":true")
+	retrievalHealthy.Store(true)
+	check("/componentsz", http.StatusOK, "\"retrieval\":true")
+	probeTimeout.Store(true)
+	check("/componentsz", http.StatusServiceUnavailable, "\"healthy\":false")
+	probeTimeout.Store(false)
+	check("/readyz", http.StatusOK, "\"ready\":true")
+
 	requestDone := make(chan error, 1)
 	go func() {
 		response, err := client.Get(base + "/work")
