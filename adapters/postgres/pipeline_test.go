@@ -116,7 +116,27 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		}
 		t.Fatal("unbounded delivery")
 	}
+	waitRequest := model.ProjectionWaitRequest{Scopes: query.Scopes, Generation: "g1", Revision: 1, Purpose: query.Purpose}
+	shortWait, stopShortWait := context.WithTimeout(ctx, 20*time.Millisecond)
+	_, waitErr := engine.WaitForProjection(shortWait, c, waitRequest)
+	stopShortWait()
+	if !errors.Is(waitErr, context.DeadlineExceeded) {
+		t.Fatal("wait ignored lag", waitErr)
+	}
+	waitContext, stopWait := context.WithTimeout(ctx, 10*time.Second)
+	defer stopWait()
+	waitDone := make(chan error, 1)
+	go func() { _, err := engine.WaitForProjection(waitContext, c, waitRequest); waitDone <- err }()
 	drain(worker, projector, key)
+	if err := <-waitDone; err != nil {
+		t.Fatal("projection wait did not converge", err)
+	}
+	wrongGeneration := query
+	wrongGeneration.RequireGeneration = "other-generation"
+	if _, err := engine.Recall(ctx, c, wrongGeneration); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("generation requirement bypassed", err)
+	}
+	query.RequireGeneration = "g1"
 	result, err := engine.Recall(ctx, c, query)
 	if err != nil || result.Incomplete || len(result.Items) == 0 {
 		t.Fatal(result, err)

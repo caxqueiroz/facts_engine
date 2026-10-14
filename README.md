@@ -172,7 +172,7 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 
 1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, structured revision-conflict details, and full sqlc query coverage.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, remaining memory-specific pagination and history contracts. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
-3. Add deadline-based projection waits, scalable/paginated rebuild verification, workload tuning, and other job types. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
+3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
@@ -292,3 +292,31 @@ The handler processes `start_extraction` and `retry_extraction` events and skips
 Pending or running jobs keep their notification unacknowledged. Outbox backoff and job backoff are independent, so choose a delivery attempt budget that covers provider retries and lease recovery. A terminal failed job is acknowledged and remains visible in `GetJob`; `RetryJob` emits a new notification. A failed consumer instead requires `RetryConsumer` with its current fence. This ordered consumer can delay later jobs while one job is waiting; separate consumer streams replay the same jobs and do not partition work. Database job claims still prevent concurrent provider invocation while a lease is live.
 
 Integration tests replay real outbox events through this handler and verify that tenant concurrency limits hold across different jobs. They also expire a live job lease, complete a replacement attempt, and verify that the old provider response cannot commit after its fence has been replaced. Missing responses remain explicit gaps in full audit exports.
+
+
+### Waiting for searchable revisions
+
+`WaitForProjection` waits for a tenant's projection consumer to acknowledge a specific ledger revision in a specific generation. Pass the committed command's `LedgerRevision`, the intended generation, authorized scopes and purpose. The context must have a deadline; the engine additionally caps each call at two minutes. It polls without holding a ledger transaction and never runs projection work itself.
+
+```go
+waitCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+defer cancel()
+receipt, err := engine.WaitForProjection(waitCtx, caller, model.ProjectionWaitRequest{
+    Scopes: []string{scope}, Generation: "g1",
+    Revision: committed.LedgerRevision, Purpose: "review",
+})
+if err != nil {
+    return err
+}
+result, err := engine.Recall(ctx, caller, model.RecallRequest{
+    Scopes: []string{scope}, Query: "client preference", Purpose: "review",
+    ValidAt: time.Now().UTC(), Limit: 10,
+    RequireGeneration: receipt.Generation, RequireRevision: committed.LedgerRevision,
+})
+```
+
+Authorization is checked before waiting and again before returning a receipt. A managed generation or epoch change fails the wait; callers must explicitly choose whether to retry against the new generation. Missing progress, an unavailable adapter, a wrong generation, or a failed consumer below the requested revision returns `ErrUnavailable`. Deadline expiry and cancellation return context errors without a partial receipt. Already acknowledged revisions remain covered even if a consumer subsequently fails on later work.
+
+A receipt establishes that the configured consumer processed the requested revision. It does not promise a search hit, remove search limits, or include later commits. Recall still revalidates candidates against the ledger and reports incomplete coverage when newer revisions are pending. `RequireGeneration` prevents a later search from silently using another generation, and managed recall also checks for cutover during the search. Direct fact reads remain immediately consistent and require no projection wait.
+
+Tests cover deadline expiry, progress arriving during a wait, failed consumers, authorization revocation, epoch changes, and wrong-generation search rejection. Real PostgreSQL/Cortex integration verifies a wait before and after outbox delivery.

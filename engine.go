@@ -259,3 +259,10 @@ func (e *Engine) RunExtraction(ctx context.Context, c Caller, r model.Extraction
 func (e *Engine) GetExtractionRun(ctx context.Context, c Caller, q model.ExtractionRunQuery) (model.ExtractionRun, error) {
 	return e.service.GetExtractionRun(ctx, c, q)
 }
+
+func (e *Engine) WaitForProjection(ctx context.Context, c Caller, q model.ProjectionWaitRequest) (model.ProjectionReceipt, error) {
+	return e.service.WaitForProjection(ctx, c, q)
+}
+
+type ProjectionWaitRequest = model.ProjectionWaitRequest
+type ProjectionReceipt = model.ProjectionReceipt

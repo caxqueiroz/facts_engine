@@ -40,6 +40,7 @@ type RetrievalOptions struct {
 type RecallRequest struct {
 	Scopes                             []string
 	Query, Purpose                     string
+	RequireGeneration                  string `json:",omitempty"`
 	ValidAt                            time.Time
 	KnowledgeRevision, RequireRevision int64
 	Limit                              int
@@ -54,4 +55,16 @@ type RecallResult struct {
 	Generation                      string
 	LedgerRevision, IndexedRevision int64
 	Incomplete                      bool
+}
+
+// ProjectionWaitRequest binds a wait to one generation and committed revision.
+// Callers must provide a context deadline; waits are additionally capped at two minutes.
+type ProjectionWaitRequest struct {
+	Scopes              []string
+	Generation, Purpose string
+	Revision            int64
+}
+type ProjectionReceipt struct {
+	Generation      string
+	IndexedRevision int64
 }

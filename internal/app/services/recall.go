@@ -40,6 +40,9 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 		}
 		out.Generation = active.Generation
 	}
+	if q.RequireGeneration != "" && q.RequireGeneration != out.Generation {
+		return out, model.ErrUnavailable
+	}
 	progress, err := s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(out.Generation)})
 	if err != nil {
 		return out, model.ErrUnavailable
