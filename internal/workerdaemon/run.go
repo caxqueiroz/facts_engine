@@ -113,6 +113,41 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize archive handler")
 		}
 		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ArchiveConsumer(c.Archive.Stream)}
+	case "refresh":
+		dsn := os.Getenv("MEMORY_DATABASE_URL")
+		if dsn == "" {
+			return errors.New("missing worker engine database configuration")
+		}
+		engineConfig, err := pgxpool.ParseConfig(dsn)
+		if err != nil {
+			return errors.New("invalid worker engine database configuration")
+		}
+		engineConfig.MaxConns = c.MaxConnections
+		engineConfig.ConnConfig.ConnectTimeout = 5 * time.Second
+		enginePool, err := pgxpool.NewWithConfig(startup, engineConfig)
+		if err != nil {
+			return errors.New("cannot create worker engine pool")
+		}
+		defer enginePool.Close()
+		engineLedger, err := postgres.New(startup, enginePool, cipher)
+		if err != nil {
+			return errors.New("worker engine schema or role check failed")
+		}
+		store, err := evidence.NewPostgres(enginePool, cipher)
+		if err != nil {
+			return errors.New("cannot initialize worker evidence store")
+		}
+
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Extraction: c.Refresh.options()})
+		if err != nil {
+			return errors.New("invalid refresh engine or approved profile configuration")
+		}
+		caller := model.Caller{Tenant: c.Refresh.Tenant, Principal: c.Principal, Service: true}
+		handler, err = workers.NewMemoryRefresh(engine, caller, c.Refresh.Stream, c.Refresh.Purpose, c.Refresh.bindings())
+		if err != nil {
+			return errors.New("cannot initialize refresh scheduler")
+		}
+		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.MemoryRefreshConsumer(c.Refresh.Stream)}
 	case "audit":
 		signingKey, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
 		if err != nil {

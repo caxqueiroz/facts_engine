@@ -58,7 +58,7 @@ func standaloneRoute(t *testing.T, ctx context.Context, tenant string) runtimeco
 	t.Setenv("MEMORY_TEST_INDEX_URL", databaseRole(t, dsn, "standalone_index_runtime"))
 	return runtimeconfig.LexicalRoute{Tenant: tenant, Generation: "standalone-g1", DatabaseEnv: "MEMORY_TEST_INDEX_URL", MaxConnections: 4}
 }
-func testStandaloneProjection(t *testing.T, ctx context.Context, client *http.Client, base, dsn, endpoint, storeID, modelID, principal string, route runtimeconfig.LexicalRoute) {
+func testStandaloneProjection(t *testing.T, ctx context.Context, client *http.Client, base, dsn, endpoint, storeID, modelID, principal string, route runtimeconfig.LexicalRoute) model.CommitResult {
 	t.Helper()
 	pool, err := pgxpool.New(ctx, databaseRole(t, dsn, "facts_runtime"))
 	if err != nil {
@@ -154,4 +154,5 @@ func testStandaloneProjection(t *testing.T, ctx context.Context, client *http.Cl
 	if err != nil || result.Incomplete || len(result.Items) != 1 || result.Items[0].Fact.VersionId != proposed.VersionID || result.Items[0].Fact.Value.GetText() != "tea" {
 		t.Fatalf("standalone lexical recall: %v, %v", result, err)
 	}
+	return proposed
 }

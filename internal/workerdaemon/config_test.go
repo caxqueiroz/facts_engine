@@ -1,6 +1,10 @@
 package workerdaemon
 
-import "testing"
+import (
+	facts "github.com/caxqueiroz/facts_engine"
+	"github.com/caxqueiroz/facts_engine/model"
+	"testing"
+)
 
 func TestExampleAndInvalidWorkerModes(t *testing.T) {
 	config, err := LoadConfig("../../examples/memoryworker.json")
@@ -61,5 +65,46 @@ func TestArchiveWorkerTrustConfiguration(t *testing.T) {
 	config.Archive = nil
 	if config.Validate() == nil {
 		t.Fatal("missing archive config accepted")
+	}
+}
+
+type configLedger struct{ model.Ledger }
+type configAuth struct{ model.Authorizer }
+type configEvidence struct{ model.EvidenceStore }
+
+func TestRefreshWorkerConfiguration(t *testing.T) {
+	config, err := LoadConfig("../../examples/memoryworker-refresh.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := config.Refresh.options()
+	if _, err := facts.NewWithOptions(configLedger{}, configAuth{}, configEvidence{}, model.EngineOptions{Extraction: options}); err != nil {
+		t.Fatal("example profile rejected by engine", err)
+	}
+	if !options.ScheduleOnly || len(options.Profiles) != 1 || options.Profiles[0].Provider != nil {
+		t.Fatal("refresh enables provider execution")
+	}
+	for _, mutate := range []func(*Config){
+		func(c *Config) { c.Refresh = nil },
+		func(c *Config) { c.Refresh.Bindings[0].ProfileID = "unknown" },
+		func(c *Config) { c.Refresh.Bindings = append(c.Refresh.Bindings, c.Refresh.Bindings[0]) },
+		func(c *Config) { c.Refresh.Profiles[0].ParserVersion = "facts-extraction-json-v1" },
+		func(c *Config) { c.Refresh.Profiles = append(c.Refresh.Profiles, c.Refresh.Profiles[0]) },
+		func(c *Config) { c.Refresh.Purpose = "" },
+		func(c *Config) { c.Refresh.DailyTokenBudget = 0 },
+		func(c *Config) {
+			c.Mode = "audit"
+			c.Audit = AuditConfig{Tenant: "tenant", Stream: "stream", KeyID: "key"}
+		},
+		func(c *Config) { c.Projection.Tenant = "tenant" },
+	} {
+		c, err := LoadConfig("../../examples/memoryworker-refresh.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		mutate(&c)
+		if c.Validate() == nil {
+			t.Fatal("invalid or mixed refresh configuration accepted")
+		}
 	}
 }
