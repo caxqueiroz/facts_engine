@@ -53,6 +53,8 @@ jobs:
             scripts/integration.sh
       - name: Run race-enabled tests with isolated services
         run: make ci-integration
+      - name: Build and smoke-test runtime containers
+        run: make containers container-smoke
 
   vulnerabilities:
     name: Reachable Go vulnerabilities

@@ -44,3 +44,10 @@ tools:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
 	go install connectrpc.com/connect/v2/cmd/protoc-gen-connect-go@v2.0.1
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+
+.PHONY: containers container-smoke
+containers:
+	sh scripts/container-build.sh
+
+container-smoke:
+	sh scripts/container-smoke.sh
