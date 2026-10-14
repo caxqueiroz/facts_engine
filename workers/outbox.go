@@ -128,3 +128,13 @@ func (w *Worker) Run(ctx context.Context) error {
 		}
 	}
 }
+
+// retryAfterError preserves the handler cause while imposing a durable job's
+// retry floor on the queue's independently configured exponential backoff.
+type retryAfterError struct {
+	cause error
+	delay time.Duration
+}
+
+func (e *retryAfterError) Error() string { return "delivery requires delayed retry" }
+func (e *retryAfterError) Unwrap() error { return e.cause }

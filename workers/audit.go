@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"github.com/caxqueiroz/facts_engine/model"
-	"time"
 )
 
 // AuditExport consumes trusted durable ledger events, never client-supplied
@@ -22,13 +21,6 @@ func NewAuditExport(runner model.AuditExportRunner, auth model.Authorizer, calle
 	return &AuditExport{runner: runner, auth: auth, caller: caller, stream: stream}, nil
 }
 
-type retryAfterError struct {
-	cause error
-	delay time.Duration
-}
-
-func (e *retryAfterError) Error() string { return "delivery requires retry after job lease" }
-func (e *retryAfterError) Unwrap() error { return e.cause }
 func (a *AuditExport) Handle(ctx context.Context, d model.Delivery) error {
 	if d.Key.Tenant != a.caller.Tenant || d.Key.Consumer != model.AuditExportConsumer(a.stream) || d.Event.Caller.Tenant != a.caller.Tenant {
 		return model.ErrDenied
