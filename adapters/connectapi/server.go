@@ -53,6 +53,7 @@ func NewHandlerWithOptions(engine Engine, verify IdentityVerifier, limits Limits
 		return nil, err
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.RegisterRetentionPolicyRequest{}, &v1.PlaceLegalHoldRequest{}, &v1.ReleaseLegalHoldRequest{}, &v1.DisposeEvidenceRequest{}, &v1.GetRetentionStatusRequest{},
 		&v1.GetProjectionStatusRequest{}, &v1.RebuildIndexRequest{},
 		&v1.PutScopeRequest{}, &v1.PutSubjectRequest{}, &v1.GetScopeRequest{}, &v1.GetSubjectRequest{}, &v1.LookupSubjectRequest{},
 		&v1.PrepareContextRequest{}, &v1.GetContextManifestRequest{}, &v1.RecordDecisionRequest{}, &v1.GetDecisionReceiptRequest{},
@@ -112,6 +113,7 @@ func NewHandlerWithOptions(engine Engine, verify IdentityVerifier, limits Limits
 	memoryv1connect.RegisterContextServiceHandler(server, &contextService{engine: engine})
 	memoryv1connect.RegisterIdentityServiceHandler(server, &identityService{engine: engine})
 	memoryv1connect.RegisterOperationsServiceHandler(server, &operationsService{engine: engine})
+	memoryv1connect.RegisterRetentionServiceHandler(server, &retentionService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	if options.AcceptTraceContext {

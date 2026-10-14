@@ -1,0 +1,100 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+// Administrative controls retain engine authorization and database-role checks.
+// Disposal currently covers only unreferenced evidence in the shared database.
+service RetentionService {
+  rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
+  rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
+  rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
+  rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc GetRetentionStatus(GetRetentionStatusRequest) returns (GetRetentionStatusResponse);
+}
+message RetentionPolicy {
+  string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_class = 3 [(buf.validate.field).string.const = "evidence_bytes"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string jurisdiction = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 minimum_age_seconds = 6 [(buf.validate.field).int64 = {
+    gte: 0
+    lte: 3162240000
+  }];
+}
+message RegisterRetentionPolicyRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  RetentionPolicy policy = 3 [(buf.validate.field).required = true];
+}
+message RegisterRetentionPolicyResponse {
+  CommitResult result = 1;
+}
+message PlaceLegalHoldRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+}
+message PlaceLegalHoldResponse {
+  CommitResult result = 1;
+}
+message ReleaseLegalHoldRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+}
+message ReleaseLegalHoldResponse {
+  CommitResult result = 1;
+}
+message DisposeEvidenceRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string evidence_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 7 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+}
+message DisposeEvidenceResponse {
+  CommitResult result = 1;
+}
+message GetRetentionStatusRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string evidence_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetRetentionStatusResponse {
+  RetentionStatus status = 1;
+}
+message RetentionStatus {
+  string evidence_id = 1;
+  string policy_id = 2;
+  google.protobuf.Timestamp registered_at = 3;
+  bool disposed = 4;
+  repeated string active_holds = 5;
+  repeated string blockers = 6;
+}

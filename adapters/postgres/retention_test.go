@@ -65,6 +65,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		}
 		return ref
 	}
+	testRemoteRetention(t, ctx, normal, engine, ledger, store, c, register)
 	ref := register("disposable", "disposable-object", "case", "short-lived")
 	request := model.EvidenceDisposalRequest{Command: command("dispose"), Scope: "case", EvidenceID: "disposable", PolicyID: "short-lived", Jurisdiction: "SG", Reason: "schedule-expired"}
 	hold := model.LegalHoldRequest{Command: command("hold"), ID: "hold1", Scope: "case", Reason: "legal-review"}

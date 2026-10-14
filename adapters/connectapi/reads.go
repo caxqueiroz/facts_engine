@@ -24,6 +24,7 @@ type Engine interface {
 	ContextEngine
 	IdentityEngine
 	OperationsEngine
+	RetentionEngine
 }
 
 type SnapshotEngine interface {
