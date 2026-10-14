@@ -61,8 +61,13 @@ func (t *transaction) flushContext(ctx context.Context, e model.Event) error {
 		if _, err = t.tx.Exec(ctx, `INSERT INTO context_manifests VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, m.ID, m.Scope, m.SelectionRevision, e.LedgerRevision, b); err != nil {
 			return err
 		}
-		for _, scope := range m.Request.Query.Scopes {
+		for _, scope := range model.ContextScopes(m) {
 			if _, err = t.tx.Exec(ctx, `INSERT INTO context_scopes VALUES($1,$2,$3)`, t.tenant, m.ID, scope); err != nil {
+				return err
+			}
+		}
+		for ordinal, item := range m.Memories {
+			if _, err = t.tx.Exec(ctx, `INSERT INTO context_memory_items VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, m.ID, ordinal, item.Memory.RecordID, item.Memory.VersionID, item.Key.Scope); err != nil {
 				return err
 			}
 		}
@@ -95,6 +100,16 @@ func (t *transaction) flushContext(ctx context.Context, e model.Event) error {
 				scope, ok := t.decisionItemScopes[item]
 				if !ok {
 					return model.ErrInvalid
+				}
+				record, err := t.Record(ctx, item.RecordID)
+				if err != nil {
+					return err
+				}
+				if record.Kind == "memory" {
+					if _, err = t.tx.Exec(ctx, `INSERT INTO decision_memory_items VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, r.ID, group.role, ordinal, item.RecordID, item.VersionID, scope); err != nil {
+						return err
+					}
+					continue
 				}
 				if _, err = t.tx.Exec(ctx, `INSERT INTO decision_items VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, r.ID, group.role, ordinal, item.RecordID, item.VersionID, scope); err != nil {
 					return err

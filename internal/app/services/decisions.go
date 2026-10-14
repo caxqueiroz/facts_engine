@@ -19,8 +19,11 @@ func (s *Service) decisionReferences(ctx context.Context, c model.Caller, r mode
 			return out, nil, err
 		}
 		out.SourceDigest = m.Digest
-		for _, scope := range m.Request.Query.Scopes {
+		for _, scope := range model.ContextScopes(m) {
 			scopes[scope] = true
+		}
+		for _, item := range m.Memories {
+			items[model.VersionReference{RecordID: item.Memory.RecordID, VersionID: item.Memory.VersionID}] = item.Key.Scope
 		}
 		for _, item := range m.Items {
 			items[model.VersionReference{RecordID: item.Fact.RecordID, VersionID: item.Fact.VersionID}] = item.Key.Scope

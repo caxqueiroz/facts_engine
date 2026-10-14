@@ -162,6 +162,15 @@ type ContextManifest struct {
 	Payload           []byte
 }
 
+type ContextMemoryItem struct {
+	TenantID  string
+	ContextID string
+	Ordinal   int32
+	RecordID  string
+	VersionID string
+	ScopeID   string
+}
+
 type ContextScope struct {
 	TenantID  string
 	ContextID string
@@ -191,6 +200,16 @@ type DecisionArtifact struct {
 }
 
 type DecisionItem struct {
+	TenantID   string
+	DecisionID string
+	Role       string
+	Ordinal    int32
+	RecordID   string
+	VersionID  string
+	ScopeID    string
+}
+
+type DecisionMemoryItem struct {
 	TenantID   string
 	DecisionID string
 	Role       string

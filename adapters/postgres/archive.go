@@ -229,7 +229,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				if err := json.Unmarshal(entry.Payload, &m); err != nil {
 					return err
 				}
-				for _, scope := range m.Request.Query.Scopes {
+				for _, scope := range model.ContextScopes(m) {
 					scopes[scope] = true
 				}
 			case "decision":

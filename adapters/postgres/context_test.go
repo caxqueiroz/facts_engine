@@ -161,6 +161,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 		}
 		previous = rec.ID
 	}
+	mixed := testMemoryContexts(t, ctx, e, l, store, c, index, d.Input, d.Output)
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +185,20 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if err = audit.Verify(*completed.Bundle, map[string]ed25519.PublicKey{"context-audit-key": public}); err != nil {
 		t.Fatal(err)
 	}
+	for _, entry := range completed.Bundle.Entries {
+		if entry.Kind == "context" && entry.ID == mixed.ID {
+			t.Fatal("memory body leaked into metadata export")
+		}
+	}
+	foundGap := false
+	for _, gap := range completed.Bundle.Manifest.Gaps {
+		if gap.Kind == "context" && gap.ID == mixed.ID && gap.Reason == "memory_context_payload_withheld" {
+			foundGap = true
+		}
+	}
+	if !foundGap {
+		t.Fatal("missing memory context redaction gap")
+	}
 	foundContext, foundDecision := false, false
 	for _, entry := range completed.Bundle.Entries {
 		if entry.Kind == "context" && entry.ID == m.ID {
@@ -202,6 +217,34 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	}
 	if !foundContext || !foundDecision {
 		t.Fatal("missing context or decision in signed export")
+	}
+
+	fullJob, err := exporter.StartAuditExport(ctx, c, model.AuditExportRequest{Command: model.Command{Key: "memory-context-export", Purpose: q.Purpose}, Scope: "case1", IncludeEvidence: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := exporter.RunAuditExport(ctx, c, model.AuditExportQuery{ID: fullJob.ID, Scope: "case1", Purpose: q.Purpose})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = audit.Verify(*full.Bundle, map[string]ed25519.PublicKey{"context-audit-key": public}); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, entry := range full.Bundle.Entries {
+		if entry.Kind == "context" && entry.ID == mixed.ID {
+			var retained model.ContextManifest
+			if err = json.Unmarshal(entry.Payload, &retained); err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(retained.Rendered, mixed.Rendered) {
+				t.Fatal("mixed context bytes changed in export")
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("mixed context absent from full export")
 	}
 
 }

@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"slices"
 	"time"
 )
 
@@ -14,8 +15,9 @@ type RetrievalDescriber interface {
 }
 type ContextRequest struct {
 	Command
-	Scope string
-	Query RecallRequest
+	Scope           string
+	Query           RecallRequest
+	IncludeMemories bool `json:",omitempty"`
 }
 type ContextManifest struct {
 	ID, Tenant, Scope                                    string
@@ -24,6 +26,8 @@ type ContextManifest struct {
 	CanonicalVersion, RedactionVersion, QueryReference   string
 	Retrieval                                            RetrievalIdentity
 	Items                                                []RecallItem
+	Memories                                             []MemoryRecallItem `json:",omitempty"`
+	Order                                                []VersionReference `json:",omitempty"`
 	Rendered                                             []byte
 	RenderedDigest, Digest                               string
 	SelectionRevision, IndexedRevision, CreationRevision int64
@@ -92,4 +96,17 @@ type ContextTx interface {
 	Decision(context.Context, string) (DecisionRecord, error)
 	DecisionRun(context.Context, string, string) (DecisionRecord, error)
 	StageDecision(context.Context, DecisionRecord, map[VersionReference]string) error
+}
+
+// ContextScopes includes every scope whose content is retained in the manifest.
+func ContextScopes(m ContextManifest) []string {
+	scopes := append([]string{}, m.Request.Query.Scopes...)
+	for _, item := range m.Memories {
+		scopes = append(scopes, item.Key.Scope)
+		for _, dependency := range item.Memory.Dependencies {
+			scopes = append(scopes, dependency.Scope)
+		}
+	}
+	slices.Sort(scopes)
+	return slices.Compact(scopes)
 }

@@ -151,7 +151,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	}
 	gaps = append(gaps, extra...)
 	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"memory_context", "coordinated_derivative_disposal"} {
+	for _, kind := range []string{"coordinated_derivative_disposal"} {
 		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
 	}
 	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
@@ -320,7 +320,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &m); err != nil {
 				return nil, nil, err
 			}
-			for _, scope := range m.Request.Query.Scopes {
+			if len(m.Memories) > 0 && !r.IncludeEvidence {
+				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "memory_context_payload_withheld"})
+				continue
+			}
+			for _, scope := range model.ContextScopes(m) {
 				include = include && scope == r.Scope
 			}
 		case "decision":

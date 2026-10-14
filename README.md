@@ -101,7 +101,7 @@ Call `StartAuditExport` with a scope, command key, purpose, and `IncludeEvidence
 
 Exports select one consistent ledger revision. Collection is bounded to 10,000 stored entries and 64 MiB of entry payloads; included evidence also counts against the payload limit. Oversized exports fail explicitly. Metadata exports omit evidence bytes and source quotes. Cross-scope snapshots and their dependent receipts are withheld with explicit gaps. Missing or corrupt evidence also produces a gap. Fact values remain in metadata exports, so these still require fact-read and history permissions.
 
-Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, where `trustedKeys` is a separately provisioned map of signing key IDs to Ed25519 public keys. Verification checks the signed manifest, ordered entry identities, counts, and payload digests. Preserve the original payload bytes for verification. The encrypted bundle resides in PostgreSQL; its digest does not establish an independently controlled immutable archive or prove coverage beyond the stated scope and revision. Manifests explicitly report missing memory context and coordinated retention coverage. Model requests and responses require evidence access and are withheld from metadata-only exports. Archive-chain receipts are not yet attached to scoped audit exports, and that coverage gap remains explicit.
+Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, where `trustedKeys` is a separately provisioned map of signing key IDs to Ed25519 public keys. Verification checks the signed manifest, ordered entry identities, counts, and payload digests. Preserve the original payload bytes for verification. The encrypted bundle resides in PostgreSQL; its digest does not establish an independently controlled immutable archive or prove coverage beyond the stated scope and revision. Manifests explicitly report missing coordinated retention coverage. Model requests and responses require evidence access and are withheld from metadata-only exports. Archive-chain receipts are not yet attached to scoped audit exports, and that coverage gap remains explicit.
 
 Integration tests cover external-run races and conflicts, preserved snapshot lineage, current authorization, tenant isolation, cross-scope exclusion, signature/content tampering, metadata redaction, live-lease exclusion, stale completion rollback, and expired-lease recovery.
 
@@ -171,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
-2. Complete memory dependency refresh jobs and context integration. Ledger-revalidated memory recall is implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
+2. Complete memory dependency refresh jobs. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
@@ -184,11 +184,11 @@ Production acceptance also requires the named domain, security, retention, and o
 
 ### Context manifests and decision receipts
 
-Apply migration 00008, refresh runtime/archive grants with `scripts/runtime-role.sql`, and republish the OpenFGA model (including `can_prepare_context`). `PrepareContext` uses the configured retrieval adapter and persists the ordered canonical facts, exact JSON bytes and digest, query, selection/index revisions, retrieval identity, redaction version, caller and authorization checks before returning any context. The current format is `facts-context-json-v1`, with an 8 MiB rendered limit; it supplies facts without evidence quotes or memory items. Custom retrieval adapters must implement `model.RetrievalDescriber`. Repeating a committed command returns its original manifest even if retrieval is unavailable. `GetContextManifest` rechecks current scope permissions without rerunning fact eligibility.
+Apply migration 00008, refresh runtime/archive grants with `scripts/runtime-role.sql`, and republish the OpenFGA model (including `can_prepare_context`). `PrepareContext` uses the configured retrieval adapter and persists the ordered canonical facts, exact JSON bytes and digest, query, selection/index revisions, retrieval identity, redaction version, caller and authorization checks before returning any context. The default format is `facts-context-json-v1`, with an 8 MiB rendered limit; it supplies facts without evidence quotes. Set `IncludeMemories: true` for the mixed format described below. Custom retrieval adapters must implement `model.RetrievalDescriber`. Repeating a committed command returns its original manifest even if retrieval is unavailable. `GetContextManifest` rechecks current scope permissions without rerunning fact eligibility.
 
 `RecordDecision` accepts exactly one context or snapshot ID, application/decision identity, ordered selected and used version references, method identity, transformation version, final input/output evidence references, outcome and decision time. Used items must be selected, and selected items must occur in the retained source. Model methods also require registered model request/response artifacts; rule methods retain a rule ID/version. An external action artifact is optional. A calculation link requires the same snapshot source. Authenticated callers supply executor/initiator provenance. The engine verifies registered artifact digests and bytes at recording time; later reads authorize retained references without requiring those bytes to remain available.
 
-A tenant/application/decision identity is immutable: identical requests from the same caller converge across command keys, while changed payloads conflict. Decision receipts describe the host's declared use, not independent proof of external execution. Contexts and decisions participate in ledger/outbox ordering, encrypted storage, scoped signed audit exports and signed event archives. Exports withhold records that span other scopes. Coordinated derivative disposal, memory contexts and production recovery drills remain outstanding.
+A tenant/application/decision identity is immutable: identical requests from the same caller converge across command keys, while changed payloads conflict. Decision receipts describe the host's declared use, not independent proof of external execution. Contexts and decisions participate in ledger/outbox ordering, encrypted storage, scoped signed audit exports and signed event archives. Exports withhold records that span other scopes. Coordinated derivative disposal and production recovery drills remain outstanding.
 
 
 ## Retention governance and evidence disposal
@@ -430,7 +430,7 @@ The engine verifies source bytes/spans, dependency ownership/digests, active sub
 
 Memory proposals and subtype definitions participate in scoped signed audits and event archives. Metadata-only audits withhold memory bodies because they may quote evidence. A scoped audit also withholds a memory version with dependencies outside that scope; archive workers authorize every dependency scope. Memory evidence links block uncoordinated byte disposal.
 
-Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Memory recall is now implemented as described below. Refresh jobs and prepared memory contexts remain in progress. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
+Memory approval, configured automated acceptance, temporal lifecycle and direct current/historical resolution are now implemented as described below. Memory recall is now implemented as described below. Refresh jobs remain in progress; prepared memory contexts are implemented below. Tests cover immutable corrections, retries/conflicts, dependency digest rejection, tenant/permission boundaries, fact/memory separation, retention blockers and signed audit disclosure.
 
 
 ### Memory acceptance, lifecycle and dependency eligibility
@@ -445,7 +445,7 @@ Dependency eligibility covers the entire interval described by the memory, not j
 
 Acceptance locks the memory and dependency records in deterministic order before appending, so a concurrent fact change cannot slip between dependency validation and commit. Reads evaluate timelines and dependency eligibility in one ledger view and report that revision. Earlier knowledge revisions preserve earlier resolutions. Evidence-byte verification and fresh scope checks occur before disclosure; unavailable evidence withholds the body.
 
-Signed audit exports and event archives retain memory timeline generations and lifecycle events. Memory context integration remains outstanding. Integration tests cover self-approval denial, automatic/manual policy separation, required-prerequisite rejection, overlap prevention, supersession, dispute/resolution, retraction, rejection, whole-interval dependency staleness and preserved historical reads.
+Signed audit exports and event archives retain memory timeline generations and lifecycle events. Memory context integration is implemented below. Integration tests cover self-approval denial, automatic/manual policy separation, required-prerequisite rejection, overlap prevention, supersession, dispute/resolution, retraction, rejection, whole-interval dependency staleness and preserved historical reads.
 
 
 ### Memory attestations and withdrawal
@@ -498,6 +498,30 @@ Memory recall resolves candidates in one ledger snapshot, then checks current ac
 
 Refresh [runtime grants](scripts/runtime-role.sql) before running the updated projector. Indexing a memory requires the worker's current `can_read`, `can_read_history` and `can_read_evidence` permissions in the memory scope and every dependency scope. **Rebuild into a new generation for existing deployments:** older consumers may already have acknowledged memory events without indexing them. Restarting an existing consumer does not replay those events. Use the managed rebuild and verified cutover procedure above.
 
-Coverage and generation requirements match fact recall. Candidate over-fetch is bounded and shared across fact and memory candidates, so filtering can return fewer results than requested; `Incomplete` describes ledger/index coverage, not exhaustive search. `PrepareContext` still includes facts only. Memory contexts and automated dependency refresh remain unfinished.
+Coverage and generation requirements match fact recall. Candidate over-fetch is bounded and shared across fact and memory candidates, so filtering can return fewer results than requested; `Incomplete` describes ledger/index coverage, not exhaustive search. `PrepareContext` can opt into memory items as described below. Automated dependency refresh remains unfinished.
 
 Integration tests exercise memory projection through the outbox, vector and lexical retrieval, fact/memory separation, tampered index text, evidence-permission denial, stale-index retraction filtering, historical recall, and rebuild verification.
+
+
+### Prepared memory contexts
+
+Apply forward-only migration `00017_memory_context.sql` and refresh [runtime/archive grants](scripts/runtime-role.sql). `ContextRequest.IncludeMemories` enables mixed retrieval:
+
+```go
+manifest, err := engine.PrepareContext(ctx, caller, model.ContextRequest{
+    Command: model.Command{Key: commandKey, Purpose: "case_review"},
+    Scope: scope, IncludeMemories: true,
+    Query: model.RecallRequest{
+        Scopes: []string{scope}, Query: "customer preferences", Purpose: "case_review",
+        ValidAt: validAt, Limit: 10,
+    },
+})
+```
+
+Mixed contexts resolve fact and memory candidates in one ledger snapshot. `Limit` bounds their combined count. The v2 manifest retains facts in `Items`, memories in `Memories`, and the combined retrieval order in `Order`. Rendered bytes use `facts-memories-context-json-v1`, with `Facts`, `Memories` and `Order` fields. Both kinds carry the same selection revision. Retrieval identity, coverage, authorization receipts, exact bytes and digests are persisted before delivery. Fact-only requests and existing v1 manifests preserve their original format and digests.
+
+Memory entries require current read, history, evidence and context-preparation permissions in their own scope and all dependency scopes. Those scopes participate in persisted context and decision access boundaries, scoped audit filtering and archive authorization. Retrieving a retained manifest rechecks read/history/evidence permissions; it preserves the originally supplied bytes without re-evaluating later eligibility. A retry returns the same committed manifest even after a dispute or index outage. A fresh context excludes newly disputed or otherwise ineligible memories.
+
+`RecordDecision` accepts memory version references from the retained manifest in `SelectedItems` and `UsedItems`. Used items must be selected, and every selection must have been supplied. Separate tenant-qualified foreign keys bind fact and memory items to their respective immutable versions. Memory bodies may quote evidence, so metadata-only audit exports withhold memory-bearing contexts with an explicit gap; authorized full exports retain the exact bytes. Cross-scope contexts remain withheld from a single-scope export.
+
+Tests cover mixed ordering and revision consistency, memory decision links, unauthorized and unsupplied references, preserved manifests after disputes, exclusion from fresh contexts, current evidence/history permissions, dependency-scope authorization, metadata redaction and signed full exports.
