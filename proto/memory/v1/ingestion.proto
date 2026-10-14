@@ -1,0 +1,97 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+import "memory/v1/evidence.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service IngestionService {
+  rpc IngestConversation(IngestConversationRequest) returns (IngestConversationResponse);
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+}
+message ConversationMessage {
+  option (buf.validate.message).cel = {
+    id: "conversation_message.size"
+    message: "message object must be at most 1 MiB"
+    expression: "!has(this.object) || this.object.size <= 1048576"
+  };
+  string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string revision = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string speaker = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string speaker_role = 4 [(buf.validate.field).string = {
+    in: [
+      "customer",
+      "assistant",
+      "system",
+      "staff"
+    ]
+  }];
+  string source_class = 5 [(buf.validate.field).string = {
+    in: [
+      "customer",
+      "assistant",
+      "system",
+      "staff",
+      "bank_record"
+    ]
+  }];
+  google.protobuf.Timestamp source_time = 6 [(buf.validate.field).required = true];
+  string media_type = 7 [(buf.validate.field).string = {
+    in: [
+      "text/plain",
+      "text/markdown"
+    ]
+  }];
+  string classification = 8 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string retention_policy = 9 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ObjectRef object = 10 [(buf.validate.field).required = true];
+}
+message ConversationInput {
+  Command command = 1 [(buf.validate.field).required = true];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string source_system = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string conversation_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string revision = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string timezone = 6 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 128
+  }];
+  repeated ConversationMessage messages = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+}
+message IngestConversationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ConversationInput conversation = 2 [(buf.validate.field).required = true];
+}
+message IngestConversationResponse {
+  ConversationRecord conversation = 1;
+}
+message GetConversationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetConversationResponse {
+  ConversationRecord conversation = 1;
+}
+message ConversationRecord {
+  string id = 1;
+  string tenant = 2;
+  string digest = 3;
+  Caller caller = 4;
+  ConversationInput request = 5;
+  repeated string evidence_ids = 6;
+  repeated AuthorizationDecision authorization = 7;
+  int64 ledger_revision = 8;
+}

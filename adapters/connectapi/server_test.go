@@ -339,3 +339,43 @@ func TestMemoryRequestValidation(t *testing.T) {
 		t.Fatalf("version tenant: %v", err)
 	}
 }
+
+func TestIngestionAndExtractionValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	transport := connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL))
+	ingestion := memoryv1connect.NewIngestionServiceClient(transport)
+	extraction := memoryv1connect.NewExtractionServiceClient(transport)
+	command := &v1.Command{Key: "command", Purpose: "review"}
+	conversation := &v1.IngestConversationRequest{Tenant: "tenant", Conversation: &v1.ConversationInput{Command: command, Scope: "scope", SourceSystem: "chat", ConversationId: "chat", Revision: "v1", Timezone: "UTC"}}
+	if _, err := ingestion.IngestConversation(context.Background(), conversation); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("empty conversation: %v", err)
+	}
+	conversation.Conversation.Messages = []*v1.ConversationMessage{{Id: "message", Revision: "v1", Speaker: "customer", SpeakerRole: "customer", SourceClass: "customer", SourceTime: validQuery().ValidAt, MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "retain", Object: &v1.ObjectRef{Locator: "object", Version: "v1", Digest: strings.Repeat("a", 64), Size: (1 << 20) + 1}}}
+	if _, err := ingestion.IngestConversation(context.Background(), conversation); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("message size: %v", err)
+	}
+	request := &v1.StartExtractionRequest{Tenant: "tenant", Command: command, Scope: "scope", ConversationId: "chat", ProfileId: "profile"}
+	if _, err := extraction.StartExtraction(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing targets: %v", err)
+	}
+	request.Subjects = []string{"subject"}
+	request.Predicates = []*v1.PredicateBinding{{Predicate: "predicate", SchemaVersion: "v1"}}
+	request.MemoryTargets = []*v1.MemoryExtractionTarget{{Id: "memory", Subtype: "summary", SchemaVersion: "v1"}}
+	if _, err := extraction.StartExtraction(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("mixed extraction modes: %v", err)
+	}
+	request.MemoryTargets = nil
+	request.InputRanges = []*v1.ExtractionInputRange{{EvidenceId: "source", Start: 2, End: 1}}
+	if _, err := extraction.StartExtraction(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("reversed range: %v", err)
+	}
+	if _, err := extraction.PlanExtractionChunks(context.Background(), &v1.PlanExtractionChunksRequest{Tenant: "tenant", Scope: "scope", ConversationId: "chat", ProfileId: "profile", Purpose: "review", MaxSourceBytes: 3}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("chunk size: %v", err)
+	}
+	if _, err := extraction.RetryJob(context.Background(), &v1.RetryJobRequest{Tenant: "tenant", Command: command, Scope: "scope", Id: "job", ExpectedFence: -1}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("negative fence: %v", err)
+	}
+	if _, err := extraction.GetExtractionRun(context.Background(), &v1.GetExtractionRunRequest{Tenant: "other", Scope: "scope", Id: "attempt", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("run tenant: %v", err)
+	}
+}

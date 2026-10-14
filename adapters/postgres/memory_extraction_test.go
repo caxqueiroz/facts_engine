@@ -93,6 +93,7 @@ func testMemoryExtraction(t *testing.T, ctx context.Context, l model.Ledger, sto
 	if err != nil || again.ID != job.ID || calls != 0 {
 		t.Fatal("memory extraction start retry", again, err)
 	}
+	t.Run("remote memory extraction replay", func(t *testing.T) { testRemoteExtractionReplay(t, ctx, engine, c, request, job) })
 	run := func(job model.JobStatus, key string) model.ExtractionRun {
 		t.Helper()
 		completed, err := engine.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd(key), ID: job.ID, Scope: scope})

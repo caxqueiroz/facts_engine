@@ -121,6 +121,7 @@ func testMemoryRefresh(t *testing.T, ctx context.Context, l model.Ledger, store 
 		t.Fatal("oversized refresh did not fail before provider", tinyResult, err)
 	}
 	job := testAutomaticMemoryRefresh(t, ctx, engine, l, store, queue, worker, request, original)
+	t.Run("remote refresh replay", func(t *testing.T) { testRemoteRefreshReplay(t, ctx, engine, l, c, job) })
 	if calls != 0 {
 		t.Fatal("scheduler invoked model")
 	}

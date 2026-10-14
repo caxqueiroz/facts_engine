@@ -16,6 +16,8 @@ type Engine interface {
 	DefinitionEngine
 	AttestationEngine
 	MemoryEngine
+	IngestionEngine
+	ExtractionEngine
 }
 
 type SnapshotEngine interface {
