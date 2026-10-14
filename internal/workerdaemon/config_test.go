@@ -131,3 +131,51 @@ func TestRefreshSweepConfiguration(t *testing.T) {
 		t.Fatal("consumer silently accepted ticker configuration")
 	}
 }
+
+func TestExtractionWorkerConfiguration(t *testing.T) {
+	c, err := LoadConfig("../../examples/memoryworker-extraction.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Extraction == nil {
+		t.Fatal("missing execution config")
+	}
+	for _, mutate := range []func(*Config){
+		func(c *Config) { c.Extraction = nil },
+		func(c *Config) { c.Extraction.Scheduling = nil },
+		func(c *Config) { c.Extraction.Gateways = nil },
+		func(c *Config) { c.Extraction.Gateways[0].ProfileID = "unknown" },
+		func(c *Config) { c.Extraction.Gateways[0].TokenEnv = "invalid name" },
+		func(c *Config) {
+			c.Extraction.Scheduling.Profiles = append(c.Extraction.Scheduling.Profiles, c.Extraction.Scheduling.Profiles[0])
+			c.Extraction.Gateways = append(c.Extraction.Gateways, c.Extraction.Gateways[0])
+		},
+		func(c *Config) { c.Mode = "refresh" },
+	} {
+		copy, err := LoadConfig("../../examples/memoryworker-extraction.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		mutate(&copy)
+		if copy.Validate() == nil {
+			t.Fatal("invalid extraction configuration accepted")
+		}
+	}
+	t.Setenv("MEMORY_EXTRACTION_GATEWAY_TOKEN", "")
+	if _, close, err := openExtractionGateways(c.Extraction); err == nil {
+		close()
+		t.Fatal("missing configured credential accepted")
+	}
+	t.Setenv("MEMORY_EXTRACTION_GATEWAY_TOKEN", "test-secret")
+	options, close, err := openExtractionGateways(c.Extraction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close()
+	if options.ScheduleOnly || options.Profiles[0].Provider == nil {
+		t.Fatal("executor lacks provider")
+	}
+	if _, err := facts.NewWithOptions(configLedger{}, configAuth{}, configEvidence{}, model.EngineOptions{Extraction: options}); err != nil {
+		t.Fatal("invalid example profiles", err)
+	}
+}

@@ -105,6 +105,7 @@ func testStandaloneRefresh(t *testing.T, ctx context.Context, client *http.Clien
 			}
 			testStandaloneRefreshSweep(t, ctx, config, engine, ledger, caller)
 			testStandaloneRefreshRPC(t, ctx, client, base, ledger, tenant, memory, profile)
+			testStandaloneExtraction(t, ctx, config, engine, caller, job.ID, dsn)
 			return
 		}
 		if time.Now().After(deadline) {

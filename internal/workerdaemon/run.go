@@ -169,6 +169,46 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize refresh scheduler")
 		}
 		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.MemoryRefreshConsumer(c.Refresh.Stream)}
+	case "extraction":
+		dsn := os.Getenv("MEMORY_DATABASE_URL")
+		if dsn == "" {
+			return errors.New("missing extraction engine database configuration")
+		}
+		engineConfig, err := pgxpool.ParseConfig(dsn)
+		if err != nil {
+			return errors.New("invalid extraction engine database configuration")
+		}
+		engineConfig.MaxConns = c.MaxConnections
+		engineConfig.ConnConfig.ConnectTimeout = 5 * time.Second
+		enginePool, err := pgxpool.NewWithConfig(startup, engineConfig)
+		if err != nil {
+			return errors.New("cannot create extraction engine pool")
+		}
+		defer enginePool.Close()
+		engineLedger, err := postgres.New(startup, enginePool, cipher)
+		if err != nil {
+			return errors.New("extraction engine schema or role check failed")
+		}
+		store, err := evidence.NewPostgres(enginePool, cipher)
+		if err != nil {
+			return errors.New("cannot initialize extraction evidence store")
+		}
+
+		extraction, closeProviders, err := openExtractionGateways(c.Extraction)
+		if err != nil {
+			return err
+		}
+		defer closeProviders()
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Extraction: extraction, RedactionPolicyVersions: c.Extraction.Scheduling.RedactionPolicyVersions})
+		if err != nil {
+			return errors.New("invalid extraction engine or approved profiles")
+		}
+		caller := model.Caller{Tenant: c.Extraction.Tenant, Principal: c.Principal, Service: true}
+		handler, err = workers.NewExtraction(engine, caller, c.Extraction.Stream)
+		if err != nil {
+			return errors.New("cannot initialize extraction executor")
+		}
+		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ExtractionConsumer(c.Extraction.Stream)}
 	case "audit":
 		signingKey, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
 		if err != nil {

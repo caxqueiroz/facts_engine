@@ -89,6 +89,7 @@ func (c *RefreshConfig) bindings() []model.MemoryRefreshBinding {
 }
 
 type Config struct {
+	Extraction             *ExtractionConfig          `json:"extraction"`
 	Refresh                *RefreshConfig             `json:"refresh"`
 	Archive                *ArchiveConfig             `json:"archive"`
 	Audit                  AuditConfig                `json:"audit"`
@@ -125,6 +126,9 @@ func (c Config) Validate() error {
 	} else if c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 {
 		return model.ErrInvalid
 	}
+	if c.Mode != "extraction" && c.Extraction != nil {
+		return model.ErrInvalid
+	}
 	switch c.Mode {
 	case "projection":
 		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil {
@@ -143,6 +147,10 @@ func (c Config) Validate() error {
 			return model.ErrInvalid
 		}
 		if (c.Mode == "refresh" && c.Refresh.SweepIntervalMinutes != 0) || (c.Mode == "refresh-sweep" && (c.Refresh.SweepIntervalMinutes < 1 || c.Refresh.SweepIntervalMinutes > 1440)) {
+			return model.ErrInvalid
+		}
+	case "extraction":
+		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.Extraction.Validate() != nil {
 			return model.ErrInvalid
 		}
 	default:
