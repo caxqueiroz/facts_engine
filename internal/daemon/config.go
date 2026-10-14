@@ -14,6 +14,7 @@ type ContextArchivePolicy struct {
 }
 
 type Config struct {
+	Gateways            []mtlsidentity.GatewayBinding       `json:"gateways,omitempty"`
 	Telemetry           *runtimeconfig.Telemetry            `json:"telemetry,omitempty"`
 	ContextArchive      *ContextArchivePolicy               `json:"context_archive,omitempty"`
 	AcceptTraceContext  bool                                `json:"accept_trace_context,omitempty"`
@@ -65,6 +66,6 @@ func (c Config) Validate() error {
 	if c.OperationsScope != "" && (!model.ValidID(c.OperationsScope) || len(c.Retrieval) == 0) {
 		return model.ErrInvalid
 	}
-	_, err := mtlsidentity.New(c.Identities)
+	_, err := mtlsidentity.NewWithGateways(c.Identities, c.Gateways)
 	return err
 }

@@ -60,3 +60,14 @@ func TestExtractionSchedulingExample(t *testing.T) {
 		t.Fatal("empty extraction configuration accepted")
 	}
 }
+
+func TestGatewayExample(t *testing.T) {
+	c, err := LoadConfig("../../examples/memoryd-gateway.json")
+	if err != nil || len(c.Gateways) != 1 || len(c.Identities) == 0 {
+		t.Fatal("invalid gateway example", err)
+	}
+	c.Gateways[0].URI = c.Identities[0].URI
+	if c.Validate() == nil {
+		t.Fatal("ambiguous gateway/workload certificate accepted")
+	}
+}

@@ -116,7 +116,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := daemon.Config{Extraction: &runtimeconfig.ExtractionScheduling{Profiles: []model.ExtractionProfile{standaloneRefreshProfile()}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 10000}, AuditKeyID: "standalone-key", Retrieval: []runtimeconfig.LexicalRoute{route}, OperationsScope: scope, Listen: listener.Addr().String(), TLSCertificate: write("server.pem", serverCert.PEM), TLSKey: write("server.key", serverCert.KeyPEM), ClientCA: write("ca.pem", authority.PEM), Identities: []mtlsidentity.Binding{{URI: "spiffe://test/memoryd", Tenant: tenant, Principal: principal}}, OpenFGAURL: endpoint, OpenFGAStore: store, OpenFGAModel: modelID, ReadinessScope: scope, MaxConnections: 4, MaxConcurrent: 4, MaxRequestBytes: 1 << 20, MaxResponseBytes: 1 << 20, RPCTimeoutSeconds: 5, ShutdownSeconds: 3}
+	config := daemon.Config{Gateways: []mtlsidentity.GatewayBinding{{URI: "spiffe://test/gateway", Tenant: tenant}}, Extraction: &runtimeconfig.ExtractionScheduling{Profiles: []model.ExtractionProfile{standaloneRefreshProfile()}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 10000}, AuditKeyID: "standalone-key", Retrieval: []runtimeconfig.LexicalRoute{route}, OperationsScope: scope, Listen: listener.Addr().String(), TLSCertificate: write("server.pem", serverCert.PEM), TLSKey: write("server.key", serverCert.KeyPEM), ClientCA: write("ca.pem", authority.PEM), Identities: []mtlsidentity.Binding{{URI: "spiffe://test/memoryd", Tenant: tenant, Principal: principal}}, OpenFGAURL: endpoint, OpenFGAStore: store, OpenFGAModel: modelID, ReadinessScope: scope, MaxConnections: 4, MaxConcurrent: 4, MaxRequestBytes: 1 << 20, MaxResponseBytes: 1 << 20, RPCTimeoutSeconds: 5, ShutdownSeconds: 3}
 	runtimeURL, err := url.Parse(dsn)
 	if err != nil || runtimeURL.Scheme == "" {
 		t.Fatal("integration requires a PostgreSQL URL")
@@ -182,6 +182,37 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	testStandaloneRefresh(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, projectionFact)
 	testStandaloneAudit(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, principal, public)
 	testStandaloneArchive(t, ctx, client, base, dsn, endpoint, store, modelID, tenant)
+	gatewayCert := authority.Issue(t, false, []string{"spiffe://test/gateway"}, time.Now().Add(time.Hour))
+	gatewayTLS := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: authority.Roots, Certificates: []tls.Certificate{gatewayCert.TLS}}, ForceAttemptHTTP2: true}
+	defer gatewayTLS.CloseIdleConnections()
+	gatewayHTTP := &http.Client{Transport: verifiedGatewayTransport{base: gatewayTLS, tenant: tenant, principal: "human"}, Timeout: 10 * time.Second}
+	gatewayIdentity := memoryv1connect.NewIdentityServiceClient(connect.NewClient(connecthttp.NewTransport(gatewayHTTP, base)))
+	human := "user:" + openfga.ObjectID(tenant, "human")
+	humanReader := tuple(human, "reader", scopeObject)
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(human, "member", tenantObject), humanReader}}})
+	gatewayCurrent, err := gatewayIdentity.GetScope(ctx, &v1.GetScopeRequest{Tenant: tenant, Scope: scope, Purpose: "gateway-read"})
+	if err != nil {
+		t.Fatal("verified gateway user could not read", err)
+	}
+	userWrite := &v1.PutScopeRequest{Tenant: tenant, Command: &v1.Command{Key: "gateway-write", Purpose: "integration"}, Definition: &v1.ScopeDefinition{Id: scope, Label: "User managed scope"}, ExpectedRevision: gatewayCurrent.Version.Revision, Reason: "Gateway identity integration"}
+	if _, err := gatewayIdentity.PutScope(ctx, userWrite); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatal("reader acquired service administrator rights", err)
+	}
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(human, "administrator", scopeObject)}}})
+	if _, err := gatewayIdentity.PutScope(ctx, userWrite); err != nil {
+		t.Fatal("gateway user write", err)
+	}
+	userScope, err := gatewayIdentity.GetScope(ctx, &v1.GetScopeRequest{Tenant: tenant, Scope: scope, Purpose: "gateway-read"})
+	if err != nil || userScope.Version.Caller.Principal != "human" || userScope.Version.Caller.Service || userScope.Version.Caller.Initiator != "" {
+		t.Fatal("gateway user identity not retained", err)
+	}
+	if _, err := gatewayIdentity.GetScope(ctx, &v1.GetScopeRequest{Tenant: "other", Scope: scope, Purpose: "gateway-read"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatal("gateway request tenant mismatch accepted", err)
+	}
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "deletes": map[string]any{"tuple_keys": []map[string]string{humanReader}}})
+	if _, err := gatewayIdentity.GetScope(ctx, &v1.GetScopeRequest{Tenant: tenant, Scope: scope, Purpose: "gateway-read"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatal("revoked gateway user retained read access", err)
+	}
 	request.Tenant = "bank1"
 	if _, err := identity.PutScope(ctx, request); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("tenant mismatch: %v", err)
@@ -193,4 +224,20 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	if _, err := identity.PutScope(ctx, request); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("revoked administrative access: %v", err)
 	}
+}
+
+// The test gateway supplies assertions on its own authenticated TLS hop. Public
+// request headers are never used as this transport's identity source.
+type verifiedGatewayTransport struct {
+	base              http.RoundTripper
+	tenant, principal string
+}
+
+func (g verifiedGatewayTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	forwarded := request.Clone(request.Context())
+	forwarded.Header.Set(mtlsidentity.VerifiedTenantHeader, g.tenant)
+	forwarded.Header.Set(mtlsidentity.VerifiedPrincipalHeader, g.principal)
+	forwarded.Header.Set("X-Facts-Service", "true")
+	forwarded.Header.Set("X-Facts-Initiator", "forged")
+	return g.base.RoundTrip(forwarded)
 }

@@ -1,5 +1,5 @@
 // Package mtlsidentity binds verified client certificates to host-configured
-// service identities. It does not interpret gateway or user identity headers.
+// service identities and explicitly trusted, tenant-bound identity gateways.
 package mtlsidentity
 
 import (
@@ -9,11 +9,24 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
 type Binding struct{ URI, Tenant, Principal string }
-type Authenticator struct{ bindings map[string]model.Caller }
+
+// GatewayBinding authorizes a certificate identity to assert user identity only
+// within one tenant. The gateway must authenticate users and replace public
+// identity headers before forwarding requests over its mutually authenticated hop.
+type GatewayBinding struct{ URI, Tenant string }
+
+const VerifiedTenantHeader = "X-Facts-Verified-Tenant"
+const VerifiedPrincipalHeader = "X-Facts-Verified-Principal"
+
+type Authenticator struct {
+	bindings map[string]model.Caller
+	gateways map[string]string
+}
 type callerKey struct{ authenticator *Authenticator }
 
 func New(bindings []Binding) (*Authenticator, error) {
@@ -22,8 +35,7 @@ func New(bindings []Binding) (*Authenticator, error) {
 	}
 	a := &Authenticator{bindings: make(map[string]model.Caller, len(bindings))}
 	for _, b := range bindings {
-		u, err := url.Parse(b.URI)
-		if err != nil || u.Scheme == "" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.String() != b.URI || !model.ValidID(b.Tenant) || !model.ValidID(b.Principal) || len(b.URI) > 2048 {
+		if !validURI(b.URI) || !model.ValidID(b.Tenant) || !model.ValidID(b.Principal) {
 			return nil, model.ErrInvalid
 		}
 		if _, exists := a.bindings[b.URI]; exists {
@@ -32,6 +44,49 @@ func New(bindings []Binding) (*Authenticator, error) {
 		a.bindings[b.URI] = model.Caller{Tenant: b.Tenant, Principal: b.Principal, Service: true}
 	}
 	return a, nil
+}
+
+// NewWithGateways preserves workload bindings and separately opts certificate
+// identities into gateway trust. At least one workload binding remains required.
+func NewWithGateways(bindings []Binding, gateways []GatewayBinding) (*Authenticator, error) {
+	a, err := New(bindings)
+	if err != nil || len(bindings)+len(gateways) > 1024 {
+		return nil, model.ErrInvalid
+	}
+	a.gateways = make(map[string]string, len(gateways))
+	for _, g := range gateways {
+		if !validURI(g.URI) || !model.ValidID(g.Tenant) {
+			return nil, model.ErrInvalid
+		}
+		if _, exists := a.bindings[g.URI]; exists {
+			return nil, model.ErrInvalid
+		}
+		if _, exists := a.gateways[g.URI]; exists {
+			return nil, model.ErrInvalid
+		}
+		a.gateways[g.URI] = g.Tenant
+	}
+	return a, nil
+}
+func validURI(value string) bool {
+	u, err := url.Parse(value)
+	return err == nil && u.Scheme != "" && u.Host != "" && u.User == nil && u.RawQuery == "" && !u.ForceQuery && u.Fragment == "" && u.String() == value && len(value) <= 2048
+}
+func singleHeader(header http.Header, name string) string {
+	value := ""
+	count := 0
+	for key, values := range header {
+		if strings.EqualFold(key, name) {
+			count += len(values)
+			if len(values) == 1 {
+				value = values[0]
+			}
+		}
+	}
+	if count != 1 {
+		return ""
+	}
+	return value
 }
 
 // Wrap must run on the TLS-terminating server. The server must use
@@ -87,6 +142,16 @@ func (a *Authenticator) authenticate(r *http.Request) (model.Caller, error) {
 	}
 	if !clientUsage {
 		return model.Caller{}, denied
+	}
+	if tenant, ok := a.gateways[leaf.URIs[0].String()]; ok {
+		claimedTenant := singleHeader(r.Header, VerifiedTenantHeader)
+		principal := singleHeader(r.Header, VerifiedPrincipalHeader)
+		if claimedTenant != tenant || !model.ValidID(principal) {
+			return model.Caller{}, denied
+		}
+		// Gateway assertions always represent a direct user. Headers cannot grant
+		// service status or a delegated initiator.
+		return model.Caller{Tenant: tenant, Principal: principal}, nil
 	}
 	caller, ok := a.bindings[leaf.URIs[0].String()]
 	if !ok {

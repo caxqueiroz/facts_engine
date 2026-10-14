@@ -64,7 +64,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	if !roots.AppendCertsFromPEM(ca) {
 		return errors.New("invalid client CA")
 	}
-	authn, err := mtlsidentity.New(c.Identities)
+	authn, err := mtlsidentity.NewWithGateways(c.Identities, c.Gateways)
 	if err != nil {
 		return errors.New("invalid workload bindings")
 	}
