@@ -18,6 +18,8 @@ type Engine interface {
 	MemoryEngine
 	IngestionEngine
 	ExtractionEngine
+	CalculationEngine
+	AuditEngine
 }
 
 type SnapshotEngine interface {

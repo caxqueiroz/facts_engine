@@ -1,0 +1,76 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/attestations.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service CalculationService {
+  rpc RecordCalculation(RecordCalculationRequest) returns (RecordCalculationResponse);
+  rpc GetCalculationReceipt(GetCalculationReceiptRequest) returns (GetCalculationReceiptResponse);
+}
+// Reports an externally executed run; the engine does not execute calculations.
+message CalculationReceipt {
+  option (buf.validate.message).cel = {
+    id: "calculation.time_order"
+    message: "completion must not precede start"
+    expression: "!has(this.started_at) || !has(this.completed_at) || this.completed_at >= this.started_at"
+  };
+  Command command = 1 [(buf.validate.field).required = true];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string snapshot_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string application_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string external_run_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string method_id = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string method_version = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string executable_digest = 8 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string configuration_digest = 9 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string normalization_version = 10 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated string reference_snapshot_ids = 11 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  ArtifactReference input = 12 [(buf.validate.field).required = true];
+  ArtifactReference output = 13 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp started_at = 14 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp completed_at = 15 [(buf.validate.field).required = true];
+  string outcome = 16 [(buf.validate.field).string = {
+    in: [
+      "succeeded",
+      "failed"
+    ]
+  }];
+}
+message RecordCalculationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  CalculationReceipt receipt = 2 [(buf.validate.field).required = true];
+}
+message RecordCalculationResponse {
+  CalculationRecord record = 1;
+}
+message GetCalculationReceiptRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetCalculationReceiptResponse {
+  CalculationRecord record = 1;
+}
+message CalculationRecord {
+  string id = 1;
+  string tenant = 2;
+  string digest = 3;
+  string snapshot_digest = 4;
+  Caller caller = 5;
+  CalculationReceipt receipt = 6;
+  int64 ledger_revision = 7;
+  repeated AuthorizationDecision authorization = 8;
+}

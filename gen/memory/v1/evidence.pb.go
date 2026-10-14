@@ -844,12 +844,12 @@ var File_memory_v1_evidence_proto protoreflect.FileDescriptor
 
 const file_memory_v1_evidence_proto_rawDesc = "" +
 	"\n" +
-	"\x18memory/v1/evidence.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\"\xa2\x01\n" +
+	"\x18memory/v1/evidence.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\"\x9d\x01\n" +
 	"\tObjectRef\x12!\n" +
 	"\alocator\x18\x01 \x01(\tB\a\xbaH\x04r\x02 \x01R\alocator\x12!\n" +
 	"\aversion\x18\x02 \x01(\tB\a\xbaH\x04r\x02 \x01R\aversion\x12-\n" +
-	"\x06digest\x18\x03 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x06digest\x12 \n" +
-	"\x04size\x18\x04 \x01(\x03B\f\xbaH\t\"\a\x18\x80\x80\x80\b(\x00R\x04size\"\xf6\x01\n" +
+	"\x06digest\x18\x03 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x06digest\x12\x1b\n" +
+	"\x04size\x18\x04 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x04size\"\xf6\x01\n" +
 	"\x11EvidenceCopyRange\x12.\n" +
 	"\x0eoriginal_start\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\roriginalStart\x12*\n" +
 	"\foriginal_end\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\voriginalEnd\x12,\n" +
@@ -859,7 +859,7 @@ const file_memory_v1_evidence_proto_rawDesc = "" +
 	"\x12parent_evidence_id\x18\x01 \x01(\tR\x10parentEvidenceId\x125\n" +
 	"\x16transformation_version\x18\x02 \x01(\tR\x15transformationVersion\x12%\n" +
 	"\x0epolicy_version\x18\x03 \x01(\tR\rpolicyVersion\x124\n" +
-	"\x06ranges\x18\x04 \x03(\v2\x1c.memory.v1.EvidenceCopyRangeR\x06ranges\"\xaa\x05\n" +
+	"\x06ranges\x18\x04 \x03(\v2\x1c.memory.v1.EvidenceCopyRangeR\x06ranges\"\xa2\x06\n" +
 	"\bEvidence\x129\n" +
 	"\x02id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12?\n" +
 	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12,\n" +
@@ -878,13 +878,14 @@ const file_memory_v1_evidence_proto_rawDesc = "" +
 	"\x06object\x18\f \x01(\v2\x14.memory.v1.ObjectRefB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12=\n" +
 	"\n" +
 	"derivation\x18\r \x01(\v2\x1d.memory.v1.EvidenceDerivationR\n" +
-	"derivation\"\xcb\x01\n" +
+	"derivation:v\xbaHs\x1aq\n" +
+	"\x14evidence.object_size\x12&evidence object must be at most 16 MiB\x1a1!has(this.object) || this.object.size <= 16777216\"\xcb\x01\n" +
 	"\x17RegisterEvidenceRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x127\n" +
 	"\bevidence\x18\x03 \x01(\v2\x13.memory.v1.EvidenceB\x06\xbaH\x03\xc8\x01\x01R\bevidence\"K\n" +
 	"\x18RegisterEvidenceResponse\x12/\n" +
-	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xb8\x04\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xb9\x05\n" +
 	"\x1fRegisterRedactedEvidenceRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x129\n" +
@@ -893,7 +894,8 @@ const file_memory_v1_evidence_proto_rawDesc = "" +
 	"\x12parent_evidence_id\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x10parentEvidenceId\x12P\n" +
 	"\x0epolicy_version\x18\x06 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\rpolicyVersion\x124\n" +
 	"\x06object\x18\a \x01(\v2\x14.memory.v1.ObjectRefB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12?\n" +
-	"\x06ranges\x18\b \x03(\v2\x1c.memory.v1.EvidenceCopyRangeB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\x06ranges\"S\n" +
+	"\x06ranges\x18\b \x03(\v2\x1c.memory.v1.EvidenceCopyRangeB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\x06ranges:\x7f\xbaH|\x1az\n" +
+	"\x1dredacted_evidence.object_size\x12&evidence object must be at most 16 MiB\x1a1!has(this.object) || this.object.size <= 16777216\"S\n" +
 	" RegisterRedactedEvidenceResponse\x12/\n" +
 	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\x81\x02\n" +
 	"\x1aGetEvidenceMetadataRequest\x12A\n" +

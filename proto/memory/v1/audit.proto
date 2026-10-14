@@ -1,0 +1,100 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "memory/v1/common.proto";
+import "memory/v1/evidence.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service AuditService {
+  rpc ListChanges(ListChangesRequest) returns (ListChangesResponse);
+  rpc StartAuditExport(StartAuditExportRequest) returns (StartAuditExportResponse);
+  rpc GetAuditExport(GetAuditExportRequest) returns (GetAuditExportResponse);
+}
+message ListChangesRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int64 after_revision = 4 [(buf.validate.field).int64.gte = 0];
+  int32 limit = 5 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 1000
+  }];
+}
+message ListChangesResponse {
+  repeated Event events = 1;
+  int64 through_revision = 2;
+  int64 next_revision = 3;
+}
+message StartAuditExportRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  bool include_evidence = 4;
+}
+message StartAuditExportResponse {
+  AuditExportResult result = 1;
+}
+message GetAuditExportRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetAuditExportResponse {
+  AuditExportResult result = 1;
+}
+message AuditExportResult {
+  string id = 1;
+  string state = 2;
+  int64 created_revision = 3;
+  int64 completed_revision = 4;
+  ObjectRef artifact = 5;
+  AuditBundle bundle = 6;
+}
+message AuditBundle {
+  AuditManifest manifest = 1;
+  repeated AuditEntry entries = 2;
+  AuditSignature signature = 3;
+  // Exact canonical JSON bytes covered by signature; protobuf bytes are not signed.
+  bytes manifest_json = 4;
+}
+message AuditManifest {
+  string schema_version = 1;
+  string encoding = 2;
+  string tenant = 3;
+  string scope = 4;
+  string export_id = 5;
+  int64 through_revision = 6;
+  int64 entry_count = 7;
+  repeated AuditManifestEntry entries = 8;
+  repeated AuditGap gaps = 9;
+  repeated AuthorizationDecision authorization = 10;
+}
+message AuditManifestEntry {
+  string kind = 1;
+  string id = 2;
+  string digest = 3;
+}
+message AuditEntry {
+  string kind = 1;
+  string id = 2;
+  // Exact UTF-8 JSON artifact bytes bound by the manifest's entry digest.
+  bytes payload_json = 3;
+}
+message AuditGap {
+  string kind = 1;
+  string id = 2;
+  string reason = 3;
+}
+message AuditSignature {
+  string algorithm = 1;
+  string key_id = 2;
+  bytes signature = 3;
+}

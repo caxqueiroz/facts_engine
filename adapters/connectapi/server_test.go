@@ -379,3 +379,35 @@ func TestIngestionAndExtractionValidation(t *testing.T) {
 		t.Fatalf("run tenant: %v", err)
 	}
 }
+
+func TestCalculationAndAuditValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	transport := connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL))
+	calculations := memoryv1connect.NewCalculationServiceClient(transport)
+	audit := memoryv1connect.NewAuditServiceClient(transport)
+	digest := strings.Repeat("a", 64)
+	receipt := &v1.CalculationReceipt{
+		Command: &v1.Command{Key: "command", Purpose: "review"}, Scope: "scope", SnapshotId: "snapshot",
+		ApplicationId: "app", ExternalRunId: "run", MethodId: "method", MethodVersion: "v1",
+		ExecutableDigest: digest, ConfigurationDigest: digest, NormalizationVersion: "v1",
+		Input: &v1.ArtifactReference{EvidenceId: "input", Digest: digest}, Output: &v1.ArtifactReference{EvidenceId: "output", Digest: digest},
+		StartedAt: timestamppb.New(time.Unix(100, 0)), CompletedAt: timestamppb.New(time.Unix(99, 0)), Outcome: "succeeded",
+	}
+	request := &v1.RecordCalculationRequest{Tenant: "tenant", Receipt: receipt}
+	if _, err := calculations.RecordCalculation(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("reversed calculation times: %v", err)
+	}
+	receipt.CompletedAt = receipt.StartedAt
+	receipt.Input = nil
+	if _, err := calculations.RecordCalculation(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing artifact: %v", err)
+	}
+	for _, limit := range []int32{0, 1001} {
+		if _, err := audit.ListChanges(context.Background(), &v1.ListChangesRequest{Tenant: "tenant", Scope: "scope", Purpose: "review", Limit: limit}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("change limit %d: %v", limit, err)
+		}
+	}
+	if _, err := audit.GetAuditExport(context.Background(), &v1.GetAuditExportRequest{Tenant: "other", Scope: "scope", Id: "export", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("audit tenant: %v", err)
+	}
+}

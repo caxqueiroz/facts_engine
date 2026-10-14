@@ -60,6 +60,7 @@ func recordCalculationFixture(t *testing.T, ctx context.Context, engine *facts.E
 	if _, err := engine.RecordCalculation(ctx, c, changed); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("mismatched artifact", err)
 	}
+	t.Run("remote calculation", func(t *testing.T) { testRemoteCalculation(t, ctx, engine, c, request) })
 	// Independent command keys racing for the same external run converge to one receipt.
 	var wg sync.WaitGroup
 	type outcome struct {
@@ -206,6 +207,7 @@ func testAuditExports(t *testing.T, ctx context.Context, ledger *postgres.Ledger
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("remote audit", func(t *testing.T) { testRemoteAudit(t, ctx, engine, noEvidence, c, public) })
 	if _, err := noEvidence.GetAuditExport(ctx, c, query); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("full export disclosed without evidence permission", err)
 	}
