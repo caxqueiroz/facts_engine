@@ -5,6 +5,7 @@ package connectapi
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"time"
 
@@ -38,8 +39,18 @@ type Limits struct {
 // goroutines. HTTP/2 is required for gRPC. The host must set HTTP server read,
 // write and idle deadlines in addition to the per-RPC timeout.
 func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Handler, error) {
+	return NewHandlerWithOptions(engine, verify, limits, HandlerOptions{})
+}
+
+// NewHandlerWithOptions adds injected RPC telemetry and optional traceparent
+// extraction without modifying global providers or identity verification.
+func NewHandlerWithOptions(engine Engine, verify IdentityVerifier, limits Limits, options HandlerOptions) (http.Handler, error) {
 	if engine == nil || verify == nil || limits.Timeout <= 0 || limits.MaxConcurrent <= 0 || limits.MaxRequestBytes <= 0 || limits.MaxResponseBytes <= 0 {
 		return nil, model.ErrInvalid
+	}
+	observer, err := newRPCObserver(options.Telemetry)
+	if err != nil {
+		return nil, err
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
 		&v1.GetProjectionStatusRequest{}, &v1.RebuildIndexRequest{},
@@ -62,7 +73,9 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	}
 	slots := make(chan struct{}, limits.MaxConcurrent)
 	server := connect.NewServer(func(next connect.ServerFunc) connect.ServerFunc {
-		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (rpcErr error) {
+			ctx, observation := observer.start(ctx, spec.Procedure)
+			defer observation.end(&rpcErr)
 			select {
 			case slots <- struct{}{}:
 				defer func() { <-slots }()
@@ -101,6 +114,16 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterOperationsServiceHandler(server, &operationsService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
+	if options.AcceptTraceContext {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			values := r.Header.Values("Traceparent")
+			if len(values) == 1 && len(values[0]) <= 512 {
+				ctx := (propagation.TraceContext{}).Extract(r.Context(), propagation.MapCarrier{"traceparent": values[0]})
+				r = r.WithContext(ctx)
+			}
+			mux.ServeHTTP(w, r)
+		}), nil
+	}
 	return mux, nil
 }
 
