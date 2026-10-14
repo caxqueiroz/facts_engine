@@ -21,6 +21,7 @@ type Engine interface {
 	CalculationEngine
 	AuditEngine
 	RetrievalEngine
+	ContextEngine
 }
 
 type SnapshotEngine interface {

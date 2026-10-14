@@ -1,0 +1,155 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/attestations.proto";
+import "memory/v1/common.proto";
+import "memory/v1/retrieval.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service ContextService {
+  rpc PrepareContext(PrepareContextRequest) returns (PrepareContextResponse);
+  rpc GetContextManifest(GetContextManifestRequest) returns (GetContextManifestResponse);
+  rpc RecordDecision(RecordDecisionRequest) returns (RecordDecisionResponse);
+  rpc GetDecisionReceipt(GetDecisionReceiptRequest) returns (GetDecisionReceiptResponse);
+}
+message ContextInput {
+  option (buf.validate.message).cel = {
+    id: "context.scope"
+    message: "context scope must be included in query scopes"
+    expression: "!has(this.query) || this.scope in this.query.scopes"
+  };
+  option (buf.validate.message).cel = {
+    id: "context.purpose"
+    message: "command and query purposes must agree"
+    expression: "!has(this.command) || !has(this.query) || this.command.purpose == this.query.purpose"
+  };
+  Command command = 1 [(buf.validate.field).required = true];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  RecallQuery query = 3 [(buf.validate.field).required = true];
+  bool include_memories = 4;
+}
+message PrepareContextRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ContextInput context = 2 [(buf.validate.field).required = true];
+}
+message PrepareContextResponse {
+  ContextManifest manifest = 1;
+}
+message GetContextManifestRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetContextManifestResponse {
+  ContextManifest manifest = 1;
+}
+message GetDecisionReceiptRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetDecisionReceiptResponse {
+  DecisionRecord record = 1;
+}
+message ContextManifest {
+  string id = 1;
+  string tenant = 2;
+  string scope = 3;
+  Caller caller = 4;
+  ContextInput request = 5;
+  string canonical_version = 6;
+  string redaction_version = 7;
+  string query_reference = 8;
+  RetrievalIdentity retrieval = 9;
+  repeated RecallItem items = 10;
+  repeated MemoryRecallItem memories = 11;
+  repeated VersionReference order = 12;
+  bytes rendered = 13;
+  string rendered_digest = 14;
+  string digest = 15;
+  int64 selection_revision = 16;
+  int64 indexed_revision = 17;
+  int64 creation_revision = 18;
+  bool incomplete = 19;
+  repeated AuthorizationDecision authorization = 20;
+}
+message RetrievalIdentity {
+  string generation = 1;
+  string embedding_id = 2;
+  string search_version = 3;
+  string reranker_id = 4;
+  int64 dimensions = 5;
+}
+message VersionReference {
+  string record_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DecisionReceipt {
+  option (buf.validate.message).cel = {
+    id: "decision.source"
+    message: "exactly one context or snapshot is required"
+    expression: "(this.context_id != '') != (this.snapshot_id != '')"
+  };
+  option (buf.validate.message).cel = {
+    id: "decision.model_artifacts"
+    message: "model artifacts are required only for model methods"
+    expression: "this.method_kind == 'model' ? (has(this.model_request) && has(this.model_response)) : (!has(this.model_request) && !has(this.model_response))"
+  };
+  Command command = 1 [(buf.validate.field).required = true];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string application_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string external_decision_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string context_id = 5 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string snapshot_id = 6 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string calculation_id = 7 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  repeated VersionReference selected_items = 8 [(buf.validate.field).repeated.max_items = 128];
+  repeated VersionReference used_items = 9 [(buf.validate.field).repeated.max_items = 128];
+  string method_kind = 10 [(buf.validate.field).string = {
+    in: [
+      "rule",
+      "model"
+    ]
+  }];
+  string method_id = 11 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string method_version = 12 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string transformation_version = 13 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ArtifactReference input = 14 [(buf.validate.field).required = true];
+  ArtifactReference output = 15 [(buf.validate.field).required = true];
+  ArtifactReference model_request = 16;
+  ArtifactReference model_response = 17;
+  ArtifactReference action_receipt = 18;
+  google.protobuf.Timestamp decided_at = 19 [(buf.validate.field).required = true];
+  string outcome = 20 [(buf.validate.field).string = {
+    in: [
+      "succeeded",
+      "failed"
+    ]
+  }];
+}
+message RecordDecisionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  DecisionReceipt receipt = 2 [(buf.validate.field).required = true];
+}
+message RecordDecisionResponse {
+  DecisionRecord record = 1;
+}
+message DecisionRecord {
+  string id = 1;
+  string tenant = 2;
+  string digest = 3;
+  string source_digest = 4;
+  string calculation_digest = 5;
+  Caller caller = 6;
+  DecisionReceipt receipt = 7;
+  repeated string scopes = 8;
+  int64 ledger_revision = 9;
+  repeated AuthorizationDecision authorization = 10;
+}

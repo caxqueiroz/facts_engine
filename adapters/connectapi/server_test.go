@@ -436,3 +436,36 @@ func TestRetrievalValidation(t *testing.T) {
 		t.Fatalf("recall tenant: %v", err)
 	}
 }
+
+func TestContextValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewContextServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	input := &v1.ContextInput{Command: &v1.Command{Key: "context", Purpose: "review"}, Scope: "other", Query: &v1.RecallQuery{Scopes: []string{"scope"}, Query: "query", Purpose: "review", ValidAt: validQuery().ValidAt, Limit: 20}}
+	if _, err := client.PrepareContext(context.Background(), &v1.PrepareContextRequest{Tenant: "tenant", Context: input}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("scope mismatch: %v", err)
+	}
+	input.Scope = "scope"
+	input.Query.Purpose = "other"
+	if _, err := client.PrepareContext(context.Background(), &v1.PrepareContextRequest{Tenant: "tenant", Context: input}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("purpose mismatch: %v", err)
+	}
+	artifact := &v1.ArtifactReference{EvidenceId: "artifact", Digest: strings.Repeat("a", 64)}
+	receipt := &v1.DecisionReceipt{Command: input.Command, Scope: "scope", ApplicationId: "app", ExternalDecisionId: "decision", ContextId: "context", SnapshotId: "snapshot", MethodKind: "rule", MethodId: "method", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact, Output: artifact, DecidedAt: validQuery().ValidAt, Outcome: "succeeded"}
+	request := &v1.RecordDecisionRequest{Tenant: "tenant", Receipt: receipt}
+	if _, err := client.RecordDecision(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("ambiguous source: %v", err)
+	}
+	receipt.SnapshotId = ""
+	receipt.MethodKind = "model"
+	if _, err := client.RecordDecision(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing model artifacts: %v", err)
+	}
+	receipt.MethodKind = "rule"
+	receipt.ModelRequest = artifact
+	if _, err := client.RecordDecision(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("rule model artifacts: %v", err)
+	}
+	if _, err := client.GetContextManifest(context.Background(), &v1.GetContextManifestRequest{Tenant: "other", Id: "context", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("context tenant: %v", err)
+	}
+}

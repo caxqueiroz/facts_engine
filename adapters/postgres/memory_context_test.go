@@ -19,7 +19,7 @@ func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *p
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "review"} }
 	// This query instant is reused as the dispute interval boundary.
 	r := model.ContextRequest{Command: cmd("mixed-context"), Scope: "case1", IncludeMemories: true, Query: model.RecallRequest{Scopes: []string{"case1"}, Query: "memory", Purpose: "review", ValidAt: time.Now().UTC().Truncate(time.Microsecond), Limit: 20}}
-	m, err := e.PrepareContext(ctx, c, r)
+	m, err := remotePrepareContext(t, ctx, e, c, r)
 	if err != nil || len(m.Memories) != 1 || len(m.Items) == 0 || len(m.Order) != len(m.Items)+len(m.Memories) || m.CanonicalVersion != "context-manifest-v2" {
 		t.Fatal("mixed manifest", m, err)
 	}
@@ -48,7 +48,7 @@ func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *p
 	memory := m.Memories[0]
 	ref := model.VersionReference{RecordID: memory.Memory.RecordID, VersionID: memory.Memory.VersionID}
 	decision := model.DecisionReceipt{Command: cmd("mixed-decision"), Scope: "case1", ApplicationID: "app", ExternalDecisionID: "mixed", ContextID: m.ID, SelectedItems: []model.VersionReference{ref}, UsedItems: []model.VersionReference{ref}, MethodKind: "rule", MethodID: "memory-rule", MethodVersion: "v1", TransformationVersion: "v1", Input: input, Output: output, DecidedAt: time.Now(), Outcome: "succeeded"}
-	retained, err := e.RecordDecision(ctx, c, decision)
+	retained, err := remoteRecordDecision(t, ctx, e, c, decision)
 	if err != nil || retained.SourceDigest != m.Digest {
 		t.Fatal("memory decision", retained, err)
 	}
@@ -65,6 +65,7 @@ func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *p
 		if err != nil {
 			t.Fatal(err)
 		}
+		testRemoteContextDenied(t, ctx, denied, c, m.ID, retained.ID)
 		if _, err = denied.GetContextManifest(ctx, c, model.ContextQuery{ID: m.ID, Purpose: "review"}); !errors.Is(err, model.ErrDenied) {
 			t.Fatal("memory manifest permission bypass", permission, err)
 		}
@@ -81,13 +82,13 @@ func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	retry, err := broken.PrepareContext(ctx, c, r)
+	retry, err := remotePrepareContext(t, ctx, broken, c, r)
 	if err != nil || retry.ID != m.ID || !bytes.Equal(retry.Rendered, m.Rendered) {
 		t.Fatal("mixed retry changed supplied bytes", err)
 	}
 	fresh := r
 	fresh.Command = cmd("mixed-context-after-dispute")
-	after, err := e.PrepareContext(ctx, c, fresh)
+	after, err := remotePrepareContext(t, ctx, e, c, fresh)
 	if err != nil || len(after.Memories) != 0 {
 		t.Fatal("disputed memory entered new context", after, err)
 	}

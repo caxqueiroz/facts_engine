@@ -36,7 +36,7 @@ func (l failedContextLedger) Transact(ctx context.Context, tenant string, fn fun
 func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgres.Ledger, store *evidence.Postgres, c model.Caller, index model.RetrievalIndex, q model.RecallRequest) {
 	t.Helper()
 	r := model.ContextRequest{Command: model.Command{Key: "context-one", Purpose: q.Purpose}, Scope: "case1", Query: q}
-	m, err := e.PrepareContext(ctx, c, r)
+	m, err := remotePrepareContext(t, ctx, e, c, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if err != nil {
 		t.Fatal(err)
 	}
-	retry, err := broken.PrepareContext(ctx, c, r)
+	retry, err := remotePrepareContext(t, ctx, broken, c, r)
 	if err != nil || retry.ID != m.ID || !bytes.Equal(retry.Rendered, m.Rendered) {
 		t.Fatal("retry depended on retrieval", err)
 	}
@@ -61,6 +61,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if !errors.Is(err, model.ErrUnavailable) || len(empty.Rendered) != 0 {
 		t.Fatal("returned uncommitted context", err)
 	}
+	testRemoteContextFailure(t, ctx, failing, c, bad)
 	artifact := func(id string) model.ArtifactReference {
 		ref, err := store.Put(ctx, c.Tenant, id, []byte(id))
 		if err != nil {
@@ -74,7 +75,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	}
 	item := model.VersionReference{RecordID: m.Items[0].Fact.RecordID, VersionID: m.Items[0].Fact.VersionID}
 	d := model.DecisionReceipt{Command: model.Command{Key: "decision-one", Purpose: q.Purpose}, Scope: "case1", ApplicationID: "app", ExternalDecisionID: "one", ContextID: m.ID, SelectedItems: []model.VersionReference{item}, UsedItems: []model.VersionReference{item}, MethodKind: "rule", MethodID: "rule1", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact("decision-input"), Output: artifact("decision-output"), DecidedAt: time.Now(), Outcome: "succeeded"}
-	receipt, err := e.RecordDecision(ctx, c, d)
+	receipt, err := remoteRecordDecision(t, ctx, e, c, d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	d.ModelResponse = &d.Output
 	d.Key = "decision-model"
 	d.ExternalDecisionID = "model"
-	if _, err = e.RecordDecision(ctx, c, d); err != nil {
+	if _, err = remoteRecordDecision(t, ctx, e, c, d); err != nil {
 		t.Fatal(err)
 	}
 	other := c
@@ -121,7 +122,13 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	d.ExternalDecisionID = "snapshot"
 	d.ContextID = ""
 	d.SnapshotID = snap.ID
-	if _, err = e.RecordDecision(ctx, c, d); err != nil {
+	calculation, err := e.RecordCalculation(ctx, c, model.CalculationReceipt{Command: model.Command{Key: "decision-calculation", Purpose: q.Purpose}, Scope: "case1", SnapshotID: snap.ID, ApplicationID: "app", ExternalRunID: "decision-calculation", MethodID: "method", MethodVersion: "v1", ExecutableDigest: model.BytesDigest([]byte("executable")), ConfigurationDigest: model.BytesDigest([]byte("configuration")), NormalizationVersion: "v1", Input: d.Input, Output: d.Output, StartedAt: d.DecidedAt.Add(-time.Second), CompletedAt: d.DecidedAt, Outcome: "succeeded"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.CalculationID = calculation.ID
+	d.ActionReceipt = &d.Output
+	if _, err = remoteRecordDecision(t, ctx, e, c, d); err != nil {
 		t.Fatal(err)
 	}
 	denied, _ := facts.New(l, denyScope{scope: "case1"}, store)
@@ -131,6 +138,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if _, err = denied.GetDecisionReceipt(ctx, c, model.DecisionQuery{ID: receipt.ID, Purpose: q.Purpose}); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("revoked decision access", err)
 	}
+	testRemoteContextDenied(t, ctx, denied, c, m.ID, receipt.ID)
 	var wg sync.WaitGroup
 	results := make(chan model.DecisionRecord, 2)
 	failures := make(chan error, 2)

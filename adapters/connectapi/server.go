@@ -1,4 +1,4 @@
-// Package connectapi exposes typed fact operations through Connect, gRPC and
+// Package connectapi exposes typed engine operations through Connect, gRPC and
 // gRPC-Web. The host owns TLS, authenticated identity verification and lifecycle.
 package connectapi
 
@@ -42,6 +42,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.PrepareContextRequest{}, &v1.GetContextManifestRequest{}, &v1.RecordDecisionRequest{}, &v1.GetDecisionReceiptRequest{},
 		&v1.RecallRequest{}, &v1.RecallMemoriesRequest{}, &v1.WaitForProjectionRequest{},
 		&v1.RecordCalculationRequest{}, &v1.GetCalculationReceiptRequest{}, &v1.ListChangesRequest{}, &v1.StartAuditExportRequest{}, &v1.GetAuditExportRequest{},
 		&v1.IngestConversationRequest{}, &v1.GetConversationRequest{}, &v1.StartExtractionRequest{}, &v1.PlanExtractionChunksRequest{}, &v1.GetJobRequest{}, &v1.RetryJobRequest{}, &v1.GetExtractionRunRequest{}, &v1.StartMemoryRefreshRequest{},
@@ -93,6 +94,7 @@ func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Han
 	memoryv1connect.RegisterCalculationServiceHandler(server, &calculationService{engine: engine})
 	memoryv1connect.RegisterAuditServiceHandler(server, &auditService{engine: engine})
 	memoryv1connect.RegisterRetrievalServiceHandler(server, &retrievalService{engine: engine})
+	memoryv1connect.RegisterContextServiceHandler(server, &contextService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil
