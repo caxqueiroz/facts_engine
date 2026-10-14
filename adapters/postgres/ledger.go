@@ -75,19 +75,9 @@ type transaction struct {
 }
 
 func (l *Ledger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
-	var err error
-	for attempt := 0; attempt < 3; attempt++ {
-		err = l.transact(ctx, tenant, fn)
-		var pe *pgconn.PgError
-		if !errors.As(err, &pe) || (pe.Code != "40001" && pe.Code != "40P01" && pe.Code != "23505") {
-			return translate(err)
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-	}
-	return translate(err)
+	return retryTransaction(ctx, func() error { return l.transact(ctx, tenant, fn) })
 }
+
 func (l *Ledger) transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
 	if !model.ValidID(tenant) {
 		return model.ErrInvalid
