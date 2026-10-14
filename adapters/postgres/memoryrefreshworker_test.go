@@ -2,21 +2,27 @@ package postgres_test
 
 import (
 	"bytes"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"context"
 	"encoding/json"
 	facts "github.com/caxqueiroz/facts_engine"
 	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
+	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
+	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/internal/workerdaemon"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"log/slog"
+	"net/http"
 	"testing"
 	"time"
 )
 
-func testStandaloneRefresh(t *testing.T, ctx context.Context, dsn, endpoint, storeID, modelID, tenant string, fact model.CommitResult) {
+func testStandaloneRefresh(t *testing.T, ctx context.Context, client *http.Client, base, dsn, endpoint, storeID, modelID, tenant string, fact model.CommitResult) {
 	t.Helper()
 	pool, err := pgxpool.New(ctx, databaseRole(t, dsn, "facts_runtime"))
 	if err != nil {
@@ -54,8 +60,7 @@ func testStandaloneRefresh(t *testing.T, ctx context.Context, dsn, endpoint, sto
 	if err != nil {
 		t.Fatalf("refresh fixture: %v", err)
 	}
-	prompt := []byte("Propose a replacement summary using supplied dependencies.")
-	profile := model.ExtractionProfile{ID: "refresh-profile", ProviderID: "fixture", RequestedModel: "fixture-v1", PromptVersion: "v1", Prompt: prompt, PromptDigest: model.BytesDigest(prompt), ParserVersion: "memory-refresh-json-v1", Parameters: json.RawMessage(`{}`), ApplicationBuild: "test-v1", Timeout: time.Second, MaxInputBytes: 1 << 20, MaxOutputBytes: 1 << 20, MaxCandidates: 1, MaxAttempts: 2, MaxTokensPerAttempt: 1000, RetryDelay: time.Second}
+	profile := standaloneRefreshProfile()
 	config := workerdaemon.Config{Mode: "refresh", Principal: "refresh-worker", Refresh: &workerdaemon.RefreshConfig{Tenant: tenant, Stream: "refresh-v1", Purpose: "refresh-review", Bindings: []workerdaemon.RefreshBinding{{Scope: "case1", ProfileID: profile.ID}}, Profiles: []model.ExtractionProfile{profile}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 10000}, OpenFGAURL: endpoint, OpenFGAStore: storeID, OpenFGAModel: modelID, MaxConnections: 4, MaxAttempts: 3, LeaseSeconds: 3, PollMilliseconds: 10, MinBackoffMilliseconds: 10, MaxBackoffSeconds: 1, DeliveryTimeoutSeconds: 5}
 	t.Setenv("MEMORY_WORKER_DATABASE_URL", databaseRole(t, dsn, "facts_worker"))
 	t.Setenv("MEMORY_DATABASE_URL", databaseRole(t, dsn, "facts_runtime"))
@@ -99,6 +104,7 @@ func testStandaloneRefresh(t *testing.T, ctx context.Context, dsn, endpoint, sto
 				t.Fatal("scheduler executed job", status, err)
 			}
 			testStandaloneRefreshSweep(t, ctx, config, engine, ledger, caller)
+			testStandaloneRefreshRPC(t, ctx, client, base, ledger, tenant, memory, profile)
 			return
 		}
 		if time.Now().After(deadline) {
@@ -172,5 +178,39 @@ func testStandaloneRefreshSweep(t *testing.T, ctx context.Context, config worker
 			t.Fatal("standalone ticker did not emit sweep")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func standaloneRefreshProfile() model.ExtractionProfile {
+	prompt := []byte("Propose a replacement summary using supplied dependencies.")
+	return model.ExtractionProfile{ID: "refresh-profile", ProviderID: "fixture", RequestedModel: "fixture-v1", PromptVersion: "v1", Prompt: prompt, PromptDigest: model.BytesDigest(prompt), ParserVersion: "memory-refresh-json-v1", Parameters: json.RawMessage(`{}`), ApplicationBuild: "test-v1", Timeout: time.Second, MaxInputBytes: 1 << 20, MaxOutputBytes: 1 << 20, MaxCandidates: 1, MaxAttempts: 2, MaxTokensPerAttempt: 1000, RetryDelay: time.Second}
+}
+
+func testStandaloneRefreshRPC(t *testing.T, ctx context.Context, client *http.Client, base string, ledger model.Ledger, tenant string, memory model.CommitResult, profile model.ExtractionProfile) {
+	t.Helper()
+	rpc := memoryv1connect.NewExtractionServiceClient(connect.NewClient(connecthttp.NewTransport(client, base)))
+	request := &v1.StartMemoryRefreshRequest{Tenant: tenant, Command: &v1.Command{Key: "remote-refresh", Purpose: "refresh-review"}, Scope: "case1", RecordId: memory.RecordID, VersionId: memory.VersionID, ProfileId: "unapproved"}
+	if _, err := rpc.StartMemoryRefresh(ctx, request); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatal("unapproved runtime profile accepted", err)
+	}
+	request.ProfileId = profile.ID
+	result, err := rpc.StartMemoryRefresh(ctx, request)
+	if err != nil || result.Job == nil || result.Job.State != "pending" || result.Job.Attempts != 0 {
+		t.Fatal("runtime scheduling failed", result, err)
+	}
+	replay, err := rpc.StartMemoryRefresh(ctx, request)
+	if err != nil || !proto.Equal(result, replay) {
+		t.Fatal("runtime scheduling replay changed", replay, err)
+	}
+	var job model.ExtractionJob
+	if err := ledger.Transact(ctx, tenant, func(tx model.Tx) error {
+		var err error
+		job, err = tx.(model.ExtractionTx).ExtractionJob(ctx, result.Job.Id)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if job.Caller.Principal != "workload" || !job.Caller.Service || job.ProfileDigest != model.ExtractionProfileDigest(profile) || job.Request.Refresh == nil || job.Request.Refresh.VersionID != memory.VersionID {
+		t.Fatal("runtime scheduling lost identity or profile", job.ID)
 	}
 }

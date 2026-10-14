@@ -9,24 +9,25 @@ import (
 // Config contains deployment settings, never credentials. Secrets are supplied
 // through environment variables by the host's secret manager.
 type Config struct {
-	Retrieval         []runtimeconfig.LexicalRoute `json:"retrieval"`
-	OperationsScope   string                       `json:"operations_scope"`
-	Listen            string                       `json:"listen"`
-	TLSCertificate    string                       `json:"tls_certificate"`
-	TLSKey            string                       `json:"tls_key"`
-	ClientCA          string                       `json:"client_ca"`
-	Identities        []mtlsidentity.Binding       `json:"identities"`
-	OpenFGAURL        string                       `json:"openfga_url"`
-	OpenFGAStore      string                       `json:"openfga_store"`
-	OpenFGAModel      string                       `json:"openfga_model"`
-	ReadinessScope    string                       `json:"readiness_scope"`
-	AuditKeyID        string                       `json:"audit_key_id"`
-	MaxConnections    int32                        `json:"max_connections"`
-	MaxConcurrent     int                          `json:"max_concurrent"`
-	MaxRequestBytes   int                          `json:"max_request_bytes"`
-	MaxResponseBytes  int                          `json:"max_response_bytes"`
-	RPCTimeoutSeconds int                          `json:"rpc_timeout_seconds"`
-	ShutdownSeconds   int                          `json:"shutdown_seconds"`
+	Extraction        *runtimeconfig.ExtractionScheduling `json:"extraction,omitempty"`
+	Retrieval         []runtimeconfig.LexicalRoute        `json:"retrieval"`
+	OperationsScope   string                              `json:"operations_scope"`
+	Listen            string                              `json:"listen"`
+	TLSCertificate    string                              `json:"tls_certificate"`
+	TLSKey            string                              `json:"tls_key"`
+	ClientCA          string                              `json:"client_ca"`
+	Identities        []mtlsidentity.Binding              `json:"identities"`
+	OpenFGAURL        string                              `json:"openfga_url"`
+	OpenFGAStore      string                              `json:"openfga_store"`
+	OpenFGAModel      string                              `json:"openfga_model"`
+	ReadinessScope    string                              `json:"readiness_scope"`
+	AuditKeyID        string                              `json:"audit_key_id"`
+	MaxConnections    int32                               `json:"max_connections"`
+	MaxConcurrent     int                                 `json:"max_concurrent"`
+	MaxRequestBytes   int                                 `json:"max_request_bytes"`
+	MaxResponseBytes  int                                 `json:"max_response_bytes"`
+	RPCTimeoutSeconds int                                 `json:"rpc_timeout_seconds"`
+	ShutdownSeconds   int                                 `json:"shutdown_seconds"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -38,6 +39,9 @@ func LoadConfig(path string) (Config, error) {
 }
 func (c Config) Validate() error {
 	if c.Listen == "" || c.TLSCertificate == "" || c.TLSKey == "" || c.ClientCA == "" || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || !model.ValidID(c.ReadinessScope) || (c.AuditKeyID != "" && !model.ValidID(c.AuditKeyID)) || c.MaxConnections < 1 || c.MaxConnections > 256 || c.MaxConcurrent < 1 || c.MaxConcurrent > 1024 || c.MaxRequestBytes < 1 || c.MaxRequestBytes > 32<<20 || c.MaxResponseBytes < 1 || c.MaxResponseBytes > 256<<20 || c.RPCTimeoutSeconds < 1 || c.RPCTimeoutSeconds > 120 || c.ShutdownSeconds < 1 || c.ShutdownSeconds > 300 {
+		return model.ErrInvalid
+	}
+	if c.Extraction != nil && c.Extraction.Validate() != nil {
 		return model.ErrInvalid
 	}
 	if err := runtimeconfig.ValidateRoutes(c.Retrieval); err != nil {

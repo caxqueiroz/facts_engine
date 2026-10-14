@@ -98,6 +98,10 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		return errors.New("invalid authorization configuration")
 	}
 	options := model.EngineOptions{Reads: model.ReadOptions{PaginationKey: paginationKey}}
+	if c.Extraction != nil {
+		options.Extraction = c.Extraction.Options()
+		options.RedactionPolicyVersions = append([]string(nil), c.Extraction.RedactionPolicyVersions...)
+	}
 	if c.AuditKeyID != "" {
 		key, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
 		if err != nil {

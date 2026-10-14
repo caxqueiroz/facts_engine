@@ -33,3 +33,17 @@ func TestStrictConfig(t *testing.T) {
 		t.Fatal("unbounded RPC timeout")
 	}
 }
+
+func TestExtractionSchedulingExample(t *testing.T) {
+	c, err := LoadConfig("../../examples/memoryd-extraction.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Extraction == nil || !c.Extraction.Options().ScheduleOnly {
+		t.Fatal("example lacks provider-free scheduling")
+	}
+	c.Extraction.Profiles = nil
+	if c.Validate() == nil {
+		t.Fatal("empty extraction configuration accepted")
+	}
+}
