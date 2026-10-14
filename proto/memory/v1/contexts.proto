@@ -80,6 +80,7 @@ message ContextManifest {
   int64 creation_revision = 18;
   bool incomplete = 19;
   repeated AuthorizationDecision authorization = 20;
+  ContextArchiveReceipt archive = 21;
 }
 message RetrievalIdentity {
   string generation = 1;
@@ -152,4 +153,12 @@ message DecisionRecord {
   repeated string scopes = 8;
   int64 ledger_revision = 9;
   repeated AuthorizationDecision authorization = 10;
+}
+
+message ContextArchiveReceipt {
+  string stream = 1;
+  int64 max_pending_revisions = 2;
+  int64 ledger_revision = 3;
+  int64 acknowledged_revision = 4;
+  google.protobuf.Timestamp checked_at = 5;
 }

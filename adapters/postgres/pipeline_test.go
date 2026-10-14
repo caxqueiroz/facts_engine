@@ -417,6 +417,8 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err := archive.VerifyChain(ctx, objects, "bank1", "audit-v1", head, progress.AcknowledgedRevision, 1000, keys); err != nil {
 		t.Fatal(err)
 	}
+	testContextArchivePolicy(t, ctx, l, store, index, archiveWorker, c, query)
+	drain(worker, projector, key)
 	t.Run("managed rebuild and cutover", func(t *testing.T) { testRebuild(t, ctx, l, source("facts_rebuild"), store, index, db) })
 	t.Run("remote rebuild audit identity", func(t *testing.T) {
 		var encrypted []byte

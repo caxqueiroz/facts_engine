@@ -19,7 +19,25 @@ type ContextRequest struct {
 	Query           RecallRequest
 	IncludeMemories bool `json:",omitempty"`
 }
+
+// ContextArchiveOptions is trusted host policy for all context deliveries on an
+// engine. Progress must read the configured archive consumer's ledger domain.
+type ContextArchiveOptions struct {
+	Stream              string
+	MaxPendingRevisions int64
+	Progress            OutboxProgressReader
+}
+
+// ContextArchiveReceipt records the preparation-time policy check. It is not a
+// signed archive-head proof; current delivery is rechecked independently.
+type ContextArchiveReceipt struct {
+	Stream                                                    string
+	MaxPendingRevisions, LedgerRevision, AcknowledgedRevision int64
+	CheckedAt                                                 time.Time
+}
+
 type ContextManifest struct {
+	Archive                                              *ContextArchiveReceipt `json:",omitempty"`
 	ID, Tenant, Scope                                    string
 	Caller                                               Caller
 	Request                                              ContextRequest
@@ -41,6 +59,7 @@ func ContextDigest(m ContextManifest) string {
 	m.Digest = ""
 	m.CreationRevision = 0
 	m.Authorization = nil
+	m.Archive = nil
 	m.Request.Key = ""
 	m.Request.CorrelationID = ""
 	m.Request.Query.ValidAt = m.Request.Query.ValidAt.UTC()

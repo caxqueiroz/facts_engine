@@ -8,7 +8,13 @@ import (
 
 // Config contains deployment settings, never credentials. Secrets are supplied
 // through environment variables by the host's secret manager.
+type ContextArchivePolicy struct {
+	Stream              string `json:"stream"`
+	MaxPendingRevisions int64  `json:"max_pending_revisions"`
+}
+
 type Config struct {
+	ContextArchive      *ContextArchivePolicy               `json:"context_archive,omitempty"`
 	AcceptTraceContext  bool                                `json:"accept_trace_context,omitempty"`
 	OpenFGATraceContext bool                                `json:"openfga_trace_context,omitempty"`
 	Extraction          *runtimeconfig.ExtractionScheduling `json:"extraction,omitempty"`
@@ -40,6 +46,9 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
+	if c.ContextArchive != nil && (!model.ValidID(c.ContextArchive.Stream) || c.ContextArchive.MaxPendingRevisions < 0) {
+		return model.ErrInvalid
+	}
 	if c.Listen == "" || c.TLSCertificate == "" || c.TLSKey == "" || c.ClientCA == "" || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || !model.ValidID(c.ReadinessScope) || (c.AuditKeyID != "" && !model.ValidID(c.AuditKeyID)) || c.MaxConnections < 1 || c.MaxConnections > 256 || c.MaxConcurrent < 1 || c.MaxConcurrent > 1024 || c.MaxRequestBytes < 1 || c.MaxRequestBytes > 32<<20 || c.MaxResponseBytes < 1 || c.MaxResponseBytes > 256<<20 || c.RPCTimeoutSeconds < 1 || c.RPCTimeoutSeconds > 120 || c.ShutdownSeconds < 1 || c.ShutdownSeconds > 300 {
 		return model.ErrInvalid
 	}

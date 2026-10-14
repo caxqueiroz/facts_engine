@@ -65,6 +65,9 @@ func (s *Service) PrepareContext(ctx context.Context, c model.Caller, r model.Co
 	if _, err := s.contextAuthorization(ctx, c, r, true); err != nil {
 		return model.ContextManifest{}, err
 	}
+	if _, err := s.checkContextArchive(ctx, c.Tenant, 0); err != nil {
+		return model.ContextManifest{}, err
+	}
 	// A retry resolves its committed manifest before calling retrieval, preserving
 	// exact supplied bytes even after facts change or the index is unavailable.
 	var prior *model.CommitResult
@@ -132,6 +135,10 @@ func (s *Service) PrepareContext(ctx context.Context, c model.Caller, r model.Co
 		receipts = append(receipts, checks...)
 		m.Authorization = receipts
 	}
+	m.Archive, err = s.checkContextArchive(ctx, c.Tenant, m.SelectionRevision)
+	if err != nil {
+		return model.ContextManifest{}, err
+	}
 	m.Digest = model.ContextDigest(m)
 	result, err := s.mutate(ctx, c, r.Scope, "prepare_context", "can_prepare_context", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		for _, receipt := range receipts {
@@ -186,6 +193,9 @@ func (s *Service) GetContextManifest(ctx context.Context, c model.Caller, q mode
 		return model.ContextManifest{}, model.ErrPrecondition
 	}
 	if _, err = s.contextMemoryAuthorization(ctx, c, m, q.Purpose, false); err != nil {
+		return model.ContextManifest{}, err
+	}
+	if _, err := s.checkContextArchive(ctx, c.Tenant, m.CreationRevision); err != nil {
 		return model.ContextManifest{}, err
 	}
 	return m, nil

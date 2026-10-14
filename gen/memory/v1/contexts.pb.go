@@ -417,6 +417,7 @@ type ContextManifest struct {
 	CreationRevision  int64                    `protobuf:"varint,18,opt,name=creation_revision,json=creationRevision,proto3" json:"creation_revision,omitempty"`
 	Incomplete        bool                     `protobuf:"varint,19,opt,name=incomplete,proto3" json:"incomplete,omitempty"`
 	Authorization     []*AuthorizationDecision `protobuf:"bytes,20,rep,name=authorization,proto3" json:"authorization,omitempty"`
+	Archive           *ContextArchiveReceipt   `protobuf:"bytes,21,opt,name=archive,proto3" json:"archive,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -587,6 +588,13 @@ func (x *ContextManifest) GetIncomplete() bool {
 func (x *ContextManifest) GetAuthorization() []*AuthorizationDecision {
 	if x != nil {
 		return x.Authorization
+	}
+	return nil
+}
+
+func (x *ContextManifest) GetArchive() *ContextArchiveReceipt {
+	if x != nil {
+		return x.Archive
 	}
 	return nil
 }
@@ -1127,6 +1135,82 @@ func (x *DecisionRecord) GetAuthorization() []*AuthorizationDecision {
 	return nil
 }
 
+type ContextArchiveReceipt struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Stream               string                 `protobuf:"bytes,1,opt,name=stream,proto3" json:"stream,omitempty"`
+	MaxPendingRevisions  int64                  `protobuf:"varint,2,opt,name=max_pending_revisions,json=maxPendingRevisions,proto3" json:"max_pending_revisions,omitempty"`
+	LedgerRevision       int64                  `protobuf:"varint,3,opt,name=ledger_revision,json=ledgerRevision,proto3" json:"ledger_revision,omitempty"`
+	AcknowledgedRevision int64                  `protobuf:"varint,4,opt,name=acknowledged_revision,json=acknowledgedRevision,proto3" json:"acknowledged_revision,omitempty"`
+	CheckedAt            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ContextArchiveReceipt) Reset() {
+	*x = ContextArchiveReceipt{}
+	mi := &file_memory_v1_contexts_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextArchiveReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextArchiveReceipt) ProtoMessage() {}
+
+func (x *ContextArchiveReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_contexts_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextArchiveReceipt.ProtoReflect.Descriptor instead.
+func (*ContextArchiveReceipt) Descriptor() ([]byte, []int) {
+	return file_memory_v1_contexts_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ContextArchiveReceipt) GetStream() string {
+	if x != nil {
+		return x.Stream
+	}
+	return ""
+}
+
+func (x *ContextArchiveReceipt) GetMaxPendingRevisions() int64 {
+	if x != nil {
+		return x.MaxPendingRevisions
+	}
+	return 0
+}
+
+func (x *ContextArchiveReceipt) GetLedgerRevision() int64 {
+	if x != nil {
+		return x.LedgerRevision
+	}
+	return 0
+}
+
+func (x *ContextArchiveReceipt) GetAcknowledgedRevision() int64 {
+	if x != nil {
+		return x.AcknowledgedRevision
+	}
+	return 0
+}
+
+func (x *ContextArchiveReceipt) GetCheckedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CheckedAt
+	}
+	return nil
+}
+
 var File_memory_v1_contexts_proto protoreflect.FileDescriptor
 
 const file_memory_v1_contexts_proto_rawDesc = "" +
@@ -1157,7 +1241,7 @@ const file_memory_v1_contexts_proto_rawDesc = "" +
 	"\apurpose\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\x02R\apurpose\"O\n" +
 	"\x1aGetDecisionReceiptResponse\x121\n" +
-	"\x06record\x18\x01 \x01(\v2\x19.memory.v1.DecisionRecordR\x06record\"\xd1\x06\n" +
+	"\x06record\x18\x01 \x01(\v2\x19.memory.v1.DecisionRecordR\x06record\"\x8d\a\n" +
 	"\x0fContextManifest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06tenant\x18\x02 \x01(\tR\x06tenant\x12\x14\n" +
@@ -1181,7 +1265,8 @@ const file_memory_v1_contexts_proto_rawDesc = "" +
 	"\n" +
 	"incomplete\x18\x13 \x01(\bR\n" +
 	"incomplete\x12F\n" +
-	"\rauthorization\x18\x14 \x03(\v2 .memory.v1.AuthorizationDecisionR\rauthorization\"\xbe\x01\n" +
+	"\rauthorization\x18\x14 \x03(\v2 .memory.v1.AuthorizationDecisionR\rauthorization\x12:\n" +
+	"\aarchive\x18\x15 \x01(\v2 .memory.v1.ContextArchiveReceiptR\aarchive\"\xbe\x01\n" +
 	"\x11RetrievalIdentity\x12\x1e\n" +
 	"\n" +
 	"generation\x18\x01 \x01(\tR\n" +
@@ -1242,7 +1327,14 @@ const file_memory_v1_contexts_proto_rawDesc = "" +
 	"\x06scopes\x18\b \x03(\tR\x06scopes\x12'\n" +
 	"\x0fledger_revision\x18\t \x01(\x03R\x0eledgerRevision\x12F\n" +
 	"\rauthorization\x18\n" +
-	" \x03(\v2 .memory.v1.AuthorizationDecisionR\rauthorization2\x84\x03\n" +
+	" \x03(\v2 .memory.v1.AuthorizationDecisionR\rauthorization\"\xfc\x01\n" +
+	"\x15ContextArchiveReceipt\x12\x16\n" +
+	"\x06stream\x18\x01 \x01(\tR\x06stream\x122\n" +
+	"\x15max_pending_revisions\x18\x02 \x01(\x03R\x13maxPendingRevisions\x12'\n" +
+	"\x0fledger_revision\x18\x03 \x01(\x03R\x0eledgerRevision\x123\n" +
+	"\x15acknowledged_revision\x18\x04 \x01(\x03R\x14acknowledgedRevision\x129\n" +
+	"\n" +
+	"checked_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt2\x84\x03\n" +
 	"\x0eContextService\x12U\n" +
 	"\x0ePrepareContext\x12 .memory.v1.PrepareContextRequest\x1a!.memory.v1.PrepareContextResponse\x12a\n" +
 	"\x12GetContextManifest\x12$.memory.v1.GetContextManifestRequest\x1a%.memory.v1.GetContextManifestResponse\x12U\n" +
@@ -1261,7 +1353,7 @@ func file_memory_v1_contexts_proto_rawDescGZIP() []byte {
 	return file_memory_v1_contexts_proto_rawDescData
 }
 
-var file_memory_v1_contexts_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_memory_v1_contexts_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_memory_v1_contexts_proto_goTypes = []any{
 	(*ContextInput)(nil),               // 0: memory.v1.ContextInput
 	(*PrepareContextRequest)(nil),      // 1: memory.v1.PrepareContextRequest
@@ -1277,56 +1369,59 @@ var file_memory_v1_contexts_proto_goTypes = []any{
 	(*RecordDecisionRequest)(nil),      // 11: memory.v1.RecordDecisionRequest
 	(*RecordDecisionResponse)(nil),     // 12: memory.v1.RecordDecisionResponse
 	(*DecisionRecord)(nil),             // 13: memory.v1.DecisionRecord
-	(*Command)(nil),                    // 14: memory.v1.Command
-	(*RecallQuery)(nil),                // 15: memory.v1.RecallQuery
-	(*Caller)(nil),                     // 16: memory.v1.Caller
-	(*RecallItem)(nil),                 // 17: memory.v1.RecallItem
-	(*MemoryRecallItem)(nil),           // 18: memory.v1.MemoryRecallItem
-	(*AuthorizationDecision)(nil),      // 19: memory.v1.AuthorizationDecision
-	(*ArtifactReference)(nil),          // 20: memory.v1.ArtifactReference
-	(*timestamppb.Timestamp)(nil),      // 21: google.protobuf.Timestamp
+	(*ContextArchiveReceipt)(nil),      // 14: memory.v1.ContextArchiveReceipt
+	(*Command)(nil),                    // 15: memory.v1.Command
+	(*RecallQuery)(nil),                // 16: memory.v1.RecallQuery
+	(*Caller)(nil),                     // 17: memory.v1.Caller
+	(*RecallItem)(nil),                 // 18: memory.v1.RecallItem
+	(*MemoryRecallItem)(nil),           // 19: memory.v1.MemoryRecallItem
+	(*AuthorizationDecision)(nil),      // 20: memory.v1.AuthorizationDecision
+	(*ArtifactReference)(nil),          // 21: memory.v1.ArtifactReference
+	(*timestamppb.Timestamp)(nil),      // 22: google.protobuf.Timestamp
 }
 var file_memory_v1_contexts_proto_depIdxs = []int32{
-	14, // 0: memory.v1.ContextInput.command:type_name -> memory.v1.Command
-	15, // 1: memory.v1.ContextInput.query:type_name -> memory.v1.RecallQuery
+	15, // 0: memory.v1.ContextInput.command:type_name -> memory.v1.Command
+	16, // 1: memory.v1.ContextInput.query:type_name -> memory.v1.RecallQuery
 	0,  // 2: memory.v1.PrepareContextRequest.context:type_name -> memory.v1.ContextInput
 	7,  // 3: memory.v1.PrepareContextResponse.manifest:type_name -> memory.v1.ContextManifest
 	7,  // 4: memory.v1.GetContextManifestResponse.manifest:type_name -> memory.v1.ContextManifest
 	13, // 5: memory.v1.GetDecisionReceiptResponse.record:type_name -> memory.v1.DecisionRecord
-	16, // 6: memory.v1.ContextManifest.caller:type_name -> memory.v1.Caller
+	17, // 6: memory.v1.ContextManifest.caller:type_name -> memory.v1.Caller
 	0,  // 7: memory.v1.ContextManifest.request:type_name -> memory.v1.ContextInput
 	8,  // 8: memory.v1.ContextManifest.retrieval:type_name -> memory.v1.RetrievalIdentity
-	17, // 9: memory.v1.ContextManifest.items:type_name -> memory.v1.RecallItem
-	18, // 10: memory.v1.ContextManifest.memories:type_name -> memory.v1.MemoryRecallItem
+	18, // 9: memory.v1.ContextManifest.items:type_name -> memory.v1.RecallItem
+	19, // 10: memory.v1.ContextManifest.memories:type_name -> memory.v1.MemoryRecallItem
 	9,  // 11: memory.v1.ContextManifest.order:type_name -> memory.v1.VersionReference
-	19, // 12: memory.v1.ContextManifest.authorization:type_name -> memory.v1.AuthorizationDecision
-	14, // 13: memory.v1.DecisionReceipt.command:type_name -> memory.v1.Command
-	9,  // 14: memory.v1.DecisionReceipt.selected_items:type_name -> memory.v1.VersionReference
-	9,  // 15: memory.v1.DecisionReceipt.used_items:type_name -> memory.v1.VersionReference
-	20, // 16: memory.v1.DecisionReceipt.input:type_name -> memory.v1.ArtifactReference
-	20, // 17: memory.v1.DecisionReceipt.output:type_name -> memory.v1.ArtifactReference
-	20, // 18: memory.v1.DecisionReceipt.model_request:type_name -> memory.v1.ArtifactReference
-	20, // 19: memory.v1.DecisionReceipt.model_response:type_name -> memory.v1.ArtifactReference
-	20, // 20: memory.v1.DecisionReceipt.action_receipt:type_name -> memory.v1.ArtifactReference
-	21, // 21: memory.v1.DecisionReceipt.decided_at:type_name -> google.protobuf.Timestamp
-	10, // 22: memory.v1.RecordDecisionRequest.receipt:type_name -> memory.v1.DecisionReceipt
-	13, // 23: memory.v1.RecordDecisionResponse.record:type_name -> memory.v1.DecisionRecord
-	16, // 24: memory.v1.DecisionRecord.caller:type_name -> memory.v1.Caller
-	10, // 25: memory.v1.DecisionRecord.receipt:type_name -> memory.v1.DecisionReceipt
-	19, // 26: memory.v1.DecisionRecord.authorization:type_name -> memory.v1.AuthorizationDecision
-	1,  // 27: memory.v1.ContextService.PrepareContext:input_type -> memory.v1.PrepareContextRequest
-	3,  // 28: memory.v1.ContextService.GetContextManifest:input_type -> memory.v1.GetContextManifestRequest
-	11, // 29: memory.v1.ContextService.RecordDecision:input_type -> memory.v1.RecordDecisionRequest
-	5,  // 30: memory.v1.ContextService.GetDecisionReceipt:input_type -> memory.v1.GetDecisionReceiptRequest
-	2,  // 31: memory.v1.ContextService.PrepareContext:output_type -> memory.v1.PrepareContextResponse
-	4,  // 32: memory.v1.ContextService.GetContextManifest:output_type -> memory.v1.GetContextManifestResponse
-	12, // 33: memory.v1.ContextService.RecordDecision:output_type -> memory.v1.RecordDecisionResponse
-	6,  // 34: memory.v1.ContextService.GetDecisionReceipt:output_type -> memory.v1.GetDecisionReceiptResponse
-	31, // [31:35] is the sub-list for method output_type
-	27, // [27:31] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	20, // 12: memory.v1.ContextManifest.authorization:type_name -> memory.v1.AuthorizationDecision
+	14, // 13: memory.v1.ContextManifest.archive:type_name -> memory.v1.ContextArchiveReceipt
+	15, // 14: memory.v1.DecisionReceipt.command:type_name -> memory.v1.Command
+	9,  // 15: memory.v1.DecisionReceipt.selected_items:type_name -> memory.v1.VersionReference
+	9,  // 16: memory.v1.DecisionReceipt.used_items:type_name -> memory.v1.VersionReference
+	21, // 17: memory.v1.DecisionReceipt.input:type_name -> memory.v1.ArtifactReference
+	21, // 18: memory.v1.DecisionReceipt.output:type_name -> memory.v1.ArtifactReference
+	21, // 19: memory.v1.DecisionReceipt.model_request:type_name -> memory.v1.ArtifactReference
+	21, // 20: memory.v1.DecisionReceipt.model_response:type_name -> memory.v1.ArtifactReference
+	21, // 21: memory.v1.DecisionReceipt.action_receipt:type_name -> memory.v1.ArtifactReference
+	22, // 22: memory.v1.DecisionReceipt.decided_at:type_name -> google.protobuf.Timestamp
+	10, // 23: memory.v1.RecordDecisionRequest.receipt:type_name -> memory.v1.DecisionReceipt
+	13, // 24: memory.v1.RecordDecisionResponse.record:type_name -> memory.v1.DecisionRecord
+	17, // 25: memory.v1.DecisionRecord.caller:type_name -> memory.v1.Caller
+	10, // 26: memory.v1.DecisionRecord.receipt:type_name -> memory.v1.DecisionReceipt
+	20, // 27: memory.v1.DecisionRecord.authorization:type_name -> memory.v1.AuthorizationDecision
+	22, // 28: memory.v1.ContextArchiveReceipt.checked_at:type_name -> google.protobuf.Timestamp
+	1,  // 29: memory.v1.ContextService.PrepareContext:input_type -> memory.v1.PrepareContextRequest
+	3,  // 30: memory.v1.ContextService.GetContextManifest:input_type -> memory.v1.GetContextManifestRequest
+	11, // 31: memory.v1.ContextService.RecordDecision:input_type -> memory.v1.RecordDecisionRequest
+	5,  // 32: memory.v1.ContextService.GetDecisionReceipt:input_type -> memory.v1.GetDecisionReceiptRequest
+	2,  // 33: memory.v1.ContextService.PrepareContext:output_type -> memory.v1.PrepareContextResponse
+	4,  // 34: memory.v1.ContextService.GetContextManifest:output_type -> memory.v1.GetContextManifestResponse
+	12, // 35: memory.v1.ContextService.RecordDecision:output_type -> memory.v1.RecordDecisionResponse
+	6,  // 36: memory.v1.ContextService.GetDecisionReceipt:output_type -> memory.v1.GetDecisionReceiptResponse
+	33, // [33:37] is the sub-list for method output_type
+	29, // [29:33] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_contexts_proto_init() }
@@ -1343,7 +1438,7 @@ func file_memory_v1_contexts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_contexts_proto_rawDesc), len(file_memory_v1_contexts_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

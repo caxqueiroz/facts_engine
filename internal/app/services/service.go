@@ -13,6 +13,7 @@ import (
 )
 
 type Service struct {
+	contextArchive      *model.ContextArchiveOptions
 	telemetry           *telemetry.Observer
 	operations          model.OperationsOptions
 	redactionPolicies   map[string]bool

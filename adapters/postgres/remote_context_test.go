@@ -33,6 +33,14 @@ func remotePrepareContext(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	if m.Id != direct.ID || m.Digest != direct.Digest || m.RenderedDigest != model.BytesDigest(m.Rendered) || !bytes.Equal(m.Rendered, direct.Rendered) || m.SelectionRevision != direct.SelectionRevision || m.IndexedRevision != direct.IndexedRevision || m.CreationRevision != direct.CreationRevision || m.Incomplete != direct.Incomplete || m.CanonicalVersion != direct.CanonicalVersion || m.RedactionVersion != direct.RedactionVersion || m.QueryReference != direct.QueryReference || !proto.Equal(m.Request, request.Context) {
 		t.Fatal("context provenance/retry mismatch")
 	}
+	if (m.Archive == nil) != (direct.Archive == nil) {
+		t.Fatal("archive receipt presence")
+	}
+	if a := direct.Archive; a != nil {
+		if m.Archive.Stream != a.Stream || m.Archive.MaxPendingRevisions != a.MaxPendingRevisions || m.Archive.LedgerRevision != a.LedgerRevision || m.Archive.AcknowledgedRevision != a.AcknowledgedRevision || !m.Archive.CheckedAt.AsTime().Equal(a.CheckedAt) {
+			t.Fatal("archive receipt parity")
+		}
+	}
 	if m.Retrieval.Generation != direct.Retrieval.Generation || m.Retrieval.EmbeddingId != direct.Retrieval.EmbeddingID || m.Retrieval.SearchVersion != direct.Retrieval.SearchVersion || m.Retrieval.RerankerId != direct.Retrieval.RerankerID || m.Retrieval.Dimensions != int64(direct.Retrieval.Dimensions) || len(m.Authorization) != len(direct.Authorization) || len(m.Items) != len(direct.Items) || len(m.Memories) != len(direct.Memories) || len(m.Order) != len(direct.Order) {
 		t.Fatal("context metadata mismatch")
 	}

@@ -28,6 +28,19 @@ func TestStrictConfig(t *testing.T) {
 			}
 		})
 	}
+	valid.ContextArchive = &ContextArchivePolicy{Stream: "audit-v1", MaxPendingRevisions: 0}
+	if err := valid.Validate(); err != nil {
+		t.Fatal("zero archive lag policy", err)
+	}
+	valid.ContextArchive.MaxPendingRevisions = -1
+	if valid.Validate() == nil {
+		t.Fatal("negative archive lag accepted")
+	}
+	valid.ContextArchive = &ContextArchivePolicy{Stream: "bad/stream"}
+	if valid.Validate() == nil {
+		t.Fatal("invalid archive stream accepted")
+	}
+	valid.ContextArchive = nil
 	valid.RPCTimeoutSeconds = 121
 	if valid.Validate() == nil {
 		t.Fatal("unbounded RPC timeout")

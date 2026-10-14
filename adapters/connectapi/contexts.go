@@ -88,6 +88,9 @@ func (c *responseConverter) recallQuery(q model.RecallRequest) *v1.RecallQuery {
 func (c *responseConverter) contextManifest(m model.ContextManifest) *v1.ContextManifest {
 	r := m.Request
 	out := &v1.ContextManifest{Id: m.ID, Tenant: m.Tenant, Scope: m.Scope, Caller: callerToProto(m.Caller), Request: &v1.ContextInput{Command: commandToProto(r.Command), Scope: r.Scope, Query: c.recallQuery(r.Query), IncludeMemories: r.IncludeMemories}, CanonicalVersion: m.CanonicalVersion, RedactionVersion: m.RedactionVersion, QueryReference: m.QueryReference, Retrieval: &v1.RetrievalIdentity{Generation: m.Retrieval.Generation, EmbeddingId: m.Retrieval.EmbeddingID, SearchVersion: m.Retrieval.SearchVersion, RerankerId: m.Retrieval.RerankerID, Dimensions: int64(m.Retrieval.Dimensions)}, Order: versionRefsToProto(m.Order), Rendered: m.Rendered, RenderedDigest: m.RenderedDigest, Digest: m.Digest, SelectionRevision: m.SelectionRevision, IndexedRevision: m.IndexedRevision, CreationRevision: m.CreationRevision, Incomplete: m.Incomplete}
+	if a := m.Archive; a != nil {
+		out.Archive = &v1.ContextArchiveReceipt{Stream: a.Stream, MaxPendingRevisions: a.MaxPendingRevisions, LedgerRevision: a.LedgerRevision, AcknowledgedRevision: a.AcknowledgedRevision, CheckedAt: c.timestamp(a.CheckedAt)}
+	}
 	for _, item := range m.Items {
 		out.Items = append(out.Items, &v1.RecallItem{Key: keyToProto(item.Key), Fact: c.factResult(item.Fact), Score: item.Score})
 	}
