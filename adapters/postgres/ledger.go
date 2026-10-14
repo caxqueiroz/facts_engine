@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL AND to_regclass('public.subject_lookup') IS NOT NULL AND to_regclass('public.scope_versions') IS NOT NULL AND to_regclass('public.subject_versions') IS NOT NULL AND to_regclass('public.extraction_subjects') IS NOT NULL AND to_regclass('public.confirmation_artifacts') IS NOT NULL AND to_regclass('public.attestation_delegations') IS NOT NULL AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('public.extraction_quota') AND attname='reserved_cost_units' AND NOT attisdropped)`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL AND to_regclass('public.subject_lookup') IS NOT NULL AND to_regclass('public.scope_versions') IS NOT NULL AND to_regclass('public.subject_versions') IS NOT NULL AND to_regclass('public.extraction_subjects') IS NOT NULL AND to_regclass('public.confirmation_artifacts') IS NOT NULL AND to_regclass('public.attestation_delegations') IS NOT NULL AND to_regclass('public.evidence_derivations') IS NOT NULL AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('public.extraction_quota') AND attname='reserved_cost_units' AND NOT attisdropped)`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -219,6 +219,18 @@ func (t *transaction) Evidence(ctx context.Context, id string) (model.Evidence, 
 	return e, err
 }
 func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (string, error) {
+	if e.Derivation != nil {
+		parent, err := t.Evidence(ctx, e.Derivation.ParentEvidenceID)
+		if err != nil {
+			return "", err
+		}
+		if parent.Scope != e.Scope || parent.Derivation != nil {
+			return "", model.ErrPrecondition
+		}
+		if err := t.guardEvidenceReference(ctx, parent.ID); err != nil {
+			return "", err
+		}
+	}
 	if err := t.lockRetentionScope(ctx, e.Scope); err != nil {
 		return "", err
 	}
@@ -257,6 +269,12 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 		return "", err
 	}
 	_, err = t.tx.Exec(ctx, `INSERT INTO evidence_retention(tenant_id,evidence_id,scope_id,locator,object_version) VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.Scope, e.Object.Locator, e.Object.Version)
+	if err != nil {
+		return "", err
+	}
+	if e.Derivation != nil {
+		_, err = t.tx.Exec(ctx, `INSERT INTO evidence_derivations(tenant_id,scope_id,evidence_id,parent_evidence_id) VALUES($1,$2,$3,$4)`, t.tenant, e.Scope, e.ID, e.Derivation.ParentEvidenceID)
+	}
 	return e.ID, err
 }
 func (t *transaction) Record(ctx context.Context, id string) (model.Record, error) {

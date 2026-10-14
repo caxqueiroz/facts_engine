@@ -102,6 +102,9 @@ func (s *Service) ProposeMemory(ctx context.Context, c model.Caller, r model.Mem
 	})
 }
 func (s *Service) stageMemoryProposal(ctx context.Context, tx model.Tx, c model.Caller, r model.MemoryProposal, checks []model.AuthorizationDecision, out *model.CommitResult) error {
+	if err := validateDerivativeSources(ctx, tx, r.Sources); err != nil {
+		return err
+	}
 	t, err := memoryTx(tx)
 	if err != nil {
 		return err

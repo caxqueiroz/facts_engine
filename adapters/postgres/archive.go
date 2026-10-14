@@ -29,6 +29,37 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			return model.ErrPrecondition
 		}
 		add := func(kind, id string, v any) error {
+			if kind == "evidence" {
+				for _, entry := range p.Entries {
+					if entry.Kind == kind && entry.ID == id {
+						return nil
+					}
+				}
+			}
+			if evidence, ok := v.(model.Evidence); ok && evidence.Derivation != nil {
+				parent, err := tx.Evidence(ctx, evidence.Derivation.ParentEvidenceID)
+				if err != nil {
+					return err
+				}
+				if parent.Scope != evidence.Scope {
+					return model.ErrPrecondition
+				}
+				payload, err := json.Marshal(parent)
+				if err != nil {
+					return err
+				}
+				found := false
+				for _, entry := range p.Entries {
+					if entry.Kind == "evidence" && entry.ID == parent.ID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					p.Entries = append(p.Entries, model.AuditEntry{Kind: "evidence", ID: parent.ID, Payload: payload})
+				}
+			}
+
 			raw, err := json.Marshal(v)
 			if err != nil {
 				return err
@@ -127,7 +158,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			if err = add("policy", v.ID, v); err != nil {
 				return err
 			}
-		case "register_evidence":
+		case "register_evidence", "register_redacted_evidence":
 			v, err := tx.Evidence(ctx, e.EntityID)
 			if err != nil {
 				return err

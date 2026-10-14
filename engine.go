@@ -23,6 +23,10 @@ func (e *Engine) RegisterAcceptancePolicy(ctx context.Context, c Caller, r Polic
 func (e *Engine) RegisterPredicateVersion(ctx context.Context, c Caller, r PredicateRequest) (CommitResult, error) {
 	return e.service.RegisterPredicateVersion(ctx, c, r)
 }
+func (e *Engine) RegisterRedactedEvidence(ctx context.Context, c Caller, r model.RedactedEvidenceRequest) (CommitResult, error) {
+	return e.service.RegisterRedactedEvidence(ctx, c, r)
+}
+
 func (e *Engine) RegisterEvidence(ctx context.Context, c Caller, r EvidenceRequest) (CommitResult, error) {
 	return e.service.RegisterEvidence(ctx, c, r)
 }

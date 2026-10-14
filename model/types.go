@@ -196,6 +196,7 @@ type ObjectRef struct {
 	Size                     int64
 }
 type Evidence struct {
+	Derivation                                                                                                              *EvidenceDerivation `json:",omitempty"`
 	ID, Scope, SourceSystem, SourceObject, SourceRevision, Speaker, SourceClass, MediaType, Classification, RetentionPolicy string
 	SourceTime                                                                                                              time.Time
 	Object                                                                                                                  ObjectRef

@@ -13,6 +13,16 @@ func NewWithOptions(l model.Ledger, a model.Authorizer, e model.EvidenceStore, o
 	if err = configureAttestationIdentity(s, o.AttestationIdentity); err != nil {
 		return nil, err
 	}
+	if len(o.RedactionPolicyVersions) > 64 {
+		return nil, model.ErrInvalid
+	}
+	s.redactionPolicies = map[string]bool{}
+	for _, version := range o.RedactionPolicyVersions {
+		if !model.ValidID(version) || s.redactionPolicies[version] {
+			return nil, model.ErrInvalid
+		}
+		s.redactionPolicies[version] = true
+	}
 	s.audit = o.Audit
 	if o.Retrieval.Index != nil || o.Retrieval.Progress != nil || o.Retrieval.Registry != nil || o.Retrieval.Generation != "" {
 		retrieval, err := NewWithRetrieval(l, a, e, o.Retrieval)

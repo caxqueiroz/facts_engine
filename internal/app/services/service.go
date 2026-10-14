@@ -12,6 +12,7 @@ import (
 )
 
 type Service struct {
+	redactionPolicies   map[string]bool
 	attestationIdentity model.AttestationIdentityOptions
 	extractors          map[string]model.ApprovedExtractor
 	extractionLimits    model.ExtractionOptions
@@ -186,7 +187,7 @@ func (s *Service) verify(ctx context.Context, tenant string, e model.Evidence) (
 }
 func (s *Service) RegisterEvidence(ctx context.Context, c model.Caller, r model.EvidenceRequest) (model.CommitResult, error) {
 	e := r.Evidence
-	if !model.ValidID(e.ID) || e.SourceSystem == "" || e.SourceObject == "" || e.SourceRevision == "" || e.Speaker == "" || e.SourceClass == "" || e.MediaType == "" || e.Classification == "" || e.RetentionPolicy == "" || e.SourceTime.IsZero() || e.Object.Locator == "" || e.Object.Version == "" || e.Object.Size < 0 || e.Object.Size > 16<<20 {
+	if e.Derivation != nil || !model.ValidID(e.ID) || e.SourceSystem == "" || e.SourceObject == "" || e.SourceRevision == "" || e.Speaker == "" || e.SourceClass == "" || e.MediaType == "" || e.Classification == "" || e.RetentionPolicy == "" || e.SourceTime.IsZero() || e.Object.Locator == "" || e.Object.Version == "" || e.Object.Size < 0 || e.Object.Size > 16<<20 {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if _, err := s.authorize(ctx, c, e.Scope, "can_propose", r.Command); err != nil {
@@ -253,6 +254,9 @@ func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactP
 	return s.mutate(ctx, c, r.Key.Scope, "propose_fact", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error { return s.stageFactProposal(ctx, tx, c, r, "", out) })
 }
 func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Caller, r model.FactProposal, attemptID string, out *model.CommitResult) error {
+	if err := validateDerivativeSources(ctx, tx, r.Sources); err != nil {
+		return err
+	}
 	if err := tx.RequireSubject(ctx, r.Key.Scope, r.Key.Subject); err != nil {
 		return err
 	}

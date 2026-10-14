@@ -270,6 +270,13 @@ type Evidence struct {
 	Payload        []byte
 }
 
+type EvidenceDerivation struct {
+	TenantID         string
+	ScopeID          string
+	EvidenceID       string
+	ParentEvidenceID string
+}
+
 type EvidenceObject struct {
 	TenantID      string
 	Locator       string
