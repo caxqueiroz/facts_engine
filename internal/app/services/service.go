@@ -11,10 +11,11 @@ import (
 )
 
 type Service struct {
-	ledger   model.Ledger
-	auth     model.Authorizer
-	evidence model.EvidenceStore
-	audit    model.AuditOptions
+	retrieval model.RetrievalOptions
+	ledger    model.Ledger
+	auth      model.Authorizer
+	evidence  model.EvidenceStore
+	audit     model.AuditOptions
 }
 
 func New(l model.Ledger, a model.Authorizer, e model.EvidenceStore) (*Service, error) {
@@ -79,6 +80,8 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		}
 		eventInput := model.Event{ID: id(), EntityID: result.ID, Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth}
 		switch request := input.(type) {
+		case model.PredicateRequest:
+			eventInput.DefinitionPredicate = request.Definition.Predicate
 		case model.Supersession:
 			eventInput.Reason = request.Reason
 			eventInput.Affected = &request.Valid

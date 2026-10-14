@@ -18,3 +18,10 @@ GRANT USAGE ON SCHEMA public TO facts_worker;
 GRANT SELECT ON ledger_events,outbox,tenant_revisions TO facts_worker;
 GRANT SELECT,INSERT,UPDATE ON consumer_offsets TO facts_worker;
 GRANT SELECT,INSERT ON consumer_retry_commands TO facts_worker;
+GRANT SELECT ON consumer_offsets TO facts_runtime;
+-- Projection/archive consumers resolve immutable source content with their own login.
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_projector') THEN CREATE ROLE facts_projector NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_archiver') THEN CREATE ROLE facts_archiver NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
+GRANT facts_worker TO facts_projector,facts_archiver;
+GRANT SELECT ON record_versions,predicate_versions,policy_versions,evidence,timeline_generations,timeline_history,accepted_intervals TO facts_projector,facts_archiver;
+GRANT SELECT ON fact_snapshots,calculation_receipts,attestations,audit_exports TO facts_archiver;

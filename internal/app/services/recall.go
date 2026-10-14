@@ -1,0 +1,131 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"github.com/caxqueiroz/facts_engine/model"
+	"math"
+	"sort"
+)
+
+func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequest) (model.RecallResult, error) {
+	out := model.RecallResult{Generation: s.retrieval.Generation, Items: []model.RecallItem{}}
+	if s.retrieval.Index == nil || s.retrieval.Progress == nil {
+		return out, model.ErrUnavailable
+	}
+	if len(q.Scopes) == 0 || len(q.Scopes) > 8 || len(q.Query) == 0 || len(q.Query) > 4096 || q.Limit < 1 || q.Limit > 20 || q.ValidAt.IsZero() || q.KnowledgeRevision < 0 || q.RequireRevision < 0 {
+		return out, model.ErrInvalid
+	}
+	scopes := map[string]bool{}
+	for _, scope := range q.Scopes {
+		if scopes[scope] {
+			return out, model.ErrInvalid
+		}
+		scopes[scope] = true
+		if _, err := s.authorize(ctx, c, scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {
+			return out, err
+		}
+		if q.KnowledgeRevision > 0 {
+			if _, err := s.authorize(ctx, c, scope, "can_read_history", model.Command{Purpose: q.Purpose}); err != nil {
+				return out, err
+			}
+		}
+	}
+	progress, err := s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(s.retrieval.Generation)})
+	if err != nil {
+		return out, model.ErrUnavailable
+	}
+	out.IndexedRevision = progress.AcknowledgedRevision
+	if out.IndexedRevision < q.RequireRevision {
+		return out, model.ErrUnavailable
+	}
+	candidates := []model.SearchCandidate{}
+	for _, scope := range q.Scopes {
+		hits, err := s.retrieval.Index.Candidates(ctx, c.Tenant, s.retrieval.Generation, scope, q.Query, min(100, q.Limit*5))
+		if err != nil {
+			return out, model.ErrUnavailable
+		}
+		if len(hits) > 100 {
+			return out, model.ErrPrecondition
+		}
+		candidates = append(candidates, hits...)
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].Score != candidates[j].Score {
+			return candidates[i].Score > candidates[j].Score
+		}
+		return candidates[i].VersionID < candidates[j].VersionID
+	})
+	items := []model.SnapshotItem{}
+	scores := []float64{}
+	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		items = nil
+		scores = nil
+		revision, at, err := selection(ctx, tx, q.KnowledgeRevision)
+		if err != nil {
+			return err
+		}
+		out.LedgerRevision = revision
+		seen := map[string]bool{}
+		for _, hit := range candidates {
+			if !model.ValidID(hit.RecordID) || !model.ValidID(hit.VersionID) || math.IsNaN(hit.Score) || math.IsInf(hit.Score, 0) || seen[hit.VersionID] {
+				continue
+			}
+			seen[hit.VersionID] = true
+			v, err := tx.Version(ctx, hit.RecordID, hit.VersionID)
+			if errors.Is(err, model.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if !scopes[v.Proposal.Key.Scope] {
+				continue
+			}
+			item, err := s.resolve(ctx, tx, model.FactQuery{Key: v.Proposal.Key, ValidAt: q.ValidAt, KnowledgeRevision: revision}, revision, at, q.KnowledgeRevision > 0)
+			if err != nil {
+				return err
+			}
+			if item.Resolution.VersionID != hit.VersionID || (item.Resolution.State != "resolved" && item.Resolution.State != "unknown") {
+				continue
+			}
+			items = append(items, item)
+			scores = append(scores, hit.Score)
+		}
+		return nil
+	})
+	if err != nil {
+		return out, err
+	}
+	for j, item := range items {
+		// Recheck permissions after retrieval, before disclosing ledger content.
+		if _, err := s.authorize(ctx, c, item.Selector.Scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {
+			return model.RecallResult{}, err
+		}
+		if q.KnowledgeRevision > 0 {
+			if _, err := s.authorize(ctx, c, item.Selector.Scope, "can_read_history", model.Command{Purpose: q.Purpose}); err != nil {
+				return model.RecallResult{}, err
+			}
+		}
+		if _, err := s.loadEvidence(ctx, c, item.Selector.Scope, item.EvidenceIDs); err != nil {
+			continue
+		}
+		out.Items = append(out.Items, model.RecallItem{Key: item.Selector, Fact: item.Resolution, Score: scores[j]})
+		if len(out.Items) == q.Limit {
+			break
+		}
+	}
+	out.Incomplete = out.IndexedRevision < out.LedgerRevision || progress.State == "failed"
+	return out, nil
+}
+func NewWithRetrieval(l model.Ledger, a model.Authorizer, e model.EvidenceStore, options model.RetrievalOptions) (*Service, error) {
+	if options.Index == nil || options.Progress == nil || !model.ValidID(options.Generation) {
+		return nil, model.ErrInvalid
+	}
+	s, err := New(l, a, e)
+	if err != nil {
+		return nil, err
+	}
+	s.retrieval = options
+	return s, nil
+}

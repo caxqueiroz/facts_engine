@@ -145,3 +145,18 @@ func (e *Engine) ListChanges(ctx context.Context, c Caller, q model.ChangesQuery
 
 type ChangesQuery = model.ChangesQuery
 type ChangesResult = model.ChangesResult
+
+func NewWithRetrieval(l Ledger, a Authorizer, e EvidenceStore, options model.RetrievalOptions) (*Engine, error) {
+	s, err := services.NewWithRetrieval(l, a, e, options)
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{s}, nil
+}
+func (e *Engine) Recall(ctx context.Context, c Caller, q model.RecallRequest) (model.RecallResult, error) {
+	return e.service.Recall(ctx, c, q)
+}
+
+type RecallRequest = model.RecallRequest
+type RecallResult = model.RecallResult
+type RetrievalOptions = model.RetrievalOptions

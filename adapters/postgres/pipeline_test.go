@@ -1,0 +1,287 @@
+package postgres_test
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"database/sql"
+	"errors"
+	facts "github.com/caxqueiroz/facts_engine"
+	"github.com/caxqueiroz/facts_engine/adapters/archive"
+	"github.com/caxqueiroz/facts_engine/adapters/audit"
+	"github.com/caxqueiroz/facts_engine/adapters/cortex"
+	"github.com/caxqueiroz/facts_engine/adapters/evidence"
+	"github.com/caxqueiroz/facts_engine/adapters/postgres"
+	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/caxqueiroz/facts_engine/workers"
+	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"os"
+	"testing"
+	"time"
+)
+
+type pipelineEmbedder struct{}
+
+func (pipelineEmbedder) Embed(context.Context, string) ([]float32, error) {
+	return []float32{1, 0, 0}, nil
+}
+func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *evidence.Postgres, admin *pgxpool.Pool) {
+	dsn := os.Getenv("TEST_PIPELINE_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("set a fresh disposable pgvector pipeline database")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(4)
+	config := cortex.Config{Tenant: "bank1", Generation: "g1", EmbeddingID: "test-constant-v1", Dimensions: 3}
+	if err := cortex.Provision(ctx, db, config); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='pipeline_runtime') THEN CREATE ROLE pipeline_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO pipeline_runtime; GRANT SELECT ON collections,facts_projection_identity TO pipeline_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO pipeline_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO pipeline_runtime`); err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := sql.Open("pgx", dsn+"&options=-c%20role%3Dpipeline_runtime")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+	runtime.SetMaxOpenConns(4)
+	index, err := cortex.New(ctx, runtime, config, pipelineEmbedder{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := func(role string) *postgres.Ledger {
+		t.Helper()
+		cfg := admin.Config().Copy()
+		cfg.ConnConfig.RuntimeParams["role"] = role
+		pool, err := pgxpool.NewWithConfig(ctx, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(pool.Close)
+		cipher, err := postgres.NewAESGCM(bytes.Repeat([]byte{4}, 32))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ledger, err := postgres.New(ctx, pool, cipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ledger
+	}
+	projector := source("facts_projector")
+	c := model.Caller{Tenant: "bank1", Principal: "index-worker"}
+	handler, err := workers.NewProjection(projector, index, allow{}, c, "g1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer("g1")}
+	if err := projector.RegisterConsumer(ctx, key, 3); err != nil {
+		t.Fatal(err)
+	}
+	options := workers.Options{Lease: time.Minute, PollInterval: time.Millisecond, MinBackoff: time.Second, MaxBackoff: time.Minute}
+	worker, err := workers.NewOutbox(projector, key, handler, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := model.RecallRequest{Scopes: []string{"case1"}, Query: "timeline", Purpose: "review", ValidAt: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC), Limit: 20, RequireRevision: 1}
+	if _, err := engine.Recall(ctx, c, query); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("coverage requirement bypassed", err)
+	}
+	drain := func(w *workers.Worker, ledger *postgres.Ledger, key model.ConsumerKey) {
+		t.Helper()
+		for i := 0; i < 1000; i++ {
+			worked, err := w.ProcessOne(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !worked {
+				s, err := ledger.ConsumerStatus(ctx, key)
+				if err != nil || s.State != "pending" || s.LastFailureCode != "" {
+					t.Fatal("consumer did not converge", s, err)
+				}
+				return
+			}
+		}
+		t.Fatal("unbounded delivery")
+	}
+	drain(worker, projector, key)
+	result, err := engine.Recall(ctx, c, query)
+	if err != nil || result.Incomplete || len(result.Items) == 0 {
+		t.Fatal(result, err)
+	}
+	var expected model.FactResult
+	for _, item := range result.Items {
+		direct, err := engine.GetFact(ctx, c, model.FactQuery{Key: item.Key, ValidAt: query.ValidAt})
+		if err != nil || direct.VersionID != item.Fact.VersionID || direct.State != "resolved" {
+			t.Fatal(item, direct, err)
+		}
+		if item.Key.Subject == "temporal-subject" {
+			expected = item.Fact
+		}
+	}
+	if expected.VersionID == "" {
+		t.Fatal("canonical timeline absent", result)
+	}
+	// Prove stale index rows cannot override current ledger lifecycle state.
+	raw, err := index.Candidates(ctx, "bank1", "g1", "case1", "timeline", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) <= len(result.Items) {
+		t.Fatal("fixture did not retain historical index versions")
+	}
+	for _, item := range result.Items {
+		if item.Fact.RecordID == expected.RecordID && item.Fact.VersionID != expected.VersionID {
+			t.Fatal("stale version disclosed")
+		}
+	}
+	// Corrupt index content remains untrusted; canonical returned values come from ledger.
+	if _, err := db.ExecContext(ctx, `UPDATE embeddings SET content='untrusted altered index text'`); err != nil {
+		t.Fatal(err)
+	}
+	again, err := engine.Recall(ctx, c, query)
+	if err != nil || len(again.Items) != len(result.Items) {
+		t.Fatal(again, err)
+	}
+	for _, item := range again.Items {
+		if item.Fact.Value != nil && item.Fact.Value.Text != nil && *item.Fact.Value.Text == "untrusted altered index text" {
+			t.Fatal("index text escaped")
+		}
+	}
+	denied, _ := facts.NewWithRetrieval(l, denyPermission{permission: "can_read"}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	if _, err := denied.Recall(ctx, c, query); !errors.Is(err, model.ErrDenied) {
+		t.Fatal("unauthorized recall", err)
+	}
+	query.RequireRevision = result.LedgerRevision + 1
+	if _, err := engine.Recall(ctx, c, query); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("future coverage accepted", err)
+	}
+	query.RequireRevision = 0
+	end := query.ValidAt.Add(24 * time.Hour)
+	change, err := engine.RetractFact(ctx, c, model.LifecycleChange{Approval: model.Approval{Command: model.Command{Key: "pipeline-retraction", Purpose: "review"}, Scope: "case1", RecordID: expected.RecordID, VersionID: expected.VersionID, ExpectedRevision: expected.StreamRevision}, Valid: model.Interval{From: &query.ValidAt, To: &end}, Reason: "review_correction"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, err := engine.Recall(ctx, c, query)
+	if err != nil || !stale.Incomplete {
+		t.Fatal("stale coverage hidden", stale, err)
+	}
+	for _, item := range stale.Items {
+		if item.Fact.RecordID == expected.RecordID {
+			t.Fatal("retracted version disclosed from stale index")
+		}
+	}
+	query.KnowledgeRevision = result.LedgerRevision
+	historical, err := engine.Recall(ctx, c, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, item := range historical.Items {
+		if item.Fact.VersionID == expected.VersionID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("retained historical version missing")
+	}
+	noHistory, _ := facts.NewWithRetrieval(l, denyPermission{permission: "can_read_history"}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	if _, err := noHistory.Recall(ctx, c, query); !errors.Is(err, model.ErrDenied) {
+		t.Fatal("historical recall permission bypassed", err)
+	}
+	drain(worker, projector, key)
+	query.KnowledgeRevision = 0
+	query.RequireRevision = change.LedgerRevision
+	result, err = engine.Recall(ctx, c, query)
+	if err != nil || result.Incomplete {
+		t.Fatal("projection did not catch up", result, err)
+	}
+	// Dedicated archiver reads immutable artifacts; external effects precede queue ack.
+	archiver := source("facts_archiver")
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := audit.NewEd25519("archive-key", private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cipher, err := postgres.NewAESGCM(bytes.Repeat([]byte{8}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects, err := archive.NewFiles(t.TempDir(), cipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]ed25519.PublicKey{"archive-key": public}
+	archiveHandler, err := workers.NewArchive(archiver, objects, signer, keys, allow{}, model.Caller{Tenant: "bank1", Principal: "archive-worker"}, "audit-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	archiveKey := model.ConsumerKey{Tenant: "bank1", Consumer: model.ArchiveConsumer("audit-v1")}
+	if err := archiver.RegisterConsumer(ctx, archiveKey, 3); err != nil {
+		t.Fatal(err)
+	}
+	// Publication events must preserve enough identity to reconstruct the exact
+	// predicate, even when several predicates share the same version label.
+	page, err := engine.ListChanges(ctx, c, model.ChangesQuery{Scope: "case1", Purpose: "archive-check", Limit: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range page.Events {
+		if event.Type != "register_predicate" {
+			continue
+		}
+		payload, err := archiver.ArchivePayload(ctx, model.Delivery{Key: archiveKey, Event: event})
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, entry := range payload.Entries {
+			if entry.Kind == "predicate" && entry.ID == event.DefinitionPredicate+"/"+event.EntityID {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("predicate identity missing from archive", event.ID)
+		}
+	}
+	// Simulate loss of the acknowledgement after external archive publication.
+	delivery, err := archiver.ClaimDelivery(ctx, archiveKey, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := archiveHandler.Handle(ctx, delivery); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `UPDATE consumer_offsets SET lease_until=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND consumer_id=$2`, archiveKey.Tenant, archiveKey.Consumer); err != nil {
+		t.Fatal(err)
+	}
+	archiveWorker, err := workers.NewOutbox(archiver, archiveKey, archiveHandler, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drain(archiveWorker, archiver, archiveKey)
+	progress, err := archiver.ConsumerStatus(ctx, archiveKey)
+	if err != nil || progress.AcknowledgedRevision != result.LedgerRevision {
+		t.Fatal(progress, err)
+	}
+	head, _, err := objects.Load(ctx, "bank1", archive.ManifestKey("audit-v1", progress.AcknowledgedRevision))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.VerifyChain(ctx, objects, "bank1", "audit-v1", head, progress.AcknowledgedRevision, 1000, keys); err != nil {
+		t.Fatal(err)
+	}
+}

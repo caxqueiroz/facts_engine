@@ -16,3 +16,14 @@ services:
     command: ["run", "--datastore-engine", "memory"]
     ports:
       - "127.0.0.1:58080:8080"
+  cortex:
+    image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+    environment:
+      POSTGRES_PASSWORD: development
+    ports:
+      - "127.0.0.1:55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 15

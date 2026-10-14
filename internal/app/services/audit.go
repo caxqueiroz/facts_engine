@@ -151,9 +151,10 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	}
 	gaps = append(gaps, extra...)
 	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"extraction_artifacts", "context_manifests", "decision_receipts", "retention_events", "independent_archive_chain"} {
+	for _, kind := range []string{"extraction_artifacts", "context_manifests", "decision_receipts", "retention_events"} {
 		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
 	}
+	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Kind == entries[j].Kind {
 			return entries[i].ID < entries[j].ID

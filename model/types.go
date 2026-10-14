@@ -254,6 +254,7 @@ type FactResult struct {
 	LedgerRevision, StreamRevision int64
 }
 type Event struct {
+	DefinitionPredicate                  string `json:",omitempty"`
 	EntityID, Reason                     string
 	Affected                             *Interval
 	ReplacedVersionIDs                   []string

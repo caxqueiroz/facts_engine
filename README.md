@@ -1,6 +1,6 @@
 # Facts engine
 
-An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, and durable outbox workers**. The complete v0.2 specification and production banking release remain in progress.
+An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, durable outbox workers, CortexDB projection/recall, and signed event archive chains**. The complete v0.2 specification and production banking release remain in progress.
 
 The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. Constructors do not run migrations, start workers/listeners, or change global logging. The host owns the PostgreSQL pools, authentication boundary, encryption keys, OpenFGA provisioning, and shutdown.
 
@@ -17,6 +17,8 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 - External calculation receipts bind an application/run identity to immutable snapshots, executable/configuration digests, normalization version, and verified input/output evidence. Concurrent retries converge; changed run content conflicts. Reads recheck snapshot and artifact permissions.
 - Durable, leased audit exports with fenced completion, revision-bound scope contents, signed entry manifests, explicit coverage gaps, and trusted-key verification.
 - Bounded authorized record event history, including actor/check receipts, correction intervals, reason codes, and replaced versions. Histories exceeding 1,000 events fail explicitly pending paginated history support.
+- Tenant-bound CortexDB projections of accepted historical versions, injected embeddings, explicit database provisioning, canonical ledger revalidation on recall, and reported indexing lag.
+- Signed event archive consumers with immutable encrypted object versions, predecessor links, standalone coverage verification, and crash-safe duplicate delivery. Local storage is a development adapter; production immutable storage remains host-provisioned.
 - Explicit outbox workers with lease renewal, fencing, bounded retries, jittered backoff, visible failure state, independent contiguous consumer offsets, and scope-authorized change replay.
 - Transactional tenant ordering, stream revisions, bounded transaction retries, command receipts, encrypted ledger events, and atomic outbox insertion. Identical authorized retries return the committed result; changed commands conflict.
 - Tenant-qualified foreign keys, forced row-level security, transaction-local tenant context, and a runtime role without mutation privileges on immutable tables.
@@ -61,7 +63,7 @@ make generate
 
 `make generate` uses sqlc v1.31.1 and regenerates the OpenFGA JSON model from its restricted DSL. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
 
-Real PostgreSQL tests require a **fresh disposable database**. They refuse a database containing ledger tables, apply migrations, and exercise the restricted runtime role. They do not drop existing databases.
+Real PostgreSQL tests require **fresh disposable databases**. They refuse a database containing ledger tables, apply migrations, and exercise the restricted runtime role. They do not drop existing databases.
 
 ```sh
 docker compose exec postgres createdb -U postgres facts_engine_integration
@@ -69,6 +71,8 @@ export TEST_DATABASE_URL='postgres://postgres:development@127.0.0.1:55432/facts_
 export TEST_OPENFGA_URL='http://127.0.0.1:58080'
 go test -race ./... -count=1
 ```
+
+For the complete suite, start the loopback CortexDB/pgvector service as well and run `scripts/integration.sh`. It creates fresh ledger and projection databases without dropping existing data. Cortex contract tests require `TEST_CORTEX_DATABASE_URL` and `TEST_CORTEX_OTHER_DATABASE_URL`; the end-to-end consumer test requires `TEST_PIPELINE_DATABASE_URL`. Each must reference a distinct fresh pgvector database. The script supplies these variables. Without them, the corresponding tests explicitly skip.
 
 Create a new disposable database for each run. The OpenFGA contract test creates a separate test store. Without these environment variables, integration tests explicitly skip; ordinary `go test` does not prove database or authorization-engine guarantees.
 
@@ -96,7 +100,7 @@ Call `StartAuditExport` with a scope, command key, purpose, and `IncludeEvidence
 
 Exports select one consistent ledger revision. Collection is bounded to 10,000 stored entries and 64 MiB of entry payloads; included evidence also counts against the payload limit. Oversized exports fail explicitly. Metadata exports omit evidence bytes and source quotes. Cross-scope snapshots and their dependent receipts are withheld with explicit gaps. Missing or corrupt evidence also produces a gap. Fact values remain in metadata exports, so these still require fact-read and history permissions.
 
-Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, where `trustedKeys` is a separately provisioned map of signing key IDs to Ed25519 public keys. Verification checks the signed manifest, ordered entry identities, counts, and payload digests. Preserve the original payload bytes for verification. The encrypted bundle resides in PostgreSQL; its digest does not establish an independently controlled immutable archive or prove coverage beyond the stated scope and revision. Manifests explicitly report unimplemented extraction, context, decision, retention, and archive-chain coverage.
+Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, where `trustedKeys` is a separately provisioned map of signing key IDs to Ed25519 public keys. Verification checks the signed manifest, ordered entry identities, counts, and payload digests. Preserve the original payload bytes for verification. The encrypted bundle resides in PostgreSQL; its digest does not establish an independently controlled immutable archive or prove coverage beyond the stated scope and revision. Manifests explicitly report unimplemented extraction, context, decision, and retention coverage. Archive-chain receipts are not yet attached to scoped audit exports, and that coverage gap remains explicit.
 
 Integration tests cover external-run races and conflicts, preserved snapshot lineage, current authorization, tenant isolation, cross-scope exclusion, signature/content tampering, metadata redaction, live-lease exclusion, stale completion rollback, and expired-lease recovery.
 
@@ -118,17 +122,41 @@ Handler errors persist a generic failure code and exponential backoff with jitte
 
 Recovery tests cover competing claimants, expired leases, duplicates after external effects, stale renewal/acknowledgement/failure, retry exhaustion and recovery, missing-event gaps, independent consumers, tenant isolation, restricted worker privileges, scope replay, heartbeat failure, and cancellation.
 
+## CortexDB projection and recall
+
+The adapter pins CortexDB `v2.129.0`, corresponding to the specification's commit `eaf996b62f75d5e499d1b9ca7fab470a23700385`. It uses the upstream PostgreSQL core directly. This keeps runtime construction free of the facade's automatic initialization and background routines. Projection writes and their immutable receipts share a transaction in the destination database; there is no transaction spanning the ledger and index.
+
+Provision a **fresh, dedicated PostgreSQL database with pgvector for each tenant and generation** using `cortex.Provision(ctx, migrationDB, config)`. This explicit operation initializes the pinned upstream schema and binds tenant, generation, embedding identity/dimensions, and CortexDB version. An existing database is rejected. If provisioning fails partway through, inspect it and provision a new database; do not start runtime against a partial schema. Run [scripts/cortex-runtime-role.sql](scripts/cortex-runtime-role.sql) in that database and provision a separate runtime login. The adapter rejects owner/superuser connections and mismatched bindings. Connection pools must have an explicit maximum of 1–32 connections.
+
+Create `cortex.New(ctx, runtimeDB, config, embedder)` with a bank-approved implementation of `model.Embedder`. Embedding calls have a 20-second deadline and validate dimensions and finite nonzero vectors. No embedding service is selected implicitly. Tests use a constant three-dimensional vector solely to establish database and lifecycle behavior, **not retrieval quality**. This initial implementation uses exact vector search; ANN tuning and relevance evaluations remain future work. Index text contains fact values and must receive appropriate database encryption and retention controls from the host.
+
+Use `workers.NewProjection` with a `facts_projector` ledger login, the tenant-bound index, an authorizer, a trusted worker caller, and generation. Register its outbox identity using `model.ProjectionConsumer(generation)`, then run it through `workers.NewOutbox`. A [compiling composition example](workers/example_test.go) shows the lifecycle. The worker indexes approval/acceptance/supersession events using immutable version IDs and policy-safe metadata. Historical accepted versions remain individually addressable. Each scope requires the worker's current `can_read` permission. Lifecycle events advance coverage without deleting historical versions or changing their content.
+
+Compose `factsengine.NewWithRetrieval` with the same generation, index, and a ledger progress reader. `Recall` accepts explicit scopes, query text, valid time, optional knowledge revision, and a result limit. It authorizes scopes, retrieves bounded opaque candidate IDs, resolves them against one ledger view, checks evidence availability, and returns canonical ledger values. Proposed, rejected, disputed, retracted, or otherwise ineligible versions are excluded. Historical recall additionally requires `can_read_history`. Index text is never the returned authority, and no external reranker receives candidates in this implementation.
+
+Recall reports `Generation`, `IndexedRevision`, `LedgerRevision`, and `Incomplete`. `RequireRevision` fails with unavailable until the consumer has acknowledged that revision; it does not wait implicitly. Candidate over-fetch is bounded, so filtering can return fewer results. Projection failure does not block direct ledger reads or writes. A new generation uses a new database and consumer identity and replays from revision one. Host-controlled binding changes are possible; automated rebuild verification, cutover barriers, and retention/purge fencing are not yet implemented. Do not treat this as a production rebuild controller.
+
+## Signed event archive consumers
+
+Use `workers.NewArchive` with a `facts_archiver` ledger login, a `model.ArchiveStore`, bank-owned signer, independently configured trusted verification keys, an authorizer, and a stable stream ID. Its consumer identity is `model.ArchiveConsumer(stream)`. Archive workers require export, history, fact, and evidence permissions on every referenced scope, including multi-scope snapshots. Signing keys must remain verifiable after rotation.
+
+Each event produces an encrypted payload object and a signed one-event batch manifest. The manifest binds tenant, stream, exact revision/count, payload digest and immutable object version, authorization checks, and the previous manifest's object reference. A retry after an external write but before acknowledgement validates and reuses the existing object. The archive source retains the full event envelope and supported immutable references: fact versions, predicates/policies associated with those versions, evidence metadata, timeline generations, attestations, snapshots, calculation receipts, and completed audit bundles. New predicate-publication events retain their predicate identity for exact reconstruction; legacy events lacking that identity carry an explicit gap. Evidence bytes are not duplicated; exact source locators are retained. These objects are **not a complete database backup**, and payload gaps say so.
+
+`archive.NewFiles` supplies an encrypted local development implementation. Create its directory explicitly, inject an archive-specific cipher/key, and retain that key separately. Atomic create-once publication, fsync, digest checks, and tenant-bound decryption make ordinary retries safe. Filesystem ownership alone does not establish WORM protection: production hosts must use separately administered immutable storage with appropriate retention controls or implement `model.ArchiveStore` for their approved object service. Local tests do not establish protection against a privileged storage administrator.
+
+Retain the archive head object reference and expected revision independently, then call `archive.VerifyChain`. Verification checks signatures, exact object versions, payload hashes, contiguous revision coverage, and predecessor links up to an explicit batch bound. Missing or tampered batches fail. An independently retained head is necessary to detect tail truncation; a mutable database offset alone is insufficient. Archive and projection offsets remain independent. Archive heads are not yet included in scoped `GetAuditExport` bundles, and complete restore/retention drills remain pending.
+
 ## Remaining delivery work
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, evidence access endpoints, configurable quotas, richer policy controls, structured revision-conflict details, and full sqlc query coverage.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, integrity-protected pagination, and known-at timestamp convenience queries. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
-3. Connect the durable outbox workers to the pinned CortexDB adapter and independent archive storage. Add per-tenant CortexDB databases, projection generation/status, rebuilds, retrieval revalidation, and other job types. The generic delivery machinery is implemented; concrete projection and archive consumers remain.
+3. Add managed generation rebuilds with count/sample verification and controlled cutover, deadline-based projection waits, workload tuning, and other job types. CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Add conversation ingestion, extraction adapters, retained provider artifacts, and bank-approved extraction evaluations.
-5. Add context manifests, decision receipts, retention/legal holds, independent archive coverage, and recovery drills. Calculation receipts and signed PostgreSQL audit bundles are implemented.
+5. Add context manifests, decision receipts, retention/legal holds, complete archive/backup coverage, production immutable storage integration, and recovery drills. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
 
-The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. No CortexDB, remote engine API, extraction model, archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
+The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. CortexDB and encrypted local archive adapters are exercised in integration tests. No remote engine API, production embedding/extraction model, independently administered immutable archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
 
 Production acceptance also requires the named domain, security, retention, and operational owners described in the spec, plus workload benchmarks and restore drills. Database roles protect normal runtime operations; they do not protect against a malicious database owner. Retained digests are integrity metadata, not anonymization.
