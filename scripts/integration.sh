@@ -24,3 +24,7 @@ for suffix in a b pipeline rebuild lexical standalone; do
   esac
 done
 go test -race ./... -count=1 -timeout 10m
+
+# Quiescent fixture backup, separate restore and fresh derived-index rebuild.
+export TEST_POSTGRES_CONTAINER TEST_POSTGRES_PORT TEST_CORTEX_CONTAINER TEST_CORTEX_PORT
+sh scripts/restore-drill.sh "$test_database"
