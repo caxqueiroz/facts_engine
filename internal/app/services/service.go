@@ -11,12 +11,14 @@ import (
 )
 
 type Service struct {
-	reads     model.ReadOptions
-	retrieval model.RetrievalOptions
-	ledger    model.Ledger
-	auth      model.Authorizer
-	evidence  model.EvidenceStore
-	audit     model.AuditOptions
+	extractors       map[string]model.ApprovedExtractor
+	extractionLimits model.ExtractionOptions
+	reads            model.ReadOptions
+	retrieval        model.RetrievalOptions
+	ledger           model.Ledger
+	auth             model.Authorizer
+	evidence         model.EvidenceStore
+	audit            model.AuditOptions
 }
 
 func New(l model.Ledger, a model.Authorizer, e model.EvidenceStore) (*Service, error) {
@@ -218,47 +220,49 @@ func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactP
 			return model.CommitResult{}, model.ErrInvalid
 		}
 	}
-	return s.mutate(ctx, c, r.Key.Scope, "propose_fact", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
-		active, err := tx.ActivePredicate(ctx, r.Key.Scope, r.Key.Predicate)
-		if err != nil {
-			return err
-		}
-		if active != r.SchemaVersion {
-			return model.ErrPrecondition
-		}
-		d, err := tx.Predicate(ctx, r.Key.Scope, r.Key.Predicate, r.SchemaVersion)
-		if err != nil {
-			return err
-		}
-		if r.Value.Kind != model.Unknown && r.Value.Kind != d.Kind {
-			return model.ErrInvalid
-		}
-		rec, err := tx.LockRecord(ctx, r.Key)
-		if err != nil {
-			return err
-		}
-		if rec.Revision != r.ExpectedRevision {
-			return model.ErrRevision
-		}
-		v := model.Version{ID: id(), RecordID: rec.ID, Proposal: r, Proposer: c, PolicyID: d.PolicyID}
-		v.Digest = model.Digest(struct {
-			Key     model.FactKey
-			Value   model.Value
-			Valid   model.Interval
-			Schema  string
-			Sources []model.SourceSpan
-		}{r.Key, r.Value, r.Valid, r.SchemaVersion, r.Sources})
-		if err := tx.InsertVersion(ctx, v); err != nil {
-			return err
-		}
-		out.ID = v.ID
-		out.ContentDigest = v.Digest
-		out.RecordID = rec.ID
-		out.VersionID = v.ID
-		out.StreamRevision = rec.Revision + 1
-		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
-	})
+	return s.mutate(ctx, c, r.Key.Scope, "propose_fact", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error { return s.stageFactProposal(ctx, tx, c, r, "", out) })
 }
+func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Caller, r model.FactProposal, attemptID string, out *model.CommitResult) error {
+	active, err := tx.ActivePredicate(ctx, r.Key.Scope, r.Key.Predicate)
+	if err != nil {
+		return err
+	}
+	if active != r.SchemaVersion {
+		return model.ErrPrecondition
+	}
+	d, err := tx.Predicate(ctx, r.Key.Scope, r.Key.Predicate, r.SchemaVersion)
+	if err != nil {
+		return err
+	}
+	if r.Value.Kind != model.Unknown && r.Value.Kind != d.Kind {
+		return model.ErrInvalid
+	}
+	rec, err := tx.LockRecord(ctx, r.Key)
+	if err != nil {
+		return err
+	}
+	if rec.Revision != r.ExpectedRevision {
+		return model.ErrRevision
+	}
+	v := model.Version{ExtractionAttemptID: attemptID, ID: id(), RecordID: rec.ID, Proposal: r, Proposer: c, PolicyID: d.PolicyID}
+	v.Digest = model.Digest(struct {
+		Key     model.FactKey
+		Value   model.Value
+		Valid   model.Interval
+		Schema  string
+		Sources []model.SourceSpan
+	}{r.Key, r.Value, r.Valid, r.SchemaVersion, r.Sources})
+	if err := tx.InsertVersion(ctx, v); err != nil {
+		return err
+	}
+	out.ID = v.ID
+	out.ContentDigest = v.Digest
+	out.RecordID = rec.ID
+	out.VersionID = v.ID
+	out.StreamRevision = rec.Revision + 1
+	return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
+}
+
 func validKind(k string) bool {
 	return slices.Contains([]string{"client_confirmation", "source_verification", "application_validation"}, k)
 }

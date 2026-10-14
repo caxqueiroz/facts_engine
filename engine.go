@@ -242,3 +242,20 @@ func (e *Engine) GetConversation(ctx context.Context, c Caller, q model.Conversa
 type ConversationRequest = model.ConversationRequest
 type ConversationRecord = model.ConversationRecord
 type ConversationQuery = model.ConversationQuery
+
+func (e *Engine) StartExtraction(ctx context.Context, c Caller, r model.ExtractionRequest) (model.JobStatus, error) {
+	return e.service.StartExtraction(ctx, c, r)
+}
+func (e *Engine) GetJob(ctx context.Context, c Caller, q model.JobQuery) (model.JobStatus, error) {
+	return e.service.GetJob(ctx, c, q)
+}
+func (e *Engine) RetryJob(ctx context.Context, c Caller, r model.JobRetryRequest) (model.JobStatus, error) {
+	return e.service.RetryJob(ctx, c, r)
+}
+
+func (e *Engine) RunExtraction(ctx context.Context, c Caller, r model.ExtractionRunRequest) (model.JobStatus, error) {
+	return e.service.RunExtraction(ctx, c, r)
+}
+func (e *Engine) GetExtractionRun(ctx context.Context, c Caller, q model.ExtractionRunQuery) (model.ExtractionRun, error) {
+	return e.service.GetExtractionRun(ctx, c, q)
+}

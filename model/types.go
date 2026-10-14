@@ -206,6 +206,7 @@ type FactProposal struct {
 	ExpectedRevision int64
 }
 type Version struct {
+	ExtractionAttemptID  string `json:",omitempty"`
 	ID, RecordID, Digest string
 	Proposal             FactProposal
 	Proposer             Caller

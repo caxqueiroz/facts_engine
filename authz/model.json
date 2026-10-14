@@ -142,6 +142,22 @@
             ]
           }
         },
+        "can_extract": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "can_ingest": {
           "intersection": {
             "child": [

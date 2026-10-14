@@ -151,7 +151,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	}
 	gaps = append(gaps, extra...)
 	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"extraction_artifacts", "memory_items", "coordinated_derivative_disposal"} {
+	for _, kind := range []string{"memory_items", "coordinated_derivative_disposal"} {
 		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
 	}
 	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
@@ -252,10 +252,37 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			evidence[e.ID] = e
 		}
 	}
+	if r.IncludeEvidence {
+		results := map[string]bool{}
+		for _, entry := range entries {
+			if entry.Kind != "extraction_result" {
+				continue
+			}
+			var result model.ExtractionResult
+			if err := json.Unmarshal(entry.Payload, &result); err != nil {
+				return nil, nil, err
+			}
+			results[result.AttemptID] = true
+			if !result.ResponseComplete {
+				gaps = append(gaps, model.AuditGap{Kind: "extraction_response", ID: result.AttemptID, Reason: "complete_response_not_retained"})
+			}
+		}
+		for _, entry := range entries {
+			if entry.Kind == "extraction_attempt" && !results[entry.ID] {
+				gaps = append(gaps, model.AuditGap{Kind: "extraction_response", ID: entry.ID, Reason: "response_not_retained_at_export_revision"})
+			}
+		}
+	}
 	size := 0
 	for _, entry := range entries {
 		include := true
 		switch entry.Kind {
+		case "extraction_job", "extraction_attempt", "extraction_result":
+			if !r.IncludeEvidence {
+				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "model_payloads_withheld"})
+				continue
+			}
+
 		case "retention":
 			var event model.RetentionEvent
 			if err := json.Unmarshal(entry.Payload, &event); err != nil {

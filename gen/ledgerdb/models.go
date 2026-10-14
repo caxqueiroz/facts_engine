@@ -230,6 +230,72 @@ type EvidenceRetention struct {
 	RegisteredAt  pgtype.Timestamptz
 }
 
+type ExtractionAttempt struct {
+	TenantID       string
+	ID             string
+	JobID          string
+	ScopeID        string
+	Fence          int64
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type ExtractionJob struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	ConversationID string
+	ProfileID      string
+	ProfileDigest  string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type ExtractionJobState struct {
+	TenantID        string
+	ID              string
+	State           string
+	Fence           int64
+	Attempts        int32
+	MaxAttempts     int32
+	AttemptID       string
+	AvailableAt     pgtype.Timestamptz
+	LeaseUntil      pgtype.Timestamptz
+	LastFailureCode string
+}
+
+type ExtractionProposal struct {
+	TenantID  string
+	AttemptID string
+	Ordinal   int32
+	RecordID  string
+	VersionID string
+}
+
+type ExtractionQuotum struct {
+	TenantID       string
+	Day            pgtype.Date
+	ReservedTokens int64
+	Epoch          int64
+}
+
+type ExtractionResult struct {
+	TenantID       string
+	AttemptID      string
+	JobID          string
+	ScopeID        string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type ExtractionRetryEvent struct {
+	TenantID       string
+	ID             string
+	JobID          string
+	LedgerRevision int64
+	Payload        []byte
+}
+
 type FactSnapshot struct {
 	TenantID          string
 	ID                string

@@ -28,6 +28,7 @@ type scope
     define can_dispose: disposal_operator and tenant_member
     define operator: [user, service]
     define can_read: reader and tenant_member
+    define can_extract: proposer and tenant_member
     define can_ingest: proposer and tenant_member
     define can_ingest_bank_record: administrator and tenant_member
     define can_propose: proposer and tenant_member

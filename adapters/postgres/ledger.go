@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,25 +40,29 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
-	pendingConversation  *model.ConversationRecord
-	pendingRetention     *model.RetentionEvent
-	pendingContext       *model.ContextManifest
-	pendingDecision      *model.DecisionRecord
-	decisionItemScopes   map[model.VersionReference]string
-	pendingCalculation   *model.CalculationRecord
-	calculationSnapshots []model.FactSnapshot
-	pendingAuditJob      *model.AuditExportJob
-	pendingAuditBundle   *model.AuditBundle
-	auditCompletionJob   *model.AuditExportJob
-	pendingAttestation   *model.Attestation
-	pendingWithdrawal    string
-	pendingRecord        string
-	pendingTimeline      []model.Acceptance
-	pendingRejection     string
-	pendingSnapshot      *model.FactSnapshot
-	tx                   pgx.Tx
-	tenant               string
-	cipher               Cipher
+	pendingExtractionAttempt *model.ExtractionAttempt
+	pendingExtractionResult  *model.ExtractionResult
+	pendingExtraction        *model.ExtractionJob
+	pendingExtractionRetry   string
+	pendingConversation      *model.ConversationRecord
+	pendingRetention         *model.RetentionEvent
+	pendingContext           *model.ContextManifest
+	pendingDecision          *model.DecisionRecord
+	decisionItemScopes       map[model.VersionReference]string
+	pendingCalculation       *model.CalculationRecord
+	calculationSnapshots     []model.FactSnapshot
+	pendingAuditJob          *model.AuditExportJob
+	pendingAuditBundle       *model.AuditBundle
+	auditCompletionJob       *model.AuditExportJob
+	pendingAttestation       *model.Attestation
+	pendingWithdrawal        string
+	pendingRecord            string
+	pendingTimeline          []model.Acceptance
+	pendingRejection         string
+	pendingSnapshot          *model.FactSnapshot
+	tx                       pgx.Tx
+	tenant                   string
+	cipher                   Cipher
 }
 
 func (l *Ledger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
@@ -382,6 +386,12 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	err = t.flushTemporal(ctx, e)
 	if err != nil {
 		return e, err
+	}
+	if err = t.flushExtractionRun(ctx, e); err != nil {
+		return model.Event{}, err
+	}
+	if err = t.flushExtraction(ctx, e); err != nil {
+		return model.Event{}, err
 	}
 	if err = t.flushConversation(ctx, e); err != nil {
 		return model.Event{}, err
