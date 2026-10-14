@@ -51,6 +51,9 @@ func (t *transaction) MemoryStreamRevisionAt(ctx context.Context, record string,
 	return stream, err
 }
 func (t *transaction) flushMemoryLifecycle(ctx context.Context, e model.Event) error {
+	if err := t.flushMemoryAttestations(ctx, e); err != nil {
+		return err
+	}
 	if t.pendingMemoryTimeline != nil {
 		if _, err := t.tx.Exec(ctx, `INSERT INTO memory_timeline_generations VALUES($1,$2,$3)`, t.tenant, t.pendingMemoryRecord, e.LedgerRevision); err != nil {
 			return err

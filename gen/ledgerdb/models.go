@@ -48,6 +48,7 @@ type Attestation struct {
 	EvidenceID     string
 	Payload        []byte
 	LedgerRevision pgtype.Int8
+	Kind           string
 }
 
 type AttestationEvent struct {
@@ -56,6 +57,13 @@ type AttestationEvent struct {
 	Actor          string
 	RecordedAt     pgtype.Timestamptz
 	LedgerRevision pgtype.Int8
+}
+
+type AttestationIdentity struct {
+	TenantID string
+	ID       string
+	ScopeID  string
+	Kind     string
 }
 
 type AuditExport struct {
@@ -342,6 +350,25 @@ type LegalHoldRelease struct {
 	TenantID string
 	ScopeID  string
 	ID       string
+}
+
+type MemoryAttestation struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	RecordID       string
+	VersionID      string
+	EvidenceID     string
+	LedgerRevision int64
+	Payload        []byte
+	Kind           string
+}
+
+type MemoryAttestationEvent struct {
+	TenantID       string
+	AttestationID  string
+	Actor          string
+	LedgerRevision int64
 }
 
 type MemoryDependency struct {

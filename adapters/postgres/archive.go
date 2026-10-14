@@ -162,6 +162,7 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			{"decision", `SELECT id,payload FROM decision_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"snapshot", `SELECT id,payload FROM fact_snapshots WHERE tenant_id=$1 AND creation_revision=$2`},
 			{"calculation", `SELECT id,payload FROM calculation_receipts WHERE tenant_id=$1 AND ledger_revision=$2`},
+			{"memory_attestation", `SELECT a.id,a.payload FROM memory_attestations a WHERE a.tenant_id=$1 AND (a.ledger_revision=$2 OR EXISTS(SELECT 1 FROM memory_attestation_events w WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND w.ledger_revision=$2))`},
 			{"attestation", `SELECT id,payload FROM attestations WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"timeline", `SELECT record_id||'/'||ordinal::text,payload FROM timeline_history WHERE tenant_id=$1 AND ledger_revision=$2 ORDER BY record_id,ordinal`},
 			{"audit_export", `SELECT id,payload FROM audit_exports WHERE tenant_id=$1 AND ledger_revision=$2`},
@@ -201,6 +202,28 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// worker authorizes disclosure to its external archive destination.
 		for _, entry := range p.Entries {
 			switch entry.Kind {
+			case "memory_attestation":
+				var attestation model.Attestation
+				if err := json.Unmarshal(entry.Payload, &attestation); err != nil {
+					return err
+				}
+				scopes[attestation.Scope] = true
+				present := false
+				for _, existing := range p.Entries {
+					if existing.Kind == "evidence" && existing.ID == attestation.EvidenceID {
+						present = true
+						break
+					}
+				}
+				if !present {
+					evidence, err := tx.Evidence(ctx, attestation.EvidenceID)
+					if err != nil {
+						return err
+					}
+					if err = add("evidence", evidence.ID, evidence); err != nil {
+						return err
+					}
+				}
 			case "context":
 				var m model.ContextManifest
 				if err := json.Unmarshal(entry.Payload, &m); err != nil {

@@ -224,12 +224,13 @@ func testMemoryProposals(t *testing.T, ctx context.Context, l model.Ledger, stor
 			if !errors.Is(err, model.ErrPrecondition) {
 				t.Fatal("memory prerequisites bypassed", err)
 			}
+			testMemoryAttestations(t, ctx, engine, c, reviewer, service, autoRequest, autoVersion, autoApproval)
 		} else if err != nil {
 			t.Fatal("configured automatic acceptance failed", err)
 		}
 	}
 	status, err := engine.GetRetentionStatus(ctx, c, model.RetentionStatusQuery{Scope: request.Key.Scope, EvidenceID: source.Sources[0].EvidenceID, Purpose: "memory-review"})
-	if err != nil || !slices.Contains(status.Blockers, "memory_versions") {
+	if err != nil || (!slices.Contains(status.Blockers, "memory_versions") || !slices.Contains(status.Blockers, "memory_attestations")) {
 		t.Fatal("memory evidence disposal not blocked", status, err)
 	}
 	public, private, err := ed25519.GenerateKey(rand.Reader)

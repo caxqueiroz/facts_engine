@@ -42,6 +42,7 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 		{"predicate", `SELECT predicate||'/'||version,payload FROM predicate_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY predicate,version`},
 		{"version", `SELECT id,payload FROM record_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
 		{"evidence", `SELECT id,payload FROM evidence WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
+		{"memory_attestation", `SELECT id,payload FROM memory_attestations WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
 		{"attestation", `SELECT id,payload FROM attestations WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id`},
 		{"snapshot", `SELECT s.id,s.payload FROM fact_snapshots s WHERE s.tenant_id=$1 AND EXISTS(SELECT 1 FROM fact_snapshot_items i WHERE i.tenant_id=s.tenant_id AND i.snapshot_id=s.id AND i.scope_id=$2) ORDER BY s.id`},
 		{"calculation", `SELECT c.id,c.payload FROM calculation_receipts c WHERE c.tenant_id=$1 AND (c.scope_id=$2 OR EXISTS(SELECT 1 FROM calculation_snapshots cs JOIN fact_snapshot_items i ON i.tenant_id=cs.tenant_id AND i.snapshot_id=cs.snapshot_id WHERE cs.tenant_id=c.tenant_id AND cs.calculation_id=c.id AND i.scope_id=$2)) ORDER BY c.id`},

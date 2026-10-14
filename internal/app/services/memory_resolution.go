@@ -128,9 +128,11 @@ func (s *Service) GetMemory(ctx context.Context, c model.Caller, q model.MemoryQ
 	}
 	out := model.MemoryResult{}
 	var selected *model.MemoryVersion
+	var attestationEvidence []string
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
 		out = model.MemoryResult{State: "missing"}
 		selected = nil
+		attestationEvidence = nil
 		t, err := memoryLifecycleTx(tx)
 		if err != nil {
 			return err
@@ -188,8 +190,18 @@ func (s *Service) GetMemory(ctx context.Context, c model.Caller, q model.MemoryQ
 			if err != nil {
 				return err
 			}
-			// Memory-specific attestations are not yet implemented; never bypass a required prerequisite.
-			if len(policy.Required) > 0 {
+			attestations, err := t.MemoryAttestations(ctx, v.ID, revision)
+			if err != nil {
+				return err
+			}
+			bound := []model.Attestation{}
+			for _, a := range attestations {
+				if slices.Contains(entry.AttestationIDs, a.ID) {
+					bound = append(bound, a)
+					attestationEvidence = append(attestationEvidence, a.EvidenceID)
+				}
+			}
+			if _, err = versionPrerequisites(policy, v.ID, v.Digest, bound, at); err != nil {
 				out.State = "ineligible"
 				return nil
 			}
@@ -216,7 +228,7 @@ func (s *Service) GetMemory(ctx context.Context, c model.Caller, q model.MemoryQ
 			return empty, err
 		}
 		if out.State == "resolved" {
-			ids := []string{}
+			ids := append([]string{}, attestationEvidence...)
 			for _, span := range selected.Proposal.Sources {
 				ids = append(ids, span.EvidenceID)
 			}

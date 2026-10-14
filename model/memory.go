@@ -78,6 +78,8 @@ type MemoryLifecycleTx interface {
 	MemoryHasAcceptance(context.Context, string, string) (bool, error)
 	StageMemoryRejection(context.Context, string, string) error
 	MemoryStreamRevisionAt(context.Context, string, int64) (int64, error)
+	MemoryAttestations(context.Context, string, int64) ([]Attestation, error)
+	StageMemoryAttestation(context.Context, Attestation) error
 }
 
 func MemoryRecordID(k MemoryKey) string {

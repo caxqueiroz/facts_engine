@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,8 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingMemoryAttestation *model.Attestation
+	pendingMemoryWithdrawal  string
 	pendingMemoryRecord      string
 	pendingMemoryTimeline    []model.Acceptance
 	pendingMemoryRejection   string
@@ -324,10 +326,20 @@ func (t *transaction) InsertAttestation(ctx context.Context, a model.Attestation
 	if err := t.guardEvidenceReference(ctx, a.EvidenceID); err != nil {
 		return err
 	}
+	if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_identities VALUES($1,$2,$3,'fact')`, t.tenant, a.ID, a.Scope); err != nil {
+		return err
+	}
 	t.pendingAttestation = &a
 	return nil
 }
 func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string, c model.Caller) (model.CommitResult, error) {
+	var kind string
+	if err := t.tx.QueryRow(ctx, `SELECT kind FROM attestation_identities WHERE tenant_id=$1 AND id=$2`, t.tenant, id).Scan(&kind); err != nil {
+		return model.CommitResult{}, translate(err)
+	}
+	if kind == "memory" {
+		return t.withdrawMemoryAttestation(ctx, id, scope, c)
+	}
 	out := model.CommitResult{}
 	var a model.Attestation
 	if err := t.read(ctx, &a, `SELECT payload FROM attestations WHERE tenant_id=$1 AND id=$2`, t.tenant, id); err != nil {

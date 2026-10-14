@@ -159,9 +159,13 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 		} else if policy.Mode != "manual" || c.Principal == v.Proposer.Principal || c.Human() == v.Proposer.Human() {
 			return model.ErrPrecondition
 		}
-		// Fail closed until the memory-specific attestation surface is delivered.
-		if len(policy.Required) > 0 {
-			return model.ErrPrecondition
+		attestations, err := t.MemoryAttestations(ctx, v.ID, 0)
+		if err != nil {
+			return err
+		}
+		attestationIDs, err := versionPrerequisites(policy, v.ID, v.Digest, attestations, time.Now())
+		if err != nil {
+			return err
 		}
 		for _, span := range v.Proposal.Sources {
 			evidence, err := tx.Evidence(ctx, span.EvidenceID)
@@ -217,7 +221,7 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 				next = append(next, piece)
 			}
 		}
-		next = append(next, model.Acceptance{VersionID: v.ID, Valid: v.Proposal.Valid, PolicyID: policy.ID, State: "accepted", DependencyAuthorization: checks})
+		next = append(next, model.Acceptance{VersionID: v.ID, Valid: v.Proposal.Valid, PolicyID: policy.ID, State: "accepted", DependencyAuthorization: checks, AttestationIDs: attestationIDs})
 		model.SortTimeline(next)
 		if err = t.StageMemoryTimeline(ctx, record.ID, next); err != nil {
 			return err

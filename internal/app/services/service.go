@@ -299,6 +299,16 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 		return model.CommitResult{}, err
 	}
 	return s.mutate(ctx, c, a.Scope, "record_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		record, err := tx.Record(ctx, a.RecordID)
+		if err != nil {
+			return err
+		}
+		if record.Key.Scope != a.Scope {
+			return model.ErrDenied
+		}
+		if record.Kind == "memory" {
+			return s.recordMemoryAttestation(ctx, tx, c, r, out)
+		}
 		v, err := tx.Version(ctx, a.RecordID, a.VersionID)
 		if err != nil {
 			return err
@@ -331,11 +341,14 @@ func (s *Service) WithdrawAttestation(ctx context.Context, c model.Caller, r mod
 	})
 }
 func prerequisites(p model.AcceptancePolicy, v model.Version, as []model.Attestation, now time.Time) ([]string, error) {
+	return versionPrerequisites(p, v.ID, v.Digest, as, now)
+}
+func versionPrerequisites(p model.AcceptancePolicy, versionID, digest string, as []model.Attestation, now time.Time) ([]string, error) {
 	ids := []string{}
 	for _, req := range p.Required {
 		found := false
 		for _, a := range as {
-			if a.Kind == req.Kind && a.VersionID == v.ID && a.ContentDigest == v.Digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
+			if a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
 				ids = append(ids, a.ID)
 				found = true
 				break
