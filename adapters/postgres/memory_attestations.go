@@ -61,6 +61,8 @@ func (t *transaction) withdrawMemoryAttestation(ctx context.Context, id, scope s
 func (t *transaction) flushMemoryAttestations(ctx context.Context, e model.Event) error {
 	if t.pendingMemoryAttestation != nil {
 		a := *t.pendingMemoryAttestation
+		at := e.RecordedAt
+		a.RecordedAt = &at
 		payload, err := t.encode(a)
 		if err != nil {
 			return err

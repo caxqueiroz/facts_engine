@@ -122,6 +122,8 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 	if err != nil {
 		return model.CommitResult{}, err
 	}
+	var commitPolicy *model.AcceptancePolicy
+	var commitIDs []string
 	return s.mutate(ctx, c, r.Scope, op, permission, r.Command, input, func(tx model.Tx, out *model.CommitResult) error {
 		t, err := memoryLifecycleTx(tx)
 		if err != nil {
@@ -174,6 +176,8 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 		if err := requireVerifiedPrerequisites(attestationIDs, verified); err != nil {
 			return err
 		}
+		commitPolicy = &policy
+		commitIDs = attestationIDs
 		for _, span := range v.Proposal.Sources {
 			evidence, err := tx.Evidence(ctx, span.EvidenceID)
 			if err != nil {
@@ -235,7 +239,7 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 		}
 		*out = model.CommitResult{ID: v.ID, RecordID: record.ID, VersionID: v.ID, RecordKind: "memory", ContentDigest: v.Digest, StreamRevision: record.Revision + 1}
 		return tx.SetRevision(ctx, record.ID, out.StreamRevision)
-	})
+	}, commitOnlyCheck(func() error { return currentBoundPrerequisites(commitPolicy, v.ID, v.Digest, commitIDs, verified) }))
 }
 func (s *Service) RejectMemory(ctx context.Context, c model.Caller, r model.LifecycleChange) (model.CommitResult, error) {
 	return s.changeMemory(ctx, c, r, "reject_memory", "can_approve")

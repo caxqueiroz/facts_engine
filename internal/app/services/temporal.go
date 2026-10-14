@@ -89,7 +89,7 @@ func (s *Service) acceptanceChecks(ctx context.Context, tx model.Tx, c model.Cal
 		if err != nil {
 			return p, nil, err
 		}
-		if e.SourceClass == "assistant" || !slices.Contains(p.SourceClasses, e.SourceClass) {
+		if (e.SourceClass == "assistant" || e.SourceClass == "system") || !slices.Contains(p.SourceClasses, e.SourceClass) {
 			return p, nil, model.ErrPrecondition
 		}
 	}
@@ -119,6 +119,8 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 	if err != nil {
 		return model.CommitResult{}, err
 	}
+	var commitPolicy *model.AcceptancePolicy
+	var commitIDs []string
 	return s.mutate(ctx, c, r.Scope, "supersede_fact", permission, r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		t, err := temporal(tx)
 		if err != nil {
@@ -138,6 +140,8 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 		if err := requireVerifiedPrerequisites(attIDs, verified); err != nil {
 			return err
 		}
+		commitPolicy = &p
+		commitIDs = attIDs
 		entries, err := tx.Acceptances(ctx, rec.ID, 0)
 		if err != nil {
 			return err
@@ -173,7 +177,7 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 		}
 		*out = model.CommitResult{ID: v.ID, VersionID: v.ID, RecordID: rec.ID, ContentDigest: v.Digest, StreamRevision: rec.Revision + 1}
 		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
-	})
+	}, commitOnlyCheck(func() error { return currentBoundPrerequisites(commitPolicy, v.ID, v.Digest, commitIDs, verified) }))
 }
 func (s *Service) RejectFact(ctx context.Context, c model.Caller, r model.LifecycleChange) (model.CommitResult, error) {
 	return s.change(ctx, c, r, "reject_fact", "can_approve")

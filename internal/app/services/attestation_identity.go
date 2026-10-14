@@ -32,7 +32,7 @@ func (s *Service) validIdentityReceipt(r model.AttestationIdentityReceipt, reque
 }
 func (s *Service) RecordDelegatedAttestation(ctx context.Context, c model.Caller, r model.DelegatedAttestationRequest) (model.CommitResult, error) {
 	a := r.Attestation
-	if !c.Service || !model.ValidID(r.GrantID) || !model.ValidID(r.Key) || a.Kind != "client_confirmation" || !validConfirmation(a) || a.Attestor.Tenant != c.Tenant || !model.ValidID(a.Attestor.Principal) || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || (c.Initiator != "" && c.Initiator != a.Attestor.Principal) {
+	if !c.Service || !model.ValidID(r.GrantID) || !model.ValidID(r.Key) || a.Kind != "client_confirmation" || !validConfirmation(a) || a.Attestor.Tenant != c.Tenant || !model.ValidID(a.Attestor.Principal) || a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || (c.Initiator != "" && c.Initiator != a.Attestor.Principal) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if s.attestationIdentity.Verifier == nil {
@@ -70,6 +70,9 @@ func (s *Service) RecordDelegatedAttestation(ctx context.Context, c model.Caller
 // Run again after Append, inside the transaction: waiting for the tenant revision
 // lock must not let an expired identity grant commit.
 func freshAttestationIdentity(a model.Attestation, now time.Time) error {
+	if a.ReviewAuthorization != nil && now.Sub(a.ReviewAuthorization.CheckedAt) > 30*time.Second {
+		return model.ErrUnavailable
+	}
 	if a.EvidenceAuthorization != nil && now.Sub(a.EvidenceAuthorization.CheckedAt) > 30*time.Second {
 		return model.ErrUnavailable
 	}

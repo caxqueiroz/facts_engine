@@ -171,8 +171,10 @@ type PredicateVersion struct {
 	TemporalPrecision                   string              `json:",omitempty"`
 }
 type AttestationRequirement struct {
-	Kind       string
-	Principals []string
+	RequireExpiry bool  `json:",omitempty"`
+	MaxAgeSeconds int64 `json:",omitempty"`
+	Kind          string
+	Principals    []string
 }
 type AcceptancePolicy struct {
 	Scope, ID                        string
@@ -234,6 +236,8 @@ type Approval struct {
 	ExpectedRevision           int64
 }
 type Attestation struct {
+	RecordedAt                                                      *time.Time             `json:",omitempty"`
+	ReviewAuthorization                                             *AuthorizationDecision `json:",omitempty"`
 	Recorder                                                        *Caller                `json:",omitempty"`
 	Delegation                                                      *AttestationDelegation `json:",omitempty"`
 	EvidenceAuthorization                                           *AuthorizationDecision `json:",omitempty"`

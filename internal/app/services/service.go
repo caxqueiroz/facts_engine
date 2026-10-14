@@ -55,7 +55,7 @@ func (s *Service) authorize(ctx context.Context, c model.Caller, scope, permissi
 	d.ContextDigest = model.Digest(req)
 	return d, nil
 }
-func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permission string, cmd model.Command, input any, fn func(model.Tx, *model.CommitResult) error, commitChecks ...func() error) (model.CommitResult, error) {
+func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permission string, cmd model.Command, input any, fn func(model.Tx, *model.CommitResult) error, commitChecks ...mutationCheck) (model.CommitResult, error) {
 	var result model.CommitResult
 	if !model.ValidID(cmd.Key) {
 		return result, model.ErrInvalid
@@ -75,8 +75,10 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		}
 		if previous != nil {
 			for _, check := range commitChecks {
-				if err := check(); err != nil {
-					return err
+				if check.onReceipt != nil {
+					if err := check.onReceipt(); err != nil {
+						return err
+					}
 				}
 			}
 			result = *previous
@@ -115,8 +117,10 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 			return err
 		}
 		for _, check := range commitChecks {
-			if err := check(); err != nil {
-				return err
+			if check.onCommit != nil {
+				if err := check.onCommit(); err != nil {
+					return err
+				}
 			}
 		}
 		result.LedgerRevision = event.LedgerRevision
@@ -138,25 +142,12 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 }
 func (s *Service) RegisterAcceptancePolicy(ctx context.Context, c model.Caller, r model.PolicyRequest) (model.CommitResult, error) {
 	p := r.Policy
-	if !model.ValidID(p.ID) || (p.Mode != "manual" && p.Mode != "automated") || len(p.SourceClasses) == 0 || (p.Mode == "automated" && len(p.AcceptingServices) == 0) {
-		return model.CommitResult{}, model.ErrInvalid
+	if p.Mode == "" {
+		p.Mode = "manual"
+		r.Policy = p
 	}
-	for _, v := range p.AcceptingServices {
-		if !model.ValidID(v) {
-			return model.CommitResult{}, model.ErrInvalid
-		}
-	}
-	kinds := map[string]bool{}
-	for _, req := range p.Required {
-		if !validKind(req.Kind) || len(req.Principals) == 0 || kinds[req.Kind] {
-			return model.CommitResult{}, model.ErrInvalid
-		}
-		kinds[req.Kind] = true
-		for _, v := range req.Principals {
-			if !model.ValidID(v) {
-				return model.CommitResult{}, model.ErrInvalid
-			}
-		}
+	if err := validatePolicy(p); err != nil {
+		return model.CommitResult{}, err
 	}
 	return s.mutate(ctx, c, p.Scope, "register_policy", "can_manage_definitions", r.Command, r, func(tx model.Tx, out *model.CommitResult) error { out.ID = p.ID; return tx.InsertPolicy(ctx, p) })
 }
@@ -306,7 +297,7 @@ func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Ca
 }
 
 func validKind(k string) bool {
-	return slices.Contains([]string{"client_confirmation", "source_verification", "application_validation"}, k)
+	return slices.Contains([]string{"client_confirmation", "source_verification", "application_validation", "human_review"}, k)
 }
 func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest) (model.CommitResult, error) {
 	return s.recordAttestation(ctx, c, r, r, nil)
@@ -314,11 +305,21 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 func (s *Service) recordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest, input any, delegation *model.AttestationDelegation) (model.CommitResult, error) {
 	a := r.Attestation
 	// Server-owned identity metadata never comes from an attestation request.
-	if a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || (delegation == nil && a.Attestor != c) || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+	if a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || (delegation == nil && a.Attestor != c) || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if _, err := s.authorize(ctx, c, a.Scope, "can_attest", r.Command); err != nil {
 		return model.CommitResult{}, err
+	}
+	if a.Kind == "human_review" {
+		if c.Service || c.Initiator != "" {
+			return model.CommitResult{}, model.ErrInvalid
+		}
+		check, err := s.authorize(ctx, c, a.Scope, "can_approve", r.Command)
+		if err != nil {
+			return model.CommitResult{}, err
+		}
+		a.ReviewAuthorization = &check
 	}
 	if a.Confirmation != nil {
 		check, err := s.authorize(ctx, c, a.Scope, "can_read_evidence", r.Command)
@@ -372,18 +373,12 @@ func (s *Service) recordAttestation(ctx context.Context, c model.Caller, r model
 		if err != nil {
 			return err
 		}
-		allowed := false
-		for _, req := range p.Required {
-			if req.Kind == a.Kind && slices.Contains(req.Principals, a.Attestor.Principal) {
-				allowed = true
-			}
-		}
-		if !allowed {
-			return model.ErrDenied
+		if err := attestationPolicyChecks(p, a, v.Proposer); err != nil {
+			return err
 		}
 		out.ID = a.ID
 		return tx.InsertAttestation(ctx, a)
-	}, func() error { return freshAttestationIdentity(a, time.Now()) })
+	}, freshnessCheck(func() error { return freshAttestationIdentity(a, time.Now()) }))
 }
 func (s *Service) WithdrawAttestation(ctx context.Context, c model.Caller, r model.Withdrawal) (model.CommitResult, error) {
 	return s.mutate(ctx, c, r.Scope, "withdraw_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
@@ -400,7 +395,7 @@ func versionPrerequisites(p model.AcceptancePolicy, versionID, digest string, as
 	for _, req := range p.Required {
 		found := false
 		for _, a := range as {
-			if validConfirmation(a) && (a.Confirmation == nil || !a.Confirmation.RespondedAt.After(now)) && a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
+			if validConfirmation(a) && (a.Confirmation == nil || !a.Confirmation.RespondedAt.After(now)) && a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && attestationEligible(req, a, now) {
 				ids = append(ids, a.ID)
 				found = true
 				break
@@ -449,6 +444,8 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 	if err != nil {
 		return model.CommitResult{}, err
 	}
+	var commitPolicy *model.AcceptancePolicy
+	var commitIDs []string
 	return s.mutate(ctx, c, r.Scope, op, permission, r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		rec, err := tx.LockRecord(ctx, preliminary.Proposal.Key)
 		if err != nil {
@@ -471,6 +468,8 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		if err := requireVerifiedPrerequisites(attIDs, verified); err != nil {
 			return err
 		}
+		commitPolicy = &p
+		commitIDs = attIDs
 		accepted, err := tx.Acceptances(ctx, rec.ID, 0)
 		if err != nil {
 			return err
@@ -489,7 +488,9 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		out.VersionID = v.ID
 		out.StreamRevision = rec.Revision + 1
 		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
-	})
+	}, commitOnlyCheck(func() error {
+		return currentBoundPrerequisites(commitPolicy, preliminary.ID, preliminary.Digest, commitIDs, verified)
+	}))
 }
 
 func NewWithAudit(l model.Ledger, a model.Authorizer, e model.EvidenceStore, options model.AuditOptions) (*Service, error) {

@@ -55,6 +55,8 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 	}
 	if t.pendingAttestation != nil {
 		a := *t.pendingAttestation
+		at := e.RecordedAt
+		a.RecordedAt = &at
 		b, err := t.encode(a)
 		if err != nil {
 			return err

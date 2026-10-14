@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"github.com/caxqueiroz/facts_engine/model"
-	"slices"
 )
 
 // RecordAttestation validates the trusted actor and evidence before dispatching
@@ -25,14 +24,8 @@ func (s *Service) recordMemoryAttestation(ctx context.Context, tx model.Tx, c mo
 	if err != nil {
 		return err
 	}
-	allowed := false
-	for _, required := range policy.Required {
-		if required.Kind == a.Kind && slices.Contains(required.Principals, a.Attestor.Principal) {
-			allowed = true
-		}
-	}
-	if !allowed {
-		return model.ErrDenied
+	if err := attestationPolicyChecks(policy, a, v.Proposer); err != nil {
+		return err
 	}
 	out.ID = a.ID
 	return t.StageMemoryAttestation(ctx, a)

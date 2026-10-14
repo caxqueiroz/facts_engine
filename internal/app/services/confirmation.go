@@ -31,7 +31,7 @@ func (s *Service) verifyAttestationEvidence(ctx context.Context, c model.Caller,
 // Verify the candidate prerequisites before taking record/tenant append locks.
 // The transaction must select only these immutable IDs; a concurrent new
 // prerequisite may require a retry instead of bypassing byte verification.
-func (s *Service) verifiedPrerequisites(ctx context.Context, c model.Caller, scope, version, digest, policy string, memory bool) (map[string]bool, error) {
+func (s *Service) verifiedPrerequisites(ctx context.Context, c model.Caller, scope, version, digest, policy string, memory bool) (map[string]model.Attestation, error) {
 	var as []model.Attestation
 	var p model.AcceptancePolicy
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
@@ -55,25 +55,41 @@ func (s *Service) verifiedPrerequisites(ctx context.Context, c model.Caller, sco
 		return nil, err
 	}
 	selected, _ := versionPrerequisites(p, version, digest, as, time.Now())
-	verified := map[string]bool{}
+	verified := map[string]model.Attestation{}
 	for _, id := range selected {
 		for _, a := range as {
 			if a.ID == id {
 				if err := s.verifyAttestationEvidence(ctx, c, a); err != nil {
 					return nil, err
 				}
-				verified[id] = true
+				verified[id] = a
 				break
 			}
 		}
 	}
 	return verified, nil
 }
-func requireVerifiedPrerequisites(ids []string, verified map[string]bool) error {
+func requireVerifiedPrerequisites(ids []string, verified map[string]model.Attestation) error {
 	for _, id := range ids {
-		if !verified[id] {
+		if _, ok := verified[id]; !ok {
 			return model.ErrPrecondition
 		}
 	}
 	return nil
+}
+
+func currentBoundPrerequisites(p *model.AcceptancePolicy, version, digest string, ids []string, verified map[string]model.Attestation) error {
+	if p == nil {
+		return nil
+	} // Committed command retries do not change old acceptance.
+	bound := make([]model.Attestation, 0, len(ids))
+	for _, id := range ids {
+		a, ok := verified[id]
+		if !ok {
+			return model.ErrPrecondition
+		}
+		bound = append(bound, a)
+	}
+	_, err := versionPrerequisites(*p, version, digest, bound, time.Now())
+	return err
 }

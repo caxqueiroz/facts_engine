@@ -98,6 +98,7 @@ func TestPostgresLedger(t *testing.T) {
 		registerTestIdentities(t, ctx, engine, fixture.tenant, fixture.scope, fixture.subjects)
 	}
 	t.Run("identity administration", func(t *testing.T) { testIdentities(t, ctx, ledger, store) })
+	t.Run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })
 	t.Run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
 	t.Run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })
 	t.Run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
