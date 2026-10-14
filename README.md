@@ -147,6 +147,28 @@ To enable remote extraction scheduling, start from [examples/memoryd-extraction.
 
 For profiles requiring approved redaction, configure `extraction.redaction_policy_versions` with the exact approved version identifiers. This allows the engine to validate previously registered derivatives and their provenance; it does not create redacted evidence, establish a redaction service, or waive evidence permissions. Refresh profiles continue to reject redaction settings that their parser does not support. Use the same pinned profiles and budget configuration on the separate executor. Clients can schedule jobs, inspect status and retained artifacts, and retry jobs with operational permission; they cannot cause this API process to invoke a model. The mTLS integration test verifies a configured profile creates a pending refresh job, an unapproved profile is rejected, and retries preserve job identity and the authenticated caller.
 
+## Injected engine telemetry
+
+`NewWithOptions` accepts host-owned OpenTelemetry providers and an optional structured logger:
+
+```go
+engine, err := facts.NewWithOptions(ledger, authorizer, evidence, model.EngineOptions{
+    Telemetry: model.TelemetryOptions{
+        TracerProvider: tracerProvider,
+        MeterProvider:  meterProvider,
+        Logger:         logger,
+    },
+})
+```
+
+The host configures SDK exporters, sampling, resource attributes, flushing and shutdown, following the [OpenTelemetry Go instrumentation guidance](https://opentelemetry.io/docs/languages/go/instrumentation/). Constructors neither install nor read global providers, open exporter connections, nor start background workers. Omitted providers use local no-ops; omitting all telemetry fields leaves instrumentation disabled. Existing context parentage is preserved through engine authorization, evidence, transaction callbacks and provider calls.
+
+Current stages cover authorization checks, evidence loading/content reads, conversation ingestion, fact/memory proposals and approvals/acceptance, extraction execution, fact/memory recall, context preparation, audit export and common mutation transactions. Spans use fixed `verb.noun` names. `facts.operations` counts completed stage invocations, and `facts.operation.duration` records seconds, with only `facts.stage` and classified `facts.outcome` labels. Nested stages count separately; these are not RPC request counts or model-job outcome metrics. Return errors map to bounded outcomes such as `denied`, `unavailable`, `conflict` or `internal`; panic observations are recorded and rethrown.
+
+Logs include stage, outcome, duration and valid trace/span IDs. They omit caller/tenant/record IDs, purposes, correlation IDs, evidence, values, prompts, responses, credentials, and error/panic text. Successful operations log at debug level; failures at warning level. Tests use injected in-memory SDK providers to verify parentage, metric labels, transaction context propagation and sensitive-text exclusion. Hosts must separately review exporter resources, custom logger attributes and upstream adapter logs.
+
+RPC instrumentation and remote trace-context propagation, worker queue/retry/lag metrics, business outcome counters, full internal-stage coverage, and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
+
 ## Standalone workers and lexical retrieval
 
 `bin/memoryworker -config /path/to/worker.json` runs one configured tenant/generation using [examples/memoryworker.json](examples/memoryworker.json). Supported modes are `projection`, `audit`, `archive`, `refresh`, `refresh-sweep` and `extraction`; use a separate configured process for each. Consumer modes use the existing outbox claim, heartbeat, fencing, retry/backoff and acknowledgement code; `refresh-sweep` emits events without claiming deliveries. A delivery deadline bounds processing. SIGINT/SIGTERM cancels in-flight work; an unacknowledged lease remains retryable after expiry. Queue errors, delivery timeouts and exhausted consumers exit nonzero for the host's process supervisor. Restarting does not reset attempts or acknowledge incomplete work. Operator retry and destination repair remain explicit actions. The worker logs mode and outcome without event content, identifiers or dependency error text.

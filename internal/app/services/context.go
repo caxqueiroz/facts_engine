@@ -55,7 +55,9 @@ func renderContext(items []model.RecallItem) ([]byte, error) {
 		Facts  []model.RecallItem
 	}{"facts-context-json-v1", items})
 }
-func (s *Service) PrepareContext(ctx context.Context, c model.Caller, r model.ContextRequest) (model.ContextManifest, error) {
+func (s *Service) PrepareContext(ctx context.Context, c model.Caller, r model.ContextRequest) (observationResult model.ContextManifest, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "prepare.context")
+	defer observation.End(&observationErr)
 	if !validContextRequest(r) {
 		return model.ContextManifest{}, model.ErrInvalid
 	}

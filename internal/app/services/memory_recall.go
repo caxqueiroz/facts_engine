@@ -10,7 +10,9 @@ import (
 
 // RecallMemories returns only ledger-revalidated eligible memory versions. Index
 // bodies, dependency metadata and eligibility claims are never authoritative.
-func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.RecallRequest) (model.MemoryRecallResult, error) {
+func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.RecallRequest) (observationResult model.MemoryRecallResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "recall.memories")
+	defer observation.End(&observationErr)
 	header, progress, active, candidates, err := s.searchRecall(ctx, c, q)
 	out := model.MemoryRecallResult{Generation: header.Generation, IndexedRevision: header.IndexedRevision, Items: []model.MemoryRecallItem{}}
 	if err != nil {

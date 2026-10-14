@@ -65,7 +65,9 @@ func (s *Service) memoryDependencyChecks(ctx context.Context, c model.Caller, de
 	}
 	return checks, nil
 }
-func (s *Service) ProposeMemory(ctx context.Context, c model.Caller, r model.MemoryProposal) (model.CommitResult, error) {
+func (s *Service) ProposeMemory(ctx context.Context, c model.Caller, r model.MemoryProposal) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "propose.memory")
+	defer observation.End(&observationErr)
 	if !model.ValidID(r.Key.ID) || !model.ValidID(r.Subtype) || !model.ValidID(r.SchemaVersion) || r.ExpectedRevision < 0 || len(r.Body) == 0 || len(r.Body) > 65536 || !utf8.ValidString(r.Body) || r.Valid.Validate() != nil || len(r.Sources) == 0 || len(r.Sources) > 64 || len(r.Dependencies) > 64 {
 		return model.CommitResult{}, model.ErrInvalid
 	}

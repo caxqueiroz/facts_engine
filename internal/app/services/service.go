@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/caxqueiroz/facts_engine/internal/telemetry"
 	"github.com/caxqueiroz/facts_engine/model"
 	"slices"
 	"time"
@@ -12,6 +13,7 @@ import (
 )
 
 type Service struct {
+	telemetry           *telemetry.Observer
 	operations          model.OperationsOptions
 	redactionPolicies   map[string]bool
 	attestationIdentity model.AttestationIdentityOptions
@@ -38,7 +40,9 @@ func id() string {
 	}
 	return fmt.Sprintf("%x", b)
 }
-func (s *Service) authorize(ctx context.Context, c model.Caller, scope, permission string, cmd model.Command) (model.AuthorizationDecision, error) {
+func (s *Service) authorize(ctx context.Context, c model.Caller, scope, permission string, cmd model.Command) (observationResult model.AuthorizationDecision, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "check.authorization")
+	defer observation.End(&observationErr)
 	if !model.ValidID(c.Tenant) || !model.ValidID(c.Principal) || !model.ValidID(scope) || cmd.Purpose == "" || len(cmd.Purpose) > 256 || (c.Initiator != "" && (!c.Service || !model.ValidID(c.Initiator))) {
 		return model.AuthorizationDecision{}, model.ErrInvalid
 	}
@@ -70,7 +74,7 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		Caller model.Caller
 		Input  any
 	}{c, input})
-	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+	err = s.commitTransaction(ctx, c.Tenant, func(ctx context.Context, tx model.Tx) error {
 		previous, err := tx.Receipt(ctx, c, op, cmd.Key, digest)
 		if err != nil {
 			return err
@@ -203,7 +207,9 @@ func (s *Service) RegisterEvidence(ctx context.Context, c model.Caller, r model.
 		return err
 	})
 }
-func (s *Service) loadEvidence(ctx context.Context, c model.Caller, scope string, ids []string) (map[string][]byte, error) {
+func (s *Service) loadEvidence(ctx context.Context, c model.Caller, scope string, ids []string) (observationResult map[string][]byte, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "load.evidence")
+	defer observation.End(&observationErr)
 	evidence := make([]model.Evidence, 0, len(ids))
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
 		for _, id := range ids {
@@ -231,7 +237,9 @@ func (s *Service) loadEvidence(ctx context.Context, c model.Caller, scope string
 	}
 	return data, nil
 }
-func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactProposal) (model.CommitResult, error) {
+func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactProposal) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "propose.fact")
+	defer observation.End(&observationErr)
 	if !model.ValidID(r.Key.Subject) || !model.ValidID(r.Key.Predicate) || !model.ValidID(r.SchemaVersion) || (r.Key.Discriminator != "" && !model.ValidID(r.Key.Discriminator)) || r.ExpectedRevision < 0 || r.Value.Validate() != nil || r.Valid.Validate() != nil || len(r.Sources) == 0 || len(r.Sources) > 64 {
 		return model.CommitResult{}, model.ErrInvalid
 	}
@@ -412,10 +420,14 @@ func versionPrerequisites(p model.AcceptancePolicy, versionID, digest string, as
 	}
 	return ids, nil
 }
-func (s *Service) ApproveFact(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+func (s *Service) ApproveFact(ctx context.Context, c model.Caller, r model.Approval) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "approve.fact")
+	defer observation.End(&observationErr)
 	return s.accept(ctx, c, r, false)
 }
-func (s *Service) AcceptFact(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+func (s *Service) AcceptFact(ctx context.Context, c model.Caller, r model.Approval) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "accept.fact")
+	defer observation.End(&observationErr)
 	return s.accept(ctx, c, r, true)
 }
 func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, automatic bool) (model.CommitResult, error) {

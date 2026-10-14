@@ -47,7 +47,9 @@ func validConversation(r model.ConversationRequest) bool {
 	}
 	return size <= 16<<20
 }
-func (s *Service) IngestConversation(ctx context.Context, c model.Caller, r model.ConversationRequest) (model.ConversationRecord, error) {
+func (s *Service) IngestConversation(ctx context.Context, c model.Caller, r model.ConversationRequest) (observationResult model.ConversationRecord, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "ingest.conversation")
+	defer observation.End(&observationErr)
 	if !validConversation(r) {
 		return model.ConversationRecord{}, model.ErrInvalid
 	}

@@ -1,9 +1,16 @@
 package services
 
-import "github.com/caxqueiroz/facts_engine/model"
+import (
+	"github.com/caxqueiroz/facts_engine/internal/telemetry"
+	"github.com/caxqueiroz/facts_engine/model"
+)
 
 func NewWithOptions(l model.Ledger, a model.Authorizer, e model.EvidenceStore, o model.EngineOptions) (*Service, error) {
 	s, err := New(l, a, e)
+	if err != nil {
+		return nil, err
+	}
+	s.telemetry, err = telemetry.New(o.Telemetry)
 	if err != nil {
 		return nil, err
 	}

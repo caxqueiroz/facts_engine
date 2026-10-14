@@ -97,7 +97,9 @@ func (s *Service) GetAuditExport(ctx context.Context, c model.Caller, q model.Au
 // RunAuditExport processes one durable request. The trusted worker must supply
 // the original requester identity; permissions are checked again at execution.
 // Failed/cancelled attempts are retried after the lease expires. No worker starts implicitly.
-func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.AuditExportQuery) (model.AuditExportResult, error) {
+func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.AuditExportQuery) (observationResult model.AuditExportResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "export.audit")
+	defer observation.End(&observationErr)
 	if s.audit.Signer == nil {
 		return model.AuditExportResult{}, model.ErrPrecondition
 	}

@@ -8,7 +8,9 @@ import (
 	"sort"
 )
 
-func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequest) (model.RecallResult, error) {
+func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequest) (observationResult model.RecallResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "recall.facts")
+	defer observation.End(&observationErr)
 	out, progress, active, candidates, err := s.searchRecall(ctx, c, q)
 	if err != nil {
 		return out, err

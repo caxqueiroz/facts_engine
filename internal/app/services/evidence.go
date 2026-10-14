@@ -36,7 +36,9 @@ func (s *Service) GetEvidenceMetadata(ctx context.Context, c model.Caller, q mod
 	}
 	return e, nil
 }
-func (s *Service) GetEvidenceContent(ctx context.Context, c model.Caller, q model.EvidenceQuery) (model.EvidenceContent, error) {
+func (s *Service) GetEvidenceContent(ctx context.Context, c model.Caller, q model.EvidenceQuery) (observationResult model.EvidenceContent, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "read.evidence")
+	defer observation.End(&observationErr)
 	e, err := s.authorizedEvidence(ctx, c, q, "can_read_evidence")
 	if err != nil {
 		return model.EvidenceContent{}, err

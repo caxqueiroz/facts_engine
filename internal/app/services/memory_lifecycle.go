@@ -10,10 +10,14 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
-func (s *Service) ApproveMemory(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+func (s *Service) ApproveMemory(ctx context.Context, c model.Caller, r model.Approval) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "approve.memory")
+	defer observation.End(&observationErr)
 	return s.acceptMemory(ctx, c, r, nil, false)
 }
-func (s *Service) AcceptMemory(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+func (s *Service) AcceptMemory(ctx context.Context, c model.Caller, r model.Approval) (observationResult model.CommitResult, observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "accept.memory")
+	defer observation.End(&observationErr)
 	return s.acceptMemory(ctx, c, r, nil, true)
 }
 func (s *Service) SupersedeMemory(ctx context.Context, c model.Caller, r model.Supersession) (model.CommitResult, error) {
