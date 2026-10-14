@@ -89,6 +89,7 @@ func (c *RefreshConfig) bindings() []model.MemoryRefreshBinding {
 }
 
 type Config struct {
+	Telemetry              *runtimeconfig.Telemetry   `json:"telemetry,omitempty"`
 	OpenFGATraceContext    bool                       `json:"openfga_trace_context,omitempty"`
 	Extraction             *ExtractionConfig          `json:"extraction"`
 	Refresh                *RefreshConfig             `json:"refresh"`
@@ -117,6 +118,9 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
+	if c.Telemetry.Validate() != nil {
+		return model.ErrInvalid
+	}
 	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
 		return model.ErrInvalid
 	}

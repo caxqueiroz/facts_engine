@@ -39,6 +39,11 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	if err := c.Validate(); err != nil {
 		return errors.New("invalid service configuration")
 	}
+	telemetry, err := runtimeconfig.StartTelemetry(ctx, c.Telemetry, "memoryd", logger)
+	if err != nil {
+		return err
+	}
+	defer telemetry.Close(logger)
 	encryptionKey, err := runtimeconfig.HexKey("MEMORY_ENCRYPTION_KEY_HEX", 32)
 	if err != nil {
 		return err
@@ -97,7 +102,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	if err != nil {
 		return errors.New("invalid authorization configuration")
 	}
-	options := model.EngineOptions{Reads: model.ReadOptions{PaginationKey: paginationKey}}
+	options := model.EngineOptions{Telemetry: telemetry.Options, Reads: model.ReadOptions{PaginationKey: paginationKey}}
 	if c.ContextArchive != nil {
 		options.ContextArchive = &model.ContextArchiveOptions{Stream: c.ContextArchive.Stream, MaxPendingRevisions: c.ContextArchive.MaxPendingRevisions, Progress: ledger}
 	}
@@ -153,7 +158,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 		return errors.New("cannot initialize engine")
 	}
 	timeout := time.Duration(c.RPCTimeoutSeconds) * time.Second
-	handler, err := connectapi.NewHandlerWithOptions(engine, authn.Verify, connectapi.Limits{Timeout: timeout, MaxConcurrent: c.MaxConcurrent, MaxRequestBytes: c.MaxRequestBytes, MaxResponseBytes: c.MaxResponseBytes}, connectapi.HandlerOptions{AcceptTraceContext: c.AcceptTraceContext})
+	handler, err := connectapi.NewHandlerWithOptions(engine, authn.Verify, connectapi.Limits{Timeout: timeout, MaxConcurrent: c.MaxConcurrent, MaxRequestBytes: c.MaxRequestBytes, MaxResponseBytes: c.MaxResponseBytes}, connectapi.HandlerOptions{Telemetry: telemetry.Options, AcceptTraceContext: c.AcceptTraceContext})
 	if err != nil {
 		return errors.New("cannot initialize API")
 	}

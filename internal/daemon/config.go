@@ -14,6 +14,7 @@ type ContextArchivePolicy struct {
 }
 
 type Config struct {
+	Telemetry           *runtimeconfig.Telemetry            `json:"telemetry,omitempty"`
 	ContextArchive      *ContextArchivePolicy               `json:"context_archive,omitempty"`
 	AcceptTraceContext  bool                                `json:"accept_trace_context,omitempty"`
 	OpenFGATraceContext bool                                `json:"openfga_trace_context,omitempty"`
@@ -46,6 +47,9 @@ func LoadConfig(path string) (Config, error) {
 	return c, c.Validate()
 }
 func (c Config) Validate() error {
+	if c.Telemetry.Validate() != nil {
+		return model.ErrInvalid
+	}
 	if c.ContextArchive != nil && (!model.ValidID(c.ContextArchive.Stream) || c.ContextArchive.MaxPendingRevisions < 0) {
 		return model.ErrInvalid
 	}

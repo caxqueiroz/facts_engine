@@ -27,6 +27,11 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if c.Validate() != nil || logger == nil {
 		return errors.New("invalid worker configuration")
 	}
+	telemetry, err := runtimeconfig.StartTelemetry(ctx, c.Telemetry, "memoryworker", logger)
+	if err != nil {
+		return err
+	}
+	defer telemetry.Close(logger)
 	key, err := runtimeconfig.HexKey("MEMORY_ENCRYPTION_KEY_HEX", 32)
 	if err != nil {
 		return err
@@ -145,7 +150,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize worker evidence store")
 		}
 
-		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Extraction: c.Refresh.options()})
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, Extraction: c.Refresh.options()})
 		if err != nil {
 			return errors.New("invalid refresh engine or approved profile configuration")
 		}
@@ -199,7 +204,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return err
 		}
 		defer closeProviders()
-		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Extraction: extraction, RedactionPolicyVersions: c.Extraction.Scheduling.RedactionPolicyVersions})
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, Extraction: extraction, RedactionPolicyVersions: c.Extraction.Scheduling.RedactionPolicyVersions})
 		if err != nil {
 			return errors.New("invalid extraction engine or approved profiles")
 		}
@@ -241,7 +246,7 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 		if err != nil {
 			return errors.New("cannot initialize audit evidence store")
 		}
-		engine, err := facts.NewWithAudit(engineLedger, auth, store, model.AuditOptions{Signer: signer})
+		engine, err := facts.NewWithOptions(engineLedger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, Audit: model.AuditOptions{Signer: signer}})
 		if err != nil {
 			return errors.New("cannot initialize audit engine")
 		}
@@ -255,7 +260,14 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if err := ledger.RegisterConsumer(startup, consumer, c.MaxAttempts); err != nil {
 		return errors.New("cannot register configured consumer")
 	}
-	worker, err := workers.NewOutbox(ledger, consumer, handler, workers.Options{Lease: time.Duration(c.LeaseSeconds) * time.Second, PollInterval: time.Duration(c.PollMilliseconds) * time.Millisecond, MinBackoff: time.Duration(c.MinBackoffMilliseconds) * time.Millisecond, MaxBackoff: time.Duration(c.MaxBackoffSeconds) * time.Second})
+	if telemetry.Metrics != nil {
+		monitor, err := workers.NewProgressMonitor(ledger, []workers.ProgressTarget{{Key: consumer, Kind: c.Mode}}, telemetry.Metrics, 2*time.Second)
+		if err != nil {
+			return errors.New("cannot initialize progress telemetry")
+		}
+		defer monitor.Close()
+	}
+	worker, err := workers.NewOutbox(ledger, consumer, handler, workers.Options{Telemetry: telemetry.Options, Lease: time.Duration(c.LeaseSeconds) * time.Second, PollInterval: time.Duration(c.PollMilliseconds) * time.Millisecond, MinBackoff: time.Duration(c.MinBackoffMilliseconds) * time.Millisecond, MaxBackoff: time.Duration(c.MaxBackoffSeconds) * time.Second})
 	if err != nil {
 		return errors.New("cannot initialize outbox worker")
 	}
