@@ -30,7 +30,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 
 ## Local setup
 
-The library minimum is Go 1.25; use a currently patched, supported toolchain (verified with Go 1.27.2), Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
+The module minimum is Go 1.26 (required by the Connect and protovalidate dependencies); use a currently patched, supported toolchain (verified with Go 1.27.2), Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
 
 ```sh
 docker compose up -d
@@ -53,6 +53,25 @@ The [embedded example](examples/go/embedded/main.go) composes the adapters and p
 
 Run `go run ./examples/go/embedded`. The example prints only the resolution state and ledger revision, not fact content. The integration test demonstrates policy/schema publication, evidence registration, proposal, confirmation, acceptance, withdrawal, historical reads, interval corrections, and immutable snapshots.
 
+## Remote fact API (initial surface)
+
+[FactService](proto/memory/v1/facts.proto) exposes typed `GetFact`, `ProposeFact`, `ApproveFact`, `AcceptFact`, `RejectFact`, `RetractFact`, `DisputeFact`, `ResolveDispute` and `SupersedeFact` requests. Generated Go messages and Connect/gRPC clients are committed under [gen/memory/v1](gen/memory/v1). Definitions, evidence ingestion, attestations, memory operations, listings, snapshots, contexts and audit operations still require the embedded API; this is not the complete remote surface in the spec.
+
+[connectapi.NewHandler](adapters/connectapi/server.go) accepts the existing engine, an injected `IdentityVerifier`, and mandatory `Limits` (timeout, concurrent requests, request bytes and response bytes). It returns an `http.Handler` without opening a listener or starting background workers. The host mounts it on its HTTP server, configures TLS and read/write/idle deadlines, and enables HTTP/2 for gRPC. Connect and gRPC-Web use the same handler. A generated Connect client is composed as follows:
+
+```go
+transport := connecthttp.NewTransport(httpClient, baseURL)
+client := memoryv1connect.NewFactServiceClient(connect.NewClient(transport))
+```
+
+The verifier authenticates the peer/session or a signed gateway assertion and returns a trusted `model.Caller`. It must verify any delegated initiator. There is deliberately no default verifier that trusts identity headers. Connect request metadata and HTTP TLS peer information are available through their server-context APIs. The request tenant must match the verified tenant before validation and engine access. Engine authorization and policy checks remain in force on every call, including retries.
+
+Requests pass Protobuf validation and explicit timestamp component checks before conversion. The value oneof preserves false, integer zero, empty text and explicit unknown. Decimal amounts remain canonical strings; intervals retain unknown/open boundaries and reject precision loss. Lifecycle reasons are opaque identifiers. Supersession requests have a transport limit of 1,000 distinct replaced versions. Domain constraints, evidence-span checks and acceptance decisions run in the shared engine.
+
+Errors use RPC status codes, including `invalid_argument`, `permission_denied`, `failed_precondition`, `already_exists` for changed command identities, and `aborted` with a typed `RevisionConflict` refresh hint. Unexpected dependency error text is not exposed. Admission fails immediately when capacity is full; the request context carries the configured deadline through identity verification and engine work. The host and injected dependencies must honor cancellation.
+
+Tests cover value presence and validation boundaries, tenant binding, authentication failure, deadlines, a generated grpc-go client over HTTP/2, and PostgreSQL-backed embedded/remote command replay and revision conflicts. Production gateway/Kratos verification, deployment, telemetry and parity coverage for the remaining services are still delivery work.
+
 ## Verification
 
 ```sh
@@ -63,7 +82,7 @@ make vuln
 make generate
 ```
 
-`make generate` uses sqlc v1.31.1 and regenerates the OpenFGA JSON model from its restricted DSL. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
+`make generate` uses sqlc v1.31.1, regenerates the OpenFGA JSON model from its restricted DSL, and generates the typed remote API with Buf v1.74.0. The pinned Protobuf generators are protoc-gen-go v1.36.12, protoc-gen-connect-go v2.0.1 and protoc-gen-go-grpc v1.6.2. `buf.lock` pins the protovalidate schema dependency. `make check` checks Protobuf formatting, schema/rule lint and generated-code drift. Run `make tools` and put its installation directory (`$(go env GOPATH)/bin` by default) first on PATH. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
 
 The [CI workflow](.github/workflows/ci.yml) runs on pushes to `master`, pull requests and manual dispatch. It uses Go 1.27.2 from [.go-version](.go-version), Ubuntu 24.04, commit-pinned GitHub Actions, read-only repository permissions and no deployment secrets. Three independent checks run: source/migration/generated-file checks, the full race-enabled integration suite, and reachable Go vulnerability scanning. Duplicate runs for the same branch or pull request are cancelled. Each job uses a distinct cache key; changes to pinned build tools also invalidate the code-check cache.
 
@@ -239,9 +258,9 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 3. Complete workload tuning and other job types. Paginated rebuild verification with bounded memory is implemented. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
-6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, and operational packaging. GitHub Actions CI with reproducible code, integration and vulnerability checks is implemented.
+6. Complete the remote services beyond the initial fact API, service and worker binaries, gateway identity integration, full transport parity tests, injected telemetry, readiness endpoints, and operational packaging. Typed fact Protobuf schemas, pinned Buf generation, protovalidate checks and an injectable Connect/gRPC handler are implemented. GitHub Actions CI with reproducible code, integration and vulnerability checks is implemented.
 
-The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. CortexDB and encrypted local archive adapters are exercised in integration tests. No remote engine API, production embedding/extraction model, independently administered immutable archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
+The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. CortexDB and encrypted local archive adapters are exercised in integration tests. The initial remote fact handler is available for host integration; no remote service deployment, production identity verifier, production embedding/extraction model, independently administered immutable archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
 
 Production acceptance also requires the named domain, security, retention, and operational owners described in the spec, plus workload benchmarks and restore drills. Database roles protect normal runtime operations; they do not protect against a malicious database owner. Retained digests are integrity metadata, not anonymization.
 

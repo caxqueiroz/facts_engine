@@ -11,8 +11,10 @@ go vet ./...
 golangci-lint run
 goose -dir sql/migrations validate
 actionlint .github/workflows/ci.yml
+buf format --diff --exit-code
+buf lint
 make generate
-generated_changes=$(git status --porcelain --untracked-files=all -- gen/ledgerdb authz/model.json)
+generated_changes=$(git status --porcelain --untracked-files=all -- gen/ledgerdb gen/memory authz/model.json)
 if [ -n "$generated_changes" ]; then
   printf 'Generated files differ from the committed source:\n%s\n' "$generated_changes" >&2
   exit 1

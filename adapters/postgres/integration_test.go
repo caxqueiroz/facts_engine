@@ -212,6 +212,7 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("remote fact parity", func(t *testing.T) { testRemoteFactParity(t, ctx, engine, caller, q, proposal) })
 	t.Run("idempotent response loss", func(t *testing.T) {
 		retry, err := engine.ProposeFact(ctx, caller, q)
 		if err != nil || retry != proposal {

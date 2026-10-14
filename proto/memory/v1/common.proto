@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+
+// Command identity is scoped to the authenticated principal and operation.
+message Command {
+  string key = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string correlation_id = 3;
+}
+
+message FactKey {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string subject = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string predicate = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string discriminator = 4 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+}
+
+// Absent from means unknown; absent to means open ended. Neither means zero time.
+message Interval {
+  option (buf.validate.message).cel = {
+    id: "interval.order"
+    message: "from must precede to"
+    expression: "!has(this.from) || !has(this.to) || this.from < this.to"
+  };
+  google.protobuf.Timestamp from = 1 [(buf.validate.field).cel = {
+    id: "interval.from_precision"
+    message: "from must have microsecond precision and must not be zero time"
+    expression: "string(this).matches('^[^.]+([.][0-9]{1,6})?Z$') && this != timestamp('0001-01-01T00:00:00Z')"
+  }];
+  google.protobuf.Timestamp to = 2 [(buf.validate.field).cel = {
+    id: "interval.to_precision"
+    message: "to must have microsecond precision and must not be zero time"
+    expression: "string(this).matches('^[^.]+([.][0-9]{1,6})?Z$') && this != timestamp('0001-01-01T00:00:00Z')"
+  }];
+}
+
+message DecimalValue {
+  option (buf.validate.message).cel = {
+    id: "decimal.negative_zero"
+    message: "negative zero is not canonical"
+    expression: "this.amount != '-0'"
+  };
+  string amount = 1 [(buf.validate.field).string = {
+    max_bytes: 128
+    pattern: "^-?(0|[1-9][0-9]*)([.][0-9]*[1-9])?$"
+  }];
+  string unit = 2 [(buf.validate.field).string.max_bytes = 32];
+}
+
+message UnknownValue {}
+
+// A required oneof preserves false, integer zero, empty text and unknown distinctly.
+message Value {
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    string text = 1 [(buf.validate.field).string.max_bytes = 65536];
+    bool boolean = 2;
+    int64 integer = 3;
+    DecimalValue decimal = 4;
+    string date = 5 [(buf.validate.field).string.pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"];
+    google.protobuf.Timestamp instant = 6 [(buf.validate.field).cel = {
+      id: "value.instant_nonzero"
+      message: "instant must not be zero time"
+      expression: "this != timestamp('0001-01-01T00:00:00Z')"
+    }];
+    string entity = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+    UnknownValue unknown = 8;
+  }
+}
+
+message SourceSpan {
+  option (buf.validate.message).cel = {
+    id: "source_span.order"
+    message: "end must exceed start"
+    expression: "this.end > this.start"
+  };
+  string evidence_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 start = 2 [(buf.validate.field).int64.gte = 0];
+  int64 end = 3 [(buf.validate.field).int64.gt = 0];
+  string quote = 4;
+}
+
+message CommitResult {
+  string id = 1;
+  string record_id = 2;
+  string version_id = 3;
+  string record_kind = 4;
+  string content_digest = 5;
+  int64 stream_revision = 6;
+  int64 ledger_revision = 7;
+}
+
+message FactResult {
+  string state = 1;
+  string record_id = 2;
+  string version_id = 3;
+  Value value = 4;
+  int64 ledger_revision = 5;
+  int64 stream_revision = 6;
+}
+
+// A refresh hint for an authorized mutation; never an overwrite reservation.
+message RevisionConflict {
+  string record_id = 1;
+  int64 expected_revision = 2;
+  int64 current_revision = 3;
+}

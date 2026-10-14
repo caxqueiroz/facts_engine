@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+
+// Identity comes from the authenticated transport, never from request actor fields.
+service FactService {
+  rpc GetFact(GetFactRequest) returns (GetFactResponse);
+  rpc ProposeFact(ProposeFactRequest) returns (ProposeFactResponse);
+  rpc ApproveFact(ApproveFactRequest) returns (ApproveFactResponse);
+  rpc AcceptFact(AcceptFactRequest) returns (AcceptFactResponse);
+  rpc RejectFact(RejectFactRequest) returns (RejectFactResponse);
+  rpc RetractFact(RetractFactRequest) returns (RetractFactResponse);
+  rpc DisputeFact(DisputeFactRequest) returns (DisputeFactResponse);
+  rpc ResolveDispute(ResolveDisputeRequest) returns (ResolveDisputeResponse);
+  rpc SupersedeFact(SupersedeFactRequest) returns (SupersedeFactResponse);
+}
+
+message GetFactRequest {
+  option (buf.validate.message).cel = {
+    id: "fact_query.knowledge_boundary"
+    message: "known_at and knowledge_revision cannot both be specified"
+    expression: "!has(this.known_at) || this.knowledge_revision == 0"
+  };
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  FactKey key = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp valid_at = 4 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 5 [(buf.validate.field).int64.gte = 0];
+  google.protobuf.Timestamp known_at = 6;
+}
+message GetFactResponse {
+  FactResult result = 1;
+}
+
+message ProposeFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  FactKey key = 3 [(buf.validate.field).required = true];
+  string schema_version = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Value value = 5 [(buf.validate.field).required = true];
+  Interval valid = 6 [(buf.validate.field).required = true];
+  repeated SourceSpan sources = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  int64 expected_revision = 8 [(buf.validate.field).int64.gte = 0];
+}
+message ProposeFactResponse {
+  CommitResult result = 1;
+}
+
+message ApproveFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+}
+message ApproveFactResponse {
+  CommitResult result = 1;
+}
+
+message AcceptFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+}
+message AcceptFactResponse {
+  CommitResult result = 1;
+}
+
+message RejectFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+}
+message RejectFactResponse {
+  CommitResult result = 1;
+}
+
+message RetractFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message RetractFactResponse {
+  CommitResult result = 1;
+}
+
+message DisputeFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message DisputeFactResponse {
+  CommitResult result = 1;
+}
+
+message ResolveDisputeRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+}
+message ResolveDisputeResponse {
+  CommitResult result = 1;
+}
+
+message SupersedeFactRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  int64 expected_revision = 6 [(buf.validate.field).int64.gte = 0];
+  string reason = 7 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}];
+  Interval valid = 8 [(buf.validate.field).required = true];
+  repeated string replaced_version_ids = 9 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 1000
+    unique: true
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
+  bool automated = 10;
+}
+message SupersedeFactResponse {
+  CommitResult result = 1;
+}
