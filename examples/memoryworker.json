@@ -1,0 +1,20 @@
+{
+  "mode": "projection",
+  "principal": "facts-projector",
+  "projection": {
+    "tenant": "bank1",
+    "generation": "lexical-v1",
+    "database_env": "MEMORY_INDEX_DATABASE_URL",
+    "max_connections": 4
+  },
+  "openfga_url": "http://127.0.0.1:8080",
+  "openfga_store": "replace-with-store-id",
+  "openfga_model": "replace-with-model-id",
+  "max_connections": 8,
+  "max_attempts": 5,
+  "lease_seconds": 30,
+  "poll_milliseconds": 250,
+  "min_backoff_milliseconds": 1000,
+  "max_backoff_seconds": 60,
+  "delivery_timeout_seconds": 120
+}

@@ -2,6 +2,7 @@
 
 build:
 	go build -trimpath -o bin/memoryd ./cmd/memoryd
+	go build -trimpath -o bin/memoryworker ./cmd/memoryworker
 
 test:
 	go test -race ./...

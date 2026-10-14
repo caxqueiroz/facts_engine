@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"errors"
 	facts "github.com/caxqueiroz/facts_engine"
 	"github.com/caxqueiroz/facts_engine/adapters/audit"
@@ -14,6 +13,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/mtlsidentity"
 	"github.com/caxqueiroz/facts_engine/adapters/openfga"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
+	"github.com/caxqueiroz/facts_engine/internal/runtimeconfig"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
@@ -22,13 +22,6 @@ import (
 	"time"
 )
 
-func secretHex(name string, size int) ([]byte, error) {
-	value, err := hex.DecodeString(os.Getenv(name))
-	if err != nil || len(value) != size {
-		return nil, errors.New("missing or invalid key configuration")
-	}
-	return value, nil
-}
 func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	return run(ctx, c, logger, nil)
 }
@@ -46,11 +39,11 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	if err := c.Validate(); err != nil {
 		return errors.New("invalid service configuration")
 	}
-	encryptionKey, err := secretHex("MEMORY_ENCRYPTION_KEY_HEX", 32)
+	encryptionKey, err := runtimeconfig.HexKey("MEMORY_ENCRYPTION_KEY_HEX", 32)
 	if err != nil {
 		return err
 	}
-	paginationKey, err := secretHex("MEMORY_PAGINATION_KEY_HEX", 32)
+	paginationKey, err := runtimeconfig.HexKey("MEMORY_PAGINATION_KEY_HEX", 32)
 	if err != nil {
 		return err
 	}
@@ -106,7 +99,7 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 	}
 	options := model.EngineOptions{Reads: model.ReadOptions{PaginationKey: paginationKey}}
 	if c.AuditKeyID != "" {
-		key, err := secretHex("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
+		key, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
 		if err != nil {
 			return err
 		}
@@ -115,6 +108,36 @@ func run(ctx context.Context, c Config, logger *slog.Logger, listener net.Listen
 			return errors.New("invalid audit signing key")
 		}
 		options.Audit.Signer = signer
+	}
+	if len(c.Retrieval) > 0 {
+		routes, closeRoutes, err := runtimeconfig.OpenLexical(startup, c.Retrieval)
+		if err != nil {
+			return err
+		}
+		defer closeRoutes()
+		options.Retrieval = model.RetrievalOptions{Index: routes, Registry: ledger, Progress: ledger}
+		if c.OperationsScope != "" {
+			dsn := os.Getenv("MEMORY_OPERATIONS_DATABASE_URL")
+			if dsn == "" {
+				return errors.New("missing administrative database configuration")
+			}
+			config, err := pgxpool.ParseConfig(dsn)
+			if err != nil {
+				return errors.New("invalid administrative database configuration")
+			}
+			config.MaxConns = min(c.MaxConnections, 4)
+			config.ConnConfig.ConnectTimeout = 5 * time.Second
+			adminPool, err := pgxpool.NewWithConfig(startup, config)
+			if err != nil {
+				return errors.New("cannot create administrative database pool")
+			}
+			defer adminPool.Close()
+			registry, err := postgres.New(startup, adminPool, cipher)
+			if err != nil {
+				return errors.New("administrative schema or role check failed")
+			}
+			options.Operations = model.OperationsOptions{Scope: c.OperationsScope, Store: registry, Index: routes, Progress: registry}
+		}
 	}
 	engine, err := facts.NewWithOptions(ledger, authz, store, options)
 	if err != nil {
