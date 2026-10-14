@@ -244,6 +244,10 @@ type ConversationRequest = model.ConversationRequest
 type ConversationRecord = model.ConversationRecord
 type ConversationQuery = model.ConversationQuery
 
+func (e *Engine) PlanExtractionChunks(ctx context.Context, c Caller, q model.ExtractionChunkQuery) (model.ExtractionChunkPlan, error) {
+	return e.service.PlanExtractionChunks(ctx, c, q)
+}
+
 func (e *Engine) StartExtraction(ctx context.Context, c Caller, r model.ExtractionRequest) (model.JobStatus, error) {
 	return e.service.StartExtraction(ctx, c, r)
 }

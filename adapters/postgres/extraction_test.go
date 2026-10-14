@@ -357,13 +357,51 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		body, _ := json.Marshal(model.ExtractionOutput{Candidates: []model.ExtractionCandidate{good, relative}})
 		return model.ExtractionResponse{ModelIdentity: "fixture-ranges", Body: body}, nil
 	}), slicedProfile, 100000)
+	chunkQuery := model.ExtractionChunkQuery{Scope: scope, ConversationID: conversation.ID, ProfileID: slicedProfile.ID, Purpose: "extraction-test", MaxSourceBytes: 10}
+	plan, err := slicedEngine.PlanExtractionChunks(ctx, c, chunkQuery)
+	if err != nil || len(plan.Chunks) < 2 || plan.ProfileDigest != model.ExtractionProfileDigest(slicedProfile) || plan.ConversationDigest != conversation.Digest {
+		t.Fatal("chunk plan", plan, err)
+	}
+	repeatedPlan, err := slicedEngine.PlanExtractionChunks(ctx, c, chunkQuery)
+	if err != nil || model.Digest(repeatedPlan) != model.Digest(plan) {
+		t.Fatal("unstable plan", err)
+	}
+	var sourceBytes int
+	for _, chunk := range plan.Chunks {
+		if chunk.SourceBytes > 10 || len(chunk.InputRanges) == 0 {
+			t.Fatal(chunk)
+		}
+		sourceBytes += chunk.SourceBytes
+	}
+	if int64(sourceBytes) != original.Size+injected.Size {
+		t.Fatal("incomplete plan", sourceBytes)
+	}
+	for _, permission := range []string{"can_extract", "can_read_evidence", "can_read_evidence_metadata"} {
+		denied, err := facts.NewWithOptions(l, denyPermission{permission: permission}, store, model.EngineOptions{Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: slicedProfile, Provider: valid}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: 100000}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = denied.PlanExtractionChunks(ctx, c, chunkQuery); !errors.Is(err, model.ErrDenied) {
+			t.Fatal("unauthorized planning", permission, err)
+		}
+	}
+	chunkQuery.InputRanges = []model.ExtractionInputRange{{EvidenceID: conversation.EvidenceIDs[0], Start: 9, End: 12}}
+	selectedPlan, err := slicedEngine.PlanExtractionChunks(ctx, c, chunkQuery)
+	if err != nil || len(selectedPlan.Chunks) != 1 || len(selectedPlan.ExcludedRanges) != 3 {
+		t.Fatal("selected plan", selectedPlan, err)
+	}
 	slicedRequest := request
 	slicedRequest.Command = cmd("extract-ranges")
-	slicedRequest.InputRanges = []model.ExtractionInputRange{{EvidenceID: conversation.EvidenceIDs[0], Start: 9, End: 12}}
+	slicedRequest.InputRanges = selectedPlan.Chunks[0].InputRanges
 	if _, err := engine.StartExtraction(ctx, c, slicedRequest); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("unapproved ranges", err)
 	}
 	slicedRequest.ProfileID = slicedProfile.ID
+	slicedRequest.ExpectedProfileDigest = model.Digest("stale-profile")
+	if _, err := slicedEngine.StartExtraction(ctx, c, slicedRequest); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("stale plan profile", err)
+	}
+	slicedRequest.ExpectedProfileDigest = selectedPlan.ProfileDigest
 	slicedJob, err := slicedEngine.StartExtraction(ctx, c, slicedRequest)
 	if err != nil {
 		t.Fatal(err)

@@ -52,7 +52,7 @@ func extractionTx(tx model.Tx) (model.ExtractionTx, error) {
 	return t, nil
 }
 func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.ExtractionRequest) (model.JobStatus, error) {
-	if r.Refresh != nil || r.RefreshTrigger != nil || !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) {
+	if (r.ExpectedProfileDigest != "" && !validDigest(r.ExpectedProfileDigest)) || r.Refresh != nil || r.RefreshTrigger != nil || !model.ValidID(r.Key) || !model.ValidID(r.ConversationID) || !model.ValidID(r.ProfileID) {
 		return model.JobStatus{}, model.ErrInvalid
 	}
 	memoryMode := len(r.MemoryTargets) > 0
@@ -86,7 +86,7 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 	if memoryMode {
 		parser = "memory-extraction-json-v1"
 	}
-	if !ok || approved.Profile.ParserVersion != parser {
+	if !ok || approved.Profile.ParserVersion != parser || (r.ExpectedProfileDigest != "" && r.ExpectedProfileDigest != model.ExtractionProfileDigest(approved.Profile)) {
 		return model.JobStatus{}, model.ErrPrecondition
 	}
 	conversation, err := s.GetConversation(ctx, c, model.ConversationQuery{ID: r.ConversationID, Scope: r.Scope, Purpose: r.Purpose})

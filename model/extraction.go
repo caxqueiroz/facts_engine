@@ -42,7 +42,8 @@ type ExtractionOptions struct {
 }
 type PredicateBinding struct{ Predicate, SchemaVersion string }
 type ExtractionRequest struct {
-	InputRanges []ExtractionInputRange `json:",omitempty"`
+	ExpectedProfileDigest string                 `json:",omitempty"`
+	InputRanges           []ExtractionInputRange `json:",omitempty"`
 	Command
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
