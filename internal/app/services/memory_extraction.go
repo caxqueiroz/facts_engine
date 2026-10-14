@@ -140,7 +140,9 @@ func memoryCandidateIssue(c model.MemoryExtractionCandidate, input model.Extract
 	}
 	return extractionSourceIssue(c.Sources, input)
 }
-func (s *Service) appendExtractedMemories(ctx context.Context, tx model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.ExtractionInput, output model.MemoryExtractionOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) error {
+func (s *Service) appendExtractedMemories(ctx context.Context, tx model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.ExtractionInput, output model.MemoryExtractionOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) (observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "validate.memory_proposals")
+	defer observation.End(&observationErr)
 	t, ok := tx.(model.MemoryExtractionTx)
 	if !ok {
 		return model.ErrPrecondition

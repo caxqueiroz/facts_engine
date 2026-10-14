@@ -256,7 +256,9 @@ func parseMemoryRefresh(body []byte) (model.MemoryRefreshOutput, error) {
 	return out, nil
 }
 
-func (s *Service) appendRefreshedMemory(ctx context.Context, tx model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.MemoryRefreshInput, output model.MemoryRefreshOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) error {
+func (s *Service) appendRefreshedMemory(ctx context.Context, tx model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.MemoryRefreshInput, output model.MemoryRefreshOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) (observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "validate.memory_refresh")
+	defer observation.End(&observationErr)
 	issue := func(code string) error {
 		result.Issues = append(result.Issues, model.ExtractionIssue{Candidate: 0, Code: code})
 		return nil

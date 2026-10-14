@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -85,6 +87,9 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		body, _ := json.Marshal(model.ExtractionOutput{Candidates: []model.ExtractionCandidate{good, unknown, assistant, negated}})
 		return model.ExtractionResponse{ModelIdentity: "fixture-reported-alias", Body: body, InputTokens: 100, OutputTokens: 50}, nil
 	})
+	traceExporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(traceExporter))
+	defer func() { _ = tracerProvider.Shutdown(context.Background()) }()
 	reader := sdkmetric.NewManualReader()
 	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 	defer func() { _ = meterProvider.Shutdown(context.Background()) }()
@@ -108,7 +113,7 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	}
 	configured := func(provider model.ExtractionProvider, p model.ExtractionProfile, budget int64) *facts.Engine {
 		t.Helper()
-		e, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Telemetry: model.TelemetryOptions{MeterProvider: meterProvider}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: p, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: budget}})
+		e, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Telemetry: model.TelemetryOptions{MeterProvider: meterProvider, TracerProvider: tracerProvider}, Extraction: model.ExtractionOptions{Profiles: []model.ApprovedExtractor{{Profile: p, Provider: provider}}, MaxConcurrentPerTenant: 1, DailyTokenBudget: budget}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -147,6 +152,15 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	retained, err := engine.GetExtractionRun(ctx, c, model.ExtractionRunQuery{ID: completed.AttemptID, Scope: scope, Purpose: "review"})
 	if err != nil || retained.Result == nil || len(retained.Result.Proposals) != 1 || len(retained.Result.Issues) != 3 {
 		t.Fatal(retained, err)
+	}
+	stages := map[string]bool{}
+	for _, span := range traceExporter.GetSpans() {
+		stages[span.Name] = true
+	}
+	for _, stage := range []string{"run.extraction", "call.extraction_provider", "validate.fact_proposals"} {
+		if !stages[stage] {
+			t.Fatal("missing extraction stage", stage)
+		}
 	}
 	totals := metricTotals()
 	if totals["facts.extraction.results"] != 1 || totals["facts.extraction.proposals"] != 1 || totals["facts.extraction.issues"] != 3 {

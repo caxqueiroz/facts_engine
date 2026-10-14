@@ -75,7 +75,7 @@ Generated Go messages and Connect/gRPC clients are committed under [gen/memory/v
 | [ExtractionService](proto/memory/v1/extraction.proto) | StartExtraction, PlanExtractionChunks, GetJob, RetryJob, GetExtractionRun, StartMemoryRefresh, ScanMemoryRefresh, StartMemoryRefreshSweep |
 | [AttestationService](proto/memory/v1/attestations.proto) | RecordAttestation, WithdrawAttestation, RecordDelegatedAttestation |
 
-The main specification API groups are available through this handler. Retention administration and refresh scheduling still use embedded/worker interfaces; standalone service deployment and full transport parity remain unfinished.
+The main specification API groups, including retention administration and refresh scheduling, are available through this handler. The standalone service is implemented; comprehensive transport parity across every operation remains unfinished.
 
 [connectapi.NewHandler](adapters/connectapi/server.go) accepts the existing engine, an injected `IdentityVerifier`, and mandatory `Limits` (timeout, concurrent requests, request bytes and response bytes). It returns an `http.Handler` without opening a listener or starting background workers. The host mounts it on its HTTP server, configures TLS and read/write/idle deadlines, and enables HTTP/2 for gRPC. Connect and gRPC-Web use the same handler. A generated Connect client is composed as follows:
 
@@ -344,7 +344,7 @@ For archive-chain monitoring, `archive.NewChainVerifier(trustedKeys, telemetryOp
 
 Projection and archive handlers accept host-owned providers through `workers.NewProjectionWithTelemetry` and `workers.NewArchiveWithTelemetry`. They emit `project.document` and `archive.event` spans plus the shared operation count/duration metrics, preserving the parent context through authorization and storage calls. Outcomes include denied access, dependency failure, cancellation and panic without logging raw errors, event contents or identifiers. An ignored projection event still completes a handler operation; these counts do not measure index writes. The original constructors keep instrumentation disabled. Packaged workers inject their configured providers into both handlers.
 
-Full internal-stage coverage remains unfinished. Both packaged binaries support the optional OTLP exporter configuration above and retain their sanitized lifecycle logs and health endpoints.
+Extraction emits `call.extraction_provider` for the deadline-bound provider invocation and `validate.fact_proposals`, `validate.memory_proposals`, or `validate.memory_refresh` for the transactional candidate validation and staging pass. Provider spans inherit the run context; errors, cancellation and panics use bounded outcomes without recording request, response or error text. Validation passes that return review issues successfully have operation outcome `ok`; use `facts.extraction.issues` for committed issue counts. Transaction retries can repeat validation spans, so these stage counts are execution attempts, not committed proposals. Full internal-stage coverage remains unfinished. Both packaged binaries support the optional OTLP exporter configuration above and retain their sanitized lifecycle logs and health endpoints.
 
 ## Standalone workers and lexical retrieval
 

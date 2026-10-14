@@ -221,10 +221,7 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		return model.JobStatus{}, model.ErrUnavailable
 	}
 	providerCtx, cancel := context.WithTimeout(ctx, min(job.Profile.Timeout, time.Until(retained.LeaseUntil)-time.Second))
-	response, providerErr := approved.Provider.Extract(providerCtx, append([]byte(nil), retained.RequestBytes...))
-	if providerErr == nil {
-		providerErr = providerCtx.Err()
-	}
+	response, providerErr := s.callExtractionProvider(providerCtx, approved.Provider, retained.RequestBytes)
 	cancel()
 	result := model.ExtractionResult{ContentScopes: job.ContentScopes, RefreshScopes: job.RefreshScopes, AttemptID: retained.ID, JobID: job.ID, Tenant: c.Tenant, Scope: r.Scope, Outcome: "completed", ModelIdentity: response.ModelIdentity, RequestDigest: retained.RequestDigest, ResponseDigest: model.BytesDigest(response.Body), ResponseComplete: true, InputTokens: response.InputTokens, OutputTokens: response.OutputTokens, Issues: []model.ExtractionIssue{}, Relations: []model.ExtractionRelation{}, Proposals: []model.ExtractedProposal{}}
 	if len(response.Body) > job.Profile.MaxOutputBytes {
@@ -325,7 +322,9 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	s.telemetry.ExtractionResult(ctx, status.Kind, result.Outcome, len(result.Proposals), len(result.Issues))
 	return s.GetJob(ctx, c, model.JobQuery{ID: job.ID, Scope: r.Scope, Purpose: r.Purpose})
 }
-func (s *Service) appendExtractedProposals(ctx context.Context, t model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.ExtractionInput, output model.ExtractionOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) error {
+func (s *Service) appendExtractedProposals(ctx context.Context, t model.ExtractionRunTx, c model.Caller, job model.ExtractionJob, input model.ExtractionInput, output model.ExtractionOutput, attempt string, auth []model.AuthorizationDecision, result *model.ExtractionResult) (observationErr error) {
+	ctx, observation := s.telemetry.Start(ctx, "validate.fact_proposals")
+	defer observation.End(&observationErr)
 	counts := map[model.FactKey]int{}
 	key := func(candidate model.ExtractionCandidate) model.FactKey {
 		return model.FactKey{Scope: job.Request.Scope, Subject: candidate.Subject, Predicate: candidate.Predicate, Discriminator: candidate.Discriminator}
