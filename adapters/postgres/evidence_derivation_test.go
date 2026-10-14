@@ -65,6 +65,13 @@ func testEvidenceDerivation(t *testing.T, ctx context.Context, l model.Ledger, s
 	if err != nil || string(content.Bytes) != "I prefer tea." || content.Metadata.Classification != source.Classification || content.Metadata.SourceClass != source.SourceClass || content.Metadata.RetentionPolicy != source.RetentionPolicy || content.Metadata.Derivation == nil {
 		t.Fatal("derivative provenance", content, err)
 	}
+	t.Run("remote evidence operations", func(t *testing.T) {
+		metadataOnly, err := facts.New(l, denyPermission{permission: "can_read_evidence"}, store)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testRemoteEvidence(t, ctx, e, metadataOnly, c, source, r)
+	})
 	if _, err = e.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd("spoof"), Evidence: content.Metadata}); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("forged derivation", err)
 	}

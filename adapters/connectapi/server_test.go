@@ -254,3 +254,34 @@ func TestResponseTimestampRange(t *testing.T) {
 		t.Fatalf("invalid output timestamp: %v", converter.err)
 	}
 }
+
+func TestEvidenceRequestValidation(t *testing.T) {
+	server, _ := startServer(t, &testEngine{}, fixedIdentity, testLimits())
+	client := memoryv1connect.NewEvidenceServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	object := &v1.ObjectRef{Locator: "object", Version: "v1", Digest: strings.Repeat("a", 64), Size: 1}
+	request := &v1.RegisterRedactedEvidenceRequest{Tenant: "tenant", Command: &v1.Command{Key: "redact", Purpose: "review"}, Id: "derived", Scope: "scope", ParentEvidenceId: "parent", PolicyVersion: "policy", Object: object}
+	request.Ranges = []*v1.EvidenceCopyRange{{OriginalStart: 2, OriginalEnd: 1}}
+	if _, err := client.RegisterRedactedEvidence(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("reversed range: %v", err)
+	}
+	request.Ranges = nil
+	for range 257 {
+		request.Ranges = append(request.Ranges, &v1.EvidenceCopyRange{OriginalEnd: 1})
+	}
+	if _, err := client.RegisterRedactedEvidence(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("range count: %v", err)
+	}
+	request.Ranges = nil
+	request.Object.Size = 16777217
+	if _, err := client.RegisterRedactedEvidence(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("object size: %v", err)
+	}
+	request.Object.Size = 1
+	request.Object.Digest = "not-a-digest"
+	if _, err := client.RegisterRedactedEvidence(context.Background(), request); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("digest: %v", err)
+	}
+	if _, err := client.GetEvidenceContent(context.Background(), &v1.GetEvidenceContentRequest{Tenant: "other", Scope: "scope", Id: "id", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("evidence tenant: %v", err)
+	}
+}

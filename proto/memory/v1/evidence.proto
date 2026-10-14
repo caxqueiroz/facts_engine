@@ -1,0 +1,101 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+service EvidenceService {
+  rpc RegisterEvidence(RegisterEvidenceRequest) returns (RegisterEvidenceResponse);
+  rpc RegisterRedactedEvidence(RegisterRedactedEvidenceRequest) returns (RegisterRedactedEvidenceResponse);
+  rpc GetEvidenceMetadata(GetEvidenceMetadataRequest) returns (GetEvidenceMetadataResponse);
+  rpc GetEvidenceContent(GetEvidenceContentRequest) returns (GetEvidenceContentResponse);
+}
+// References identify host-managed immutable objects; they are not uploads.
+message ObjectRef {
+  string locator = 1 [(buf.validate.field).string.min_bytes = 1];
+  string version = 2 [(buf.validate.field).string.min_bytes = 1];
+  string digest = 3 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  int64 size = 4 [(buf.validate.field).int64 = {
+    gte: 0
+    lte: 16777216
+  }];
+}
+message EvidenceCopyRange {
+  option (buf.validate.message).cel = {
+    id: "copy_range.order"
+    message: "end must exceed start"
+    expression: "this.original_end > this.original_start"
+  };
+  int64 original_start = 1 [(buf.validate.field).int64.gte = 0];
+  int64 original_end = 2 [(buf.validate.field).int64.gt = 0];
+  int64 derived_start = 3 [(buf.validate.field).int64.gte = 0];
+}
+message EvidenceDerivation {
+  string parent_evidence_id = 1;
+  string transformation_version = 2;
+  string policy_version = 3;
+  repeated EvidenceCopyRange ranges = 4;
+}
+message Evidence {
+  string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string source_system = 3 [(buf.validate.field).string.min_bytes = 1];
+  string source_object = 4 [(buf.validate.field).string.min_bytes = 1];
+  string source_revision = 5 [(buf.validate.field).string.min_bytes = 1];
+  string speaker = 6 [(buf.validate.field).string.min_bytes = 1];
+  string source_class = 7 [(buf.validate.field).string.min_bytes = 1];
+  string media_type = 8 [(buf.validate.field).string.min_bytes = 1];
+  string classification = 9 [(buf.validate.field).string.min_bytes = 1];
+  string retention_policy = 10 [(buf.validate.field).string.min_bytes = 1];
+  google.protobuf.Timestamp source_time = 11 [(buf.validate.field).required = true];
+  ObjectRef object = 12 [(buf.validate.field).required = true];
+  EvidenceDerivation derivation = 13;
+}
+message RegisterEvidenceRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  Evidence evidence = 3 [(buf.validate.field).required = true];
+}
+message RegisterEvidenceResponse {
+  CommitResult result = 1;
+}
+message RegisterRedactedEvidenceRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string parent_evidence_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_version = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ObjectRef object = 7 [(buf.validate.field).required = true];
+  repeated EvidenceCopyRange ranges = 8 [(buf.validate.field).repeated.max_items = 256];
+}
+message RegisterRedactedEvidenceResponse {
+  CommitResult result = 1;
+}
+message GetEvidenceMetadataRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetEvidenceMetadataResponse {
+  Evidence metadata = 1;
+}
+message GetEvidenceContentRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetEvidenceContentResponse {
+  Evidence metadata = 1;
+  bytes content = 2;
+}

@@ -12,6 +12,7 @@ import (
 type Engine interface {
 	FactEngine
 	SnapshotEngine
+	EvidenceEngine
 }
 
 type SnapshotEngine interface {
