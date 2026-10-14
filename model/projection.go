@@ -3,8 +3,9 @@ package model
 import "context"
 import "time"
 
-// ProjectionDocument contains only canonical accepted fact content, never quotes.
+// ProjectionDocument contains canonical accepted fact or memory content, never source-span quotes.
 type ProjectionDocument struct {
+	Memory                                                                           *MemoryProjection `json:",omitempty"`
 	Tenant, Generation, RecordID, VersionID, VersionDigest, PolicyID, Classification string
 	Key                                                                              FactKey
 	Value                                                                            Value
@@ -12,7 +13,22 @@ type ProjectionDocument struct {
 	SourceClasses                                                                    []string
 }
 
+type MemoryProjection struct {
+	Key                          MemoryKey
+	Subtype, SchemaVersion, Body string
+	Dependencies                 []MemoryDependency
+}
+
+func (d ProjectionDocument) Scope() string {
+	if d.Memory != nil {
+		return d.Memory.Key.Scope
+	}
+	return d.Key.Scope
+}
 func ProjectionID(d ProjectionDocument) string {
+	if d.Memory != nil {
+		return Digest([]string{"memory-projection-v1", d.Tenant, d.Generation, d.VersionID})
+	}
 	return Digest([]string{"facts-projection-v1", d.Tenant, d.Generation, d.VersionID})
 }
 func ProjectionConsumer(generation string) string { return "projection-" + Digest(generation) }
@@ -21,6 +37,7 @@ type ProjectionSource interface {
 	ProjectionDocument(context.Context, Delivery, string) (*ProjectionDocument, error)
 }
 type SearchCandidate struct {
+	Kind                string `json:",omitempty"`
 	RecordID, VersionID string
 	Score               float64
 }
@@ -67,4 +84,16 @@ type ProjectionWaitRequest struct {
 type ProjectionReceipt struct {
 	Generation      string
 	IndexedRevision int64
+}
+
+type MemoryRecallItem struct {
+	Key    MemoryKey
+	Memory MemoryResult
+	Score  float64
+}
+type MemoryRecallResult struct {
+	Items                           []MemoryRecallItem
+	Generation                      string
+	LedgerRevision, IndexedRevision int64
+	Incomplete                      bool
 }

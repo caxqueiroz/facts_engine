@@ -69,3 +69,5 @@ GRANT SELECT ON memory_timeline_generations,memory_timeline_history,memory_rejec
 
 GRANT SELECT,INSERT ON attestation_identities,memory_attestations,memory_attestation_events TO facts_runtime;
 GRANT SELECT ON attestation_identities,memory_attestations,memory_attestation_events TO facts_archiver;
+
+GRANT SELECT ON memory_versions,memory_types,memory_timeline_generations,memory_timeline_history,memory_record_events TO facts_projector;

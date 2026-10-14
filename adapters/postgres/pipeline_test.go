@@ -145,6 +145,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil {
 		t.Fatal(err)
 	}
+	testMemoryRecall(t, ctx, lexicalEngine, c, query)
 	lexicalManifest, err := lexicalEngine.PrepareContext(ctx, c, model.ContextRequest{Command: model.Command{Key: "lexical-context", Purpose: query.Purpose}, Scope: "case1", Query: query})
 	if err != nil || len(lexicalManifest.Items) == 0 || lexicalManifest.Retrieval.EmbeddingID != "none" || lexicalManifest.Retrieval.Dimensions != 0 {
 		t.Fatal("lexical context provenance", lexicalManifest, err)
@@ -184,6 +185,28 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	// Corrupt index content remains untrusted; canonical returned values come from ledger.
 	if _, err := db.ExecContext(ctx, `UPDATE embeddings SET content='untrusted altered index text'`); err != nil {
 		t.Fatal(err)
+	}
+	memoryQuery := query
+	memoryQuery.Query = "memory"
+	memoryQuery.ValidAt = time.Now().UTC()
+	memories, err := engine.RecallMemories(ctx, c, memoryQuery)
+	if err != nil || len(memories.Items) != 1 || memories.Items[0].Memory.Body != "Corrected memory requiring its own validation." {
+		t.Fatal("vector recall trusted altered index body", memories, err)
+	}
+	noEvidence, err := facts.NewWithRetrieval(l, denyPermission{permission: "can_read_evidence"}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	withheld, err := noEvidence.RecallMemories(ctx, c, memoryQuery)
+	if err != nil || len(withheld.Items) != 0 {
+		t.Fatal("memory evidence permission bypassed", withheld, err)
+	}
+	successMemory := memories.Items[0]
+	if _, err := noEvidence.GetMemory(ctx, c, model.MemoryQuery{Key: successMemory.Key, ValidAt: memoryQuery.ValidAt, Purpose: "review"}); !errors.Is(err, model.ErrDenied) {
+		t.Fatal("direct memory evidence permission bypassed", err)
+	}
+	if _, err := noEvidence.GetMemoryVersion(ctx, c, model.MemoryVersionQuery{Scope: successMemory.Key.Scope, RecordID: successMemory.Memory.RecordID, VersionID: successMemory.Memory.VersionID, Purpose: "review"}); !errors.Is(err, model.ErrDenied) {
+		t.Fatal("memory version evidence permission bypassed", err)
 	}
 	again, err := engine.Recall(ctx, c, query)
 	if err != nil || len(again.Items) != len(result.Items) {

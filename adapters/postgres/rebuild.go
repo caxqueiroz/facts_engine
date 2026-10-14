@@ -292,7 +292,7 @@ func (l *Ledger) ProjectionDocuments(ctx context.Context, k model.GenerationKey,
 	err := l.Transact(ctx, k.Tenant, func(tx model.Tx) error {
 		events = nil
 		t := tx.(*transaction)
-		rows, err := t.tx.Query(ctx, `SELECT DISTINCT ON (version_id) e.payload FROM ledger_events e JOIN record_events r ON r.tenant_id=e.tenant_id AND r.event_id=e.id WHERE e.tenant_id=$1 AND e.ledger_revision<=$2 AND e.event_type IN ('approve_fact','accept_fact','supersede_fact') ORDER BY version_id,e.ledger_revision LIMIT 10001`, k.Tenant, through)
+		rows, err := t.tx.Query(ctx, `SELECT DISTINCT ON (r.kind,r.version_id) e.payload FROM ledger_events e JOIN (SELECT tenant_id,event_id,version_id,'fact' AS kind FROM record_events UNION ALL SELECT tenant_id,event_id,version_id,'memory' AS kind FROM memory_record_events) r ON r.tenant_id=e.tenant_id AND r.event_id=e.id WHERE e.tenant_id=$1 AND e.ledger_revision<=$2 AND e.event_type IN ('approve_fact','accept_fact','supersede_fact','approve_memory','accept_memory','supersede_memory') ORDER BY r.kind,r.version_id,e.ledger_revision LIMIT 10001`, k.Tenant, through)
 		if err != nil {
 			return err
 		}

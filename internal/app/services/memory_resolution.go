@@ -106,128 +106,142 @@ func (s *Service) memoryDependencyEvidence(ctx context.Context, c model.Caller, 
 	}
 	return nil
 }
+
+type memoryRead struct {
+	Result              model.MemoryResult
+	Version             *model.MemoryVersion
+	AttestationEvidence []string
+}
+
+func (s *Service) memoryReadAuthorization(ctx context.Context, c model.Caller, q model.MemoryQuery) error {
+	if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {
+		return err
+	}
+	if q.KnowledgeRevision > 0 || q.KnownAt != nil {
+		if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read_history", model.Command{Purpose: q.Purpose}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (s *Service) GetMemory(ctx context.Context, c model.Caller, q model.MemoryQuery) (model.MemoryResult, error) {
-	empty := model.MemoryResult{}
 	if !model.ValidID(q.Key.ID) || q.ValidAt.IsZero() || q.KnowledgeRevision < 0 || (q.KnownAt != nil && (q.KnownAt.IsZero() || q.KnowledgeRevision != 0)) {
-		return empty, model.ErrInvalid
+		return model.MemoryResult{}, model.ErrInvalid
 	}
-	historical := q.KnowledgeRevision > 0 || q.KnownAt != nil
-	authorize := func() error {
-		if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {
-			return err
-		}
-		if historical {
-			if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read_history", model.Command{Purpose: q.Purpose}); err != nil {
-				return err
-			}
-		}
-		return nil
+	if err := s.memoryReadAuthorization(ctx, c, q); err != nil {
+		return model.MemoryResult{}, err
 	}
-	if err := authorize(); err != nil {
-		return empty, err
-	}
-	out := model.MemoryResult{}
-	var selected *model.MemoryVersion
-	var attestationEvidence []string
+	var view memoryRead
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
-		out = model.MemoryResult{State: "missing"}
-		selected = nil
-		attestationEvidence = nil
-		t, err := memoryLifecycleTx(tx)
-		if err != nil {
-			return err
-		}
 		revision, at, err := readSelection(ctx, tx, q.KnowledgeRevision, q.KnownAt)
 		if err != nil {
 			return err
 		}
-		out.LedgerRevision = revision
-		if revision == 0 {
-			return nil
-		}
-		record, err := tx.Record(ctx, model.MemoryRecordID(q.Key))
-		if errors.Is(err, model.ErrNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if record.Kind != "memory" {
-			return model.ErrPrecondition
-		}
-		stream, err := t.MemoryStreamRevisionAt(ctx, record.ID, revision)
-		if err != nil {
-			return err
-		}
-		if stream == 0 {
-			return nil
-		}
-		out.RecordID = record.ID
-		out.StreamRevision = stream
-		out.State = "unresolved"
-		entries, err := t.MemoryTimeline(ctx, record.ID, revision)
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			if !entry.Valid.Contains(q.ValidAt) {
-				continue
-			}
-			out.VersionID = entry.VersionID
-			v, err := t.MemoryVersion(ctx, record.ID, entry.VersionID)
-			if err != nil {
-				return err
-			}
-			selected = &v
-			if model.MemoryDigest(v.Proposal) != v.Digest {
-				return model.ErrPrecondition
-			}
-			if entry.State == "disputed" || entry.State == "retracted" {
-				out.State = entry.State
-				return nil
-			}
-			policy, err := tx.Policy(ctx, q.Key.Scope, entry.PolicyID)
-			if err != nil {
-				return err
-			}
-			attestations, err := t.MemoryAttestations(ctx, v.ID, revision)
-			if err != nil {
-				return err
-			}
-			bound := []model.Attestation{}
-			for _, a := range attestations {
-				if slices.Contains(entry.AttestationIDs, a.ID) {
-					bound = append(bound, a)
-					attestationEvidence = append(attestationEvidence, a.EvidenceID)
-				}
-			}
-			if _, err = versionPrerequisites(policy, v.ID, v.Digest, bound, at); err != nil {
-				out.State = "ineligible"
-				return nil
-			}
-			eligible, err := s.memoryDependencies(ctx, t, v, revision, at, historical)
-			if err != nil {
-				return err
-			}
-			if !eligible {
-				out.State = "stale"
-				return nil
-			}
-			out.State = "resolved"
-			out.Body = v.Proposal.Body
-			out.Dependencies = v.Proposal.Dependencies
-			return nil
-		}
-		return nil
+		view, err = s.resolveMemory(ctx, tx, q, revision, at, q.KnowledgeRevision > 0 || q.KnownAt != nil)
+		return err
 	})
 	if err != nil {
-		return empty, err
+		return model.MemoryResult{}, err
 	}
+	return s.discloseMemory(ctx, c, q, view)
+}
+func (s *Service) resolveMemory(ctx context.Context, tx model.Tx, q model.MemoryQuery, revision int64, at time.Time, historical bool) (memoryRead, error) {
+	view := memoryRead{Result: model.MemoryResult{State: "missing", LedgerRevision: revision}}
+	t, err := memoryLifecycleTx(tx)
+	if err != nil {
+		return view, err
+	}
+
+	if revision == 0 {
+		return view, nil
+	}
+	record, err := tx.Record(ctx, model.MemoryRecordID(q.Key))
+	if errors.Is(err, model.ErrNotFound) {
+		return view, nil
+	}
+	if err != nil {
+		return view, err
+	}
+	if record.Kind != "memory" {
+		return view, model.ErrPrecondition
+	}
+	stream, err := t.MemoryStreamRevisionAt(ctx, record.ID, revision)
+	if err != nil {
+		return view, err
+	}
+	if stream == 0 {
+		return view, nil
+	}
+	view.Result.RecordID = record.ID
+	view.Result.StreamRevision = stream
+	view.Result.State = "unresolved"
+	entries, err := t.MemoryTimeline(ctx, record.ID, revision)
+	if err != nil {
+		return view, err
+	}
+	for _, entry := range entries {
+		if !entry.Valid.Contains(q.ValidAt) {
+			continue
+		}
+		view.Result.VersionID = entry.VersionID
+		v, err := t.MemoryVersion(ctx, record.ID, entry.VersionID)
+		if err != nil {
+			return view, err
+		}
+		view.Version = &v
+		if model.MemoryDigest(v.Proposal) != v.Digest {
+			return view, model.ErrPrecondition
+		}
+		if entry.State == "disputed" || entry.State == "retracted" {
+			view.Result.State = entry.State
+			return view, nil
+		}
+		policy, err := tx.Policy(ctx, q.Key.Scope, entry.PolicyID)
+		if err != nil {
+			return view, err
+		}
+		attestations, err := t.MemoryAttestations(ctx, v.ID, revision)
+		if err != nil {
+			return view, err
+		}
+		bound := []model.Attestation{}
+		for _, a := range attestations {
+			if slices.Contains(entry.AttestationIDs, a.ID) {
+				bound = append(bound, a)
+				view.AttestationEvidence = append(view.AttestationEvidence, a.EvidenceID)
+			}
+		}
+		if _, err = versionPrerequisites(policy, v.ID, v.Digest, bound, at); err != nil {
+			view.Result.State = "ineligible"
+			return view, nil
+		}
+		eligible, err := s.memoryDependencies(ctx, t, v, revision, at, historical)
+		if err != nil {
+			return view, err
+		}
+		if !eligible {
+			view.Result.State = "stale"
+			return view, nil
+		}
+		view.Result.State = "resolved"
+		view.Result.Body = v.Proposal.Body
+		view.Result.Dependencies = v.Proposal.Dependencies
+		return view, nil
+	}
+	return view, nil
+}
+func (s *Service) discloseMemory(ctx context.Context, c model.Caller, q model.MemoryQuery, view memoryRead) (model.MemoryResult, error) {
+	empty := model.MemoryResult{}
+	out, selected, attestationEvidence := view.Result, view.Version, view.AttestationEvidence
+	var err error
 	if selected != nil {
 		if _, err = s.memoryDependencyChecks(ctx, c, selected.Proposal.Dependencies, q.Purpose); err != nil {
 			return empty, err
 		}
 		if out.State == "resolved" {
+			if err = s.memoryEvidenceAuthorization(ctx, c, *selected, q.Purpose); err != nil {
+				return empty, err
+			}
 			ids := append([]string{}, attestationEvidence...)
 			for _, span := range selected.Proposal.Sources {
 				ids = append(ids, span.EvidenceID)
@@ -251,8 +265,26 @@ func (s *Service) GetMemory(ctx context.Context, c model.Caller, q model.MemoryQ
 			return empty, err
 		}
 	}
-	if err = authorize(); err != nil {
+	if selected != nil && out.State == "resolved" {
+		if err = s.memoryEvidenceAuthorization(ctx, c, *selected, q.Purpose); err != nil {
+			return empty, err
+		}
+	}
+	if err = s.memoryReadAuthorization(ctx, c, q); err != nil {
 		return empty, err
 	}
 	return out, nil
+}
+
+func (s *Service) memoryEvidenceAuthorization(ctx context.Context, c model.Caller, v model.MemoryVersion, purpose string) error {
+	scopes := map[string]bool{v.Proposal.Key.Scope: true}
+	for _, dependency := range v.Proposal.Dependencies {
+		scopes[dependency.Scope] = true
+	}
+	for scope := range scopes {
+		if _, err := s.authorize(ctx, c, scope, "can_read_evidence", model.Command{Purpose: purpose}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

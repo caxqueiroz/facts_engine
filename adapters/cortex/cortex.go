@@ -11,6 +11,7 @@ import (
 	"github.com/liliang-cn/cortexdb/v2/pkg/core"
 	"math"
 	"time"
+	"unicode/utf8"
 )
 
 const Version = "v2.129.0" // eaf996b62f75d5e499d1b9ca7fab470a23700385
@@ -125,7 +126,10 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 	if d.Tenant != i.config.Tenant || d.Generation != i.config.Generation {
 		return model.ErrDenied
 	}
-	if !model.ValidID(d.RecordID) || !model.ValidID(d.VersionID) || !model.ValidID(d.Key.Scope) || d.Value.Validate() != nil {
+	if !model.ValidID(d.RecordID) || !model.ValidID(d.VersionID) || !model.ValidID(d.Scope()) || (d.Memory == nil && d.Value.Validate() != nil) {
+		return model.ErrInvalid
+	}
+	if d.Memory != nil && (!model.ValidID(d.Memory.Key.ID) || !model.ValidID(d.Memory.Subtype) || !model.ValidID(d.Memory.SchemaVersion) || len(d.Memory.Body) == 0 || len(d.Memory.Body) > 65536 || !utf8.ValidString(d.Memory.Body) || len(d.Memory.Dependencies) > 64 || d.Key != (model.FactKey{}) || d.Value != (model.Value{})) {
 		return model.ErrInvalid
 	}
 	content, metadata, err := projectionContent(d)
@@ -208,7 +212,7 @@ func (i *Index) Candidates(ctx context.Context, tenant, generation, scope, query
 	}
 	out := make([]model.SearchCandidate, 0, len(hits))
 	for _, hit := range hits {
-		out = append(out, model.SearchCandidate{RecordID: hit.Metadata["record"], VersionID: hit.Metadata["version"], Score: hit.Score})
+		out = append(out, model.SearchCandidate{Kind: hit.Metadata["kind"], RecordID: hit.Metadata["record"], VersionID: hit.Metadata["version"], Score: hit.Score})
 	}
 	return out, nil
 }
@@ -235,22 +239,31 @@ func (r Router) Candidates(ctx context.Context, t, g, s, q string, n int) ([]mod
 }
 
 func projectionContent(d model.ProjectionDocument) ([]byte, map[string]string, error) {
-	content, err := json.Marshal(struct {
-		Key   model.FactKey
-		Value model.Value
-	}{d.Key, d.Value})
+	var content []byte
+	var err error
+	if d.Memory != nil {
+		content, err = json.Marshal(d.Memory)
+	} else {
+		content, err = json.Marshal(struct {
+			Key   model.FactKey
+			Value model.Value
+		}{d.Key, d.Value})
+	}
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(content) > 1<<20 {
 		return nil, nil, model.ErrInvalid
 	}
-	metadata := map[string]string{"tenant": d.Tenant, "generation": d.Generation, "scope": d.Key.Scope, "record": d.RecordID, "version": d.VersionID, "digest": d.VersionDigest, "policy": d.PolicyID, "classification": d.Classification}
+	metadata := map[string]string{"tenant": d.Tenant, "generation": d.Generation, "scope": d.Scope(), "record": d.RecordID, "version": d.VersionID, "digest": d.VersionDigest, "policy": d.PolicyID, "classification": d.Classification}
 	provenance, _ := json.Marshal(struct {
 		Valid         model.Interval
 		SourceClasses []string
 	}{d.Valid, d.SourceClasses})
 	metadata["provenance"] = string(provenance)
+	if d.Memory != nil {
+		metadata["kind"] = "memory"
+	}
 
 	return content, metadata, nil
 }

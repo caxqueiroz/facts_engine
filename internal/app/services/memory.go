@@ -179,6 +179,9 @@ func (s *Service) GetMemoryVersion(ctx context.Context, c model.Caller, q model.
 	if model.MemoryDigest(v.Proposal) != v.Digest {
 		return empty, model.ErrPrecondition
 	}
+	if err = s.memoryEvidenceAuthorization(ctx, c, v, q.Purpose); err != nil {
+		return empty, err
+	}
 	if _, err = s.memoryDependencyChecks(ctx, c, v.Proposal.Dependencies, q.Purpose); err != nil {
 		return empty, err
 	}
@@ -187,6 +190,9 @@ func (s *Service) GetMemoryVersion(ctx context.Context, c model.Caller, q model.
 		ids = append(ids, span.EvidenceID)
 	}
 	if _, err = s.loadEvidence(ctx, c, q.Scope, ids); err != nil {
+		return empty, err
+	}
+	if err = s.memoryEvidenceAuthorization(ctx, c, v, q.Purpose); err != nil {
 		return empty, err
 	}
 	if _, err = s.memoryDependencyChecks(ctx, c, v.Proposal.Dependencies, q.Purpose); err != nil {

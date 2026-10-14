@@ -123,6 +123,9 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 			Key   model.FactKey
 			Value model.Value
 		}{d.Key, d.Value})
+		if d.Memory != nil {
+			raw, err = json.Marshal(d.Memory)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

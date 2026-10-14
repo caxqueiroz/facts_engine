@@ -35,7 +35,7 @@ func (i *Index) lexicalCandidates(ctx context.Context, tenant, generation, scope
 	}
 	// Explicit regconfig makes results independent of session language settings;
 	// plainto_tsquery treats caller text as data rather than query syntax.
-	rows, err := i.db.QueryContext(ctx, `SELECT metadata->>'record',metadata->>'version',ts_rank_cd(to_tsvector('simple',content),plainto_tsquery('simple',$4)) AS score FROM embeddings WHERE metadata->>'tenant'=$1 AND metadata->>'generation'=$2 AND metadata->>'scope'=$3 AND to_tsvector('simple',content) @@ plainto_tsquery('simple',$4) ORDER BY score DESC,metadata->>'version',id LIMIT $5`, tenant, generation, scope, query, limit)
+	rows, err := i.db.QueryContext(ctx, `SELECT metadata->>'record',metadata->>'version',coalesce(metadata->>'kind',''),ts_rank_cd(to_tsvector('simple',content),plainto_tsquery('simple',$4)) AS score FROM embeddings WHERE metadata->>'tenant'=$1 AND metadata->>'generation'=$2 AND metadata->>'scope'=$3 AND to_tsvector('simple',content) @@ plainto_tsquery('simple',$4) ORDER BY score DESC,metadata->>'version',id LIMIT $5`, tenant, generation, scope, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (i *Index) lexicalCandidates(ctx context.Context, tenant, generation, scope
 	out := []model.SearchCandidate{}
 	for rows.Next() {
 		var hit model.SearchCandidate
-		if err = rows.Scan(&hit.RecordID, &hit.VersionID, &hit.Score); err != nil {
+		if err = rows.Scan(&hit.RecordID, &hit.VersionID, &hit.Kind, &hit.Score); err != nil {
 			return nil, err
 		}
 		out = append(out, hit)

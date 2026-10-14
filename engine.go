@@ -324,3 +324,9 @@ type MemoryResult = model.MemoryResult
 func (e *Engine) GetMemoryHistory(ctx context.Context, c Caller, q model.HistoryPageQuery) (model.HistoryPage, error) {
 	return e.service.GetMemoryHistory(ctx, c, q)
 }
+
+func (e *Engine) RecallMemories(ctx context.Context, c Caller, q model.RecallRequest) (model.MemoryRecallResult, error) {
+	return e.service.RecallMemories(ctx, c, q)
+}
+
+type MemoryRecallResult = model.MemoryRecallResult

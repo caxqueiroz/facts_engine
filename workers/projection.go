@@ -25,7 +25,7 @@ func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
 		return model.ErrDenied
 	}
 	switch d.Event.Type {
-	case "approve_fact", "accept_fact", "supersede_fact":
+	case "approve_fact", "accept_fact", "supersede_fact", "approve_memory", "accept_memory", "supersede_memory":
 	default:
 		return nil
 	}
@@ -42,6 +42,26 @@ func (p *Projection) Handle(ctx context.Context, d model.Delivery) error {
 	}
 	if doc == nil {
 		return nil
+	}
+	if doc.Memory != nil {
+		scopes := map[string]bool{doc.Memory.Key.Scope: true}
+		for _, dependency := range doc.Memory.Dependencies {
+			scopes[dependency.Scope] = true
+		}
+		for scope := range scopes {
+			for _, permission := range []string{"can_read", "can_read_history", "can_read_evidence"} {
+				check, err := p.auth.Check(ctx, model.AuthorizationRequest{Caller: p.caller, Scope: scope, Permission: permission, Purpose: "index_projection"})
+				if err != nil {
+					return model.ErrUnavailable
+				}
+				if !check.Allowed {
+					return model.ErrDenied
+				}
+				if check.Consistency != "HIGHER_CONSISTENCY" || check.ModelID == "" || time.Since(check.CheckedAt) > 30*time.Second || check.CheckedAt.After(time.Now().Add(time.Second)) {
+					return model.ErrUnavailable
+				}
+			}
+		}
 	}
 	if time.Since(decision.CheckedAt) > 30*time.Second {
 		return model.ErrUnavailable
