@@ -28,7 +28,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            Makefile
       - name: Install pinned development tools
         run: make tools
       - name: Check source, migrations and generated files
@@ -45,7 +47,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            scripts/integration.sh
       - name: Run race-enabled tests with isolated services
         run: make ci-integration
 
