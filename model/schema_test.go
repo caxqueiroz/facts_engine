@@ -51,7 +51,7 @@ func TestValueConstraints(t *testing.T) {
 func TestSchemaPrecisionAndLegacyEncoding(t *testing.T) {
 	base := PredicateVersion{Kind: Text}
 	b, err := json.Marshal(base)
-	if err != nil || strings.Contains(string(b), "Constraints") || strings.Contains(string(b), "Cardinality") || strings.Contains(string(b), "TemporalPrecision") {
+	if err != nil || strings.Contains(string(b), "Constraints") || strings.Contains(string(b), "Cardinality") || strings.Contains(string(b), "TemporalPrecision") || strings.Contains(string(b), "Migration") {
 		t.Fatal("legacy encoding changed", string(b), err)
 	}
 	value := Value{Kind: Text, Text: schemaPtr("tea")}

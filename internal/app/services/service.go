@@ -150,6 +150,16 @@ func (s *Service) RegisterPredicateVersion(ctx context.Context, c model.Caller, 
 		if _, err := tx.Policy(ctx, d.Scope, d.PolicyID); err != nil {
 			return err
 		}
+		active, err := tx.ActivePredicate(ctx, d.Scope, d.Predicate)
+		if errors.Is(err, model.ErrNotFound) {
+			if d.Migration != nil {
+				return model.ErrPrecondition
+			}
+		} else if err != nil {
+			return err
+		} else if d.Migration == nil || d.Migration.FromVersion != active {
+			return model.ErrPrecondition
+		}
 		out.ID = d.Version
 		return tx.InsertPredicate(ctx, d)
 	})

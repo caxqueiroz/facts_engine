@@ -56,3 +56,6 @@ GRANT SELECT ON extraction_jobs,extraction_job_state,extraction_retry_events TO 
 GRANT SELECT,INSERT ON extraction_quota,extraction_attempts,extraction_results,extraction_proposals TO facts_runtime;
 GRANT UPDATE ON extraction_quota TO facts_runtime;
 GRANT SELECT ON extraction_attempts,extraction_results,extraction_proposals TO facts_archiver;
+
+GRANT SELECT,INSERT ON predicate_migrations TO facts_runtime;
+GRANT SELECT ON predicate_migrations TO facts_archiver;

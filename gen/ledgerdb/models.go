@@ -350,6 +350,15 @@ type PolicyVersion struct {
 	Payload  []byte
 }
 
+type PredicateMigration struct {
+	TenantID    string
+	ScopeID     string
+	Predicate   string
+	Version     string
+	FromVersion string
+	Mode        string
+}
+
 type PredicateVersion struct {
 	TenantID  string
 	ScopeID   string

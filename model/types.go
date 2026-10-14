@@ -155,13 +155,19 @@ func Digest(v any) string {
 }
 func BytesDigest(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 
+// PredicateMigration declares a reviewed schema transition. Existing versions
+// are never rewritten; replacement values require new proposals and acceptance.
+type PredicateMigration struct {
+	FromVersion, Mode, Reason string
+}
 type PredicateVersion struct {
 	Scope, Predicate, Version, PolicyID string
 	Kind                                ValueKind
 	Classification                      string
-	Constraints                         *ValueConstraints `json:",omitempty"`
-	Cardinality                         string            `json:",omitempty"`
-	TemporalPrecision                   string            `json:",omitempty"`
+	Migration                           *PredicateMigration `json:",omitempty"`
+	Constraints                         *ValueConstraints   `json:",omitempty"`
+	Cardinality                         string              `json:",omitempty"`
+	TemporalPrecision                   string              `json:",omitempty"`
 }
 type AttestationRequirement struct {
 	Kind       string

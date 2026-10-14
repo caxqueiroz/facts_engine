@@ -170,7 +170,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: scope/subject administration, explicit schema migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints and temporal precision.
+1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, remaining memory-specific pagination and history contracts. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -355,8 +355,33 @@ The real PostgreSQL concurrent-approval test verifies that the losing command re
 - `DecimalPlaces`: maximum fractional digits in the canonical decimal representation. Trailing-zero strings remain invalid under the existing canonical-value contract.
 - `Units`: an allowlist for decimal units/currencies, including an explicit empty string if unitless values are permitted. Numeric bounds apply in each allowed unit; the engine does not convert currencies or units.
 
-Constraint definitions are limited to 64 KiB. Wrong-type constraints, inverted bounds, duplicate enumeration values/units, invalid canonical decimals and unsupported cardinalities are rejected at publication. Manual proposals and extracted candidates share `ValidateFact`; invalid extracted values become review issues. Acceptance rechecks the bound immutable definition. Register a new schema version for changes; existing accepted versions retain their original schema and history. Explicit migration planning and transformation rules remain delivery work.
+Constraint definitions are limited to 64 KiB. Wrong-type constraints, inverted bounds, duplicate enumeration values/units, invalid canonical decimals and unsupported cardinalities are rejected at publication. Manual proposals and extracted candidates share `ValidateFact`; invalid extracted values become review issues. Acceptance rechecks the bound immutable definition. Register a new schema version for changes; existing accepted versions retain their original schema and history. Replacement publication requires the explicit migration rule described below; the host supplies any transformed values through new governed proposals.
 
 `TemporalPrecision` accepts `microsecond`, `second` or `day`. It applies to effective interval boundaries and instant values; `day` requires UTC midnight. It never rounds timestamps or infers a local timezone. Omission retains the existing interval microsecond contract without adding a restriction to instant values. Lifecycle changes also validate their affected intervals against the version's declared precision.
 
 Tests cover exact decimal comparisons beyond floating-point precision, Unicode lengths, ranges, units, enumerations, unknown values, time boundaries, legacy serialization, persisted definitions and extraction filtering. A PostgreSQL scenario rejects an invalid proposal without consuming its command key, then accepts a valid proposal through the ordinary review policy.
+
+
+### Publishing replacement schemas
+
+Apply `00013_predicate_migrations.sql` and refresh runtime grants before upgrading the adapter. A first predicate version has no `Migration`. Every replacement must carry `PredicateMigration` with the currently active `FromVersion`, `Mode: "preserve_history_repropose"`, and an opaque reason code. The command still requires `can_manage_definitions`, an idempotency key and purpose.
+
+```go
+next := model.PredicateVersion{
+    Scope: scope, Predicate: "preference", Version: "v2", PolicyID: "review-v2",
+    Kind: model.Text, Classification: "confidential",
+    Migration: &model.PredicateMigration{
+        FromVersion: "v1", Mode: "preserve_history_repropose", Reason: "schema_review",
+    },
+}
+_, err := engine.RegisterPredicateVersion(ctx, caller, model.PredicateRequest{
+    Command: model.Command{Key: "publish-preference-v2", Purpose: "schema_administration"},
+    Definition: next,
+})
+```
+
+Publication checks the active predecessor under a database lock, then atomically stores the definition, immutable migration link, active pointer, event and command receipt. Concurrent replacements of one predecessor cannot both activate: the stale publisher receives `ErrPrecondition` and must review the new active state. An identical retry of a committed publication returns its original receipt even after another version becomes active. Database foreign keys bind both sides of the migration to the same tenant, scope and predicate.
+
+The supported rule leaves accepted facts, historical resolutions, evidence, snapshots and calculation receipts unchanged. Pending proposals under an inactive schema cannot be accepted. New values must be proposed against the active schema and pass its policy; replacing an overlapping accepted value still requires ordinary supersession with evidence and review. The engine does not reinterpret old payloads, convert units, or carry attestations onto a new version. Schema rollback likewise means publishing a new version derived from the current active version; existing immutable version IDs cannot be reactivated by republishing them.
+
+The migration reason and rule are retained inside the encrypted predicate definition and therefore appear in authorized audit exports and event archives. Legacy definitions remain readable; the deployment migration does not invent predecessor links or reasons for publications made before this contract. Tests cover missing rules, concurrent replacement conflicts, committed retries and preserved accepted history.

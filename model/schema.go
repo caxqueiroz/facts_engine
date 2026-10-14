@@ -22,6 +22,9 @@ type ValueConstraints struct {
 }
 
 func (p PredicateVersion) ValidateSchema() error {
+	if p.Migration != nil && (!ValidID(p.Migration.FromVersion) || p.Migration.FromVersion == p.Version || p.Migration.Mode != "preserve_history_repropose" || !ValidID(p.Migration.Reason)) {
+		return ErrInvalid
+	}
 	if p.Cardinality != "" && p.Cardinality != "single" {
 		return ErrInvalid
 	}

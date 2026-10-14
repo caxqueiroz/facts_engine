@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -195,6 +195,11 @@ func (t *transaction) InsertPredicate(ctx context.Context, d model.PredicateVers
 	_, err = t.tx.Exec(ctx, `INSERT INTO predicate_versions VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, d.Scope, d.Predicate, d.Version, d.PolicyID, b)
 	if err != nil {
 		return err
+	}
+	if d.Migration != nil {
+		if _, err = t.tx.Exec(ctx, `INSERT INTO predicate_migrations VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, d.Scope, d.Predicate, d.Version, d.Migration.FromVersion, d.Migration.Mode); err != nil {
+			return err
+		}
 	}
 	_, err = t.tx.Exec(ctx, `INSERT INTO active_predicates VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,scope_id,predicate) DO UPDATE SET version=EXCLUDED.version`, t.tenant, d.Scope, d.Predicate, d.Version)
 	return err
@@ -419,5 +424,9 @@ func (t *transaction) Revision(ctx context.Context) (int64, error) {
 func (t *transaction) ActivePredicate(ctx context.Context, scope, predicate string) (string, error) {
 	var version string
 	err := t.tx.QueryRow(ctx, `SELECT version FROM active_predicates WHERE tenant_id=$1 AND scope_id=$2 AND predicate=$3 FOR SHARE`, t.tenant, scope, predicate).Scan(&version)
-	return version, translate(err)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return version, model.ErrNotFound
+	}
+	// Preserve serialization/deadlock errors for the transaction retry loop.
+	return version, err
 }

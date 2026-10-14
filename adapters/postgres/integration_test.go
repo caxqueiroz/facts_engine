@@ -41,7 +41,7 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql", "00005_calculations_audit.sql", "00006_outbox_consumers.sql", "00007_projection_rebuilds.sql", "00008_context_decisions.sql", "00009_retention.sql", "00010_conversations.sql", "00011_extraction_jobs.sql", "00012_extraction_runs.sql", "00013_predicate_migrations.sql"} {
 		if name == "00004_temporal_snapshots.sql" {
 			seedLegacyTimeline(t, ctx, admin)
 		}
@@ -405,8 +405,47 @@ func TestPostgresLedger(t *testing.T) {
 		newer := def
 		newer.Command = cmd("schema-v2")
 		newer.Definition.Version = "v2"
+		newer.Definition.Migration = &model.PredicateMigration{FromVersion: "v1", Mode: "preserve_history_repropose", Reason: "policy_review"}
+		missingRule := newer
+		missingRule.Definition.Migration = nil
+		if _, err := engine.RegisterPredicateVersion(ctx, caller, missingRule); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("implicit schema migration accepted", err)
+		}
 		if _, err := engine.RegisterPredicateVersion(ctx, caller, newer); err != nil {
 			t.Fatal(err)
+		}
+		// A committed retry retains its result even if a later migration wins.
+		migrations := make(chan error, 2)
+		for _, version := range []string{"v3", "v4"} {
+			go func(version string) {
+				next := def
+				next.Command = cmd("schema-" + version)
+				next.Definition.Version = version
+				next.Definition.Migration = &model.PredicateMigration{FromVersion: "v2", Mode: "preserve_history_repropose", Reason: "concurrent_review"}
+				_, err := engine.RegisterPredicateVersion(ctx, caller, next)
+				migrations <- err
+			}(version)
+		}
+		won, stale := 0, 0
+		for i := 0; i < 2; i++ {
+			err := <-migrations
+			if err == nil {
+				won++
+			} else if errors.Is(err, model.ErrPrecondition) {
+				stale++
+			} else {
+				t.Fatal(err)
+			}
+		}
+		if won != 1 || stale != 1 {
+			t.Fatal("concurrent migrations both activated", won, stale)
+		}
+		if _, err := engine.RegisterPredicateVersion(ctx, caller, newer); err != nil {
+			t.Fatal("committed migration retry failed", err)
+		}
+		current, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: q.Key, ValidAt: now})
+		if err != nil || current.State != "resolved" || current.VersionID != proposal.VersionID {
+			t.Fatal("migration rewrote accepted history", current, err)
 		}
 		old := q
 		old.Command = cmd("old-schema-proposal")
