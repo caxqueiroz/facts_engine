@@ -11,6 +11,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/audit"
 	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/caxqueiroz/facts_engine/workers"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"sync/atomic"
 	"testing"
@@ -22,7 +23,7 @@ type extractionFunc func(context.Context, []byte) (model.ExtractionResponse, err
 func (f extractionFunc) Extract(ctx context.Context, b []byte) (model.ExtractionResponse, error) {
 	return f(ctx, b)
 }
-func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres, admin *pgxpool.Pool, c model.Caller) {
+func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres, admin *pgxpool.Pool, queue model.Outbox, c model.Caller) {
 	t.Helper()
 	base, _ := facts.New(l, allow{}, store)
 	scope := "extraction-case"
@@ -179,10 +180,48 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	go func() { _, err := run(blocking, blocked, "extract-blocked-run"); finished <- err }()
 	<-entered
 	_, duplicateErr := run(blocking, blocked, "extract-blocked-run")
+	otherJob := start(engine, "extract-concurrent-other")
+	_, admissionErr := run(engine, otherJob, "extract-concurrent-other-run")
 	close(release)
+	if !errors.Is(admissionErr, model.ErrUnavailable) {
+		t.Fatal("tenant concurrency limit bypassed", admissionErr)
+	}
 	firstErr := <-finished
 	if !errors.Is(duplicateErr, model.ErrUnavailable) || firstErr != nil || blockedCalls.Load() != 1 {
 		t.Fatal("duplicate provider execution", duplicateErr, firstErr, blockedCalls.Load())
+	}
+	// A provider may return after losing its lease. A replacement claim fences
+	// that old response out while retaining the abandoned attempt for audit.
+	staleEntered, staleRelease := make(chan struct{}), make(chan struct{})
+	staleEngine := configured(extractionFunc(func(context.Context, []byte) (model.ExtractionResponse, error) {
+		close(staleEntered)
+		<-staleRelease
+		return model.ExtractionResponse{ModelIdentity: "fixture", Body: []byte(`{"candidates":[]}`)}, nil
+	}), profile, 100000)
+	staleJob := start(staleEngine, "extract-stale-lease")
+	staleDone := make(chan error, 1)
+	go func() { _, err := run(staleEngine, staleJob, "extract-stale-first"); staleDone <- err }()
+	<-staleEntered
+	oldStatus, err := engine.GetJob(ctx, c, model.JobQuery{ID: staleJob.ID, Scope: scope, Purpose: "extraction-test"})
+	if err != nil {
+		close(staleRelease)
+		<-staleDone
+		t.Fatal(err)
+	}
+	if _, err = admin.Exec(ctx, `UPDATE extraction_job_state SET lease_until=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND id=$2`, c.Tenant, staleJob.ID); err != nil {
+		close(staleRelease)
+		<-staleDone
+		t.Fatal(err)
+	}
+	replacement, replacementErr := run(engine, staleJob, "extract-stale-replacement")
+	close(staleRelease)
+	staleErr := <-staleDone
+	if replacementErr != nil || replacement.State != "completed" || replacement.Attempts != 2 || !errors.Is(staleErr, model.ErrRevision) {
+		t.Fatal(replacement, replacementErr, staleErr)
+	}
+	abandoned, err := engine.GetExtractionRun(ctx, c, model.ExtractionRunQuery{ID: oldStatus.AttemptID, Scope: scope, Purpose: "extraction-test"})
+	if err != nil || abandoned.Result != nil {
+		t.Fatal("stale response committed", abandoned, err)
 	}
 	// Provider outages back off, exhaust the budget, then permit an audited retry.
 	failing := configured(extractionFunc(func(context.Context, []byte) (model.ExtractionResponse, error) {
@@ -253,4 +292,38 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 			t.Fatal("model input missing from full export")
 		}
 	}
+	// Replay the real tenant stream through the extraction handler. Other
+	// consumers remain independent; generated completion events are skipped.
+	queued := start(engine, "extract-outbox-job")
+	handler, err := workers.NewExtraction(engine, worker, "fixture-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer := model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ExtractionConsumer("fixture-v1")}
+	if err = queue.RegisterConsumer(ctx, consumer, 5); err != nil {
+		t.Fatal(err)
+	}
+	outbox, err := workers.NewOutbox(queue, consumer, handler, workers.Options{Lease: time.Minute, PollInterval: time.Millisecond, MinBackoff: time.Second, MaxBackoff: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	drained := false
+	for i := 0; i < 1000; i++ {
+		worked, err := outbox.ProcessOne(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !worked {
+			drained = true
+			break
+		}
+	}
+	if !drained {
+		t.Fatal("extraction consumer failed to drain")
+	}
+	status, err := engine.GetJob(ctx, c, model.JobQuery{ID: queued.ID, Scope: scope, Purpose: "extraction-test"})
+	if err != nil || status.State != "completed" {
+		t.Fatal("outbox did not execute extraction", status, err)
+	}
+
 }

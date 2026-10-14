@@ -135,7 +135,15 @@ func (s *Service) GetJob(ctx context.Context, c model.Caller, q model.JobQuery) 
 			return err
 		}
 		status, err = t.ExtractionJobStatus(ctx, q.ID)
-		return err
+		if err != nil {
+			return err
+		}
+		job, err := t.ExtractionJob(ctx, q.ID)
+		if err != nil {
+			return err
+		}
+		status.Purpose = job.Request.Purpose
+		return nil
 	})
 	if errors.Is(err, model.ErrNotFound) {
 		return model.JobStatus{}, model.ErrDenied

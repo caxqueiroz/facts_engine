@@ -173,7 +173,7 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, structured revision-conflict details, and full sqlc query coverage.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, remaining memory-specific pagination and history contracts. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add deadline-based projection waits, scalable/paginated rebuild verification, workload tuning, and other job types. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
-4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Worker scheduling is currently host-owned.
+4. Integrate an approved production extraction provider and bank-approved evaluations; add chunk planning, redaction policies and memory candidate extraction. Durable fact extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
 5. Complete coordinated disposal of referenced payloads and derivatives, archive/backup coverage, production immutable storage integration, and recovery drills. Scope legal holds, versioned evidence-byte retention policies, and atomic unreferenced PostgreSQL evidence disposal are implemented. Calculation receipts, signed PostgreSQL audit bundles, and signed event archive chains are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.
 
@@ -243,7 +243,7 @@ The embedded workflow is:
 
 1. Call `IngestConversation` to retain ordered source revisions and evidence links.
 2. Call `StartExtraction` with the conversation ID, approved profile ID, explicitly bound subjects and predicate/schema versions. This commits a durable job without calling the provider.
-3. Have a trusted service worker call `RunExtraction` with the job ID, scope, original purpose and a command key. Use the same key for delivery retries of one invocation; a later attempt needs a new key. The host owns scheduling and shutdown. No extraction-specific outbox handler or worker binary is supplied yet.
+3. Have a trusted service worker call `RunExtraction` with the job ID, scope, original purpose and a command key. Use the same key for delivery retries of one invocation; a later attempt needs a new key. Use `workers.NewExtraction` with `workers.NewOutbox` for durable delivery, as shown below. The host owns startup and shutdown; a standalone worker binary is not yet supplied.
 4. Inspect `GetJob` for `pending`, `running`, `completed` or `failed`, attempt count, fence, next available time and generic failure code. Fetch retained attempt input and results through `GetExtractionRun` using the attempt ID; this requires current extraction and evidence permissions.
 5. Review resulting proposals through the ordinary fact lifecycle. Extraction never accepts a fact. `RetryJob` requires operator permission and the expected fence to reset an exhausted job's attempt budget.
 
@@ -262,3 +262,33 @@ Duplicate keys within one output are flagged for review. Exact existing value/in
 Encrypted jobs, attempts and results participate in event archives and full signed audit exports. Metadata-only exports omit model payloads because prompts, requests and responses may contain source content. Evidence disposal remains blocked by conversation references until coordinated retention is implemented.
 
 Integration tests verify input retention before provider invocation, candidate filtering, proposals remaining unaccepted, manual separation of duties, exact duplicate detection, concurrent execution fencing, profile pinning, token-budget rejection, provider failure/retry recovery, tenant isolation and signed exports without metadata-only payload disclosure. No production model or bank-approved extraction evaluation has been configured.
+
+
+### Running extraction from the outbox
+
+Create one extraction consumer per tenant and logical worker stream. The queue connection uses `facts_worker`; the engine connection uses `facts_runtime`. The configured service identity must have the scope permissions needed by extraction. Keep the consumer stream name stable across restarts so its durable offset is reused. Registering a new stream replays the tenant ledger from the beginning; completed and failed jobs are acknowledged without invoking the provider again.
+
+```go
+key := model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ExtractionConsumer("primary")}
+if err := queue.RegisterConsumer(ctx, key, 20); err != nil {
+    return err
+}
+handler, err := workers.NewExtraction(engine, caller, "primary") // caller.Service must be true
+if err != nil {
+    return err
+}
+worker, err := workers.NewOutbox(queue, key, handler, workers.Options{
+    Lease: time.Minute, PollInterval: time.Second,
+    MinBackoff: 5 * time.Second, MaxBackoff: 5 * time.Minute,
+})
+if err != nil {
+    return err
+}
+return worker.Run(ctx) // host cancels ctx and closes its resources on shutdown
+```
+
+The handler processes `start_extraction` and `retry_extraction` events and skips other events. Each delivery fence supplies a distinct invocation key; repeated handling of that same delivery uses the same key. An operator's retry purpose is retained on the retry event, while provider execution uses the job's original purpose, exposed by authorized `GetJob` reads. The engine still rechecks both requester and worker authorization.
+
+Pending or running jobs keep their notification unacknowledged. Outbox backoff and job backoff are independent, so choose a delivery attempt budget that covers provider retries and lease recovery. A terminal failed job is acknowledged and remains visible in `GetJob`; `RetryJob` emits a new notification. A failed consumer instead requires `RetryConsumer` with its current fence. This ordered consumer can delay later jobs while one job is waiting; separate consumer streams replay the same jobs and do not partition work. Database job claims still prevent concurrent provider invocation while a lease is live.
+
+Integration tests replay real outbox events through this handler and verify that tenant concurrency limits hold across different jobs. They also expire a live job lease, complete a replacement attempt, and verify that the old provider response cannot commit after its fence has been replaced. Missing responses remain explicit gaps in full audit exports.

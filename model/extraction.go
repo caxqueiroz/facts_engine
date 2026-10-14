@@ -58,11 +58,11 @@ type JobRetryRequest struct {
 	ExpectedFence int64
 }
 type JobStatus struct {
-	ID, Scope, Kind, State, AttemptID, LastFailureCode string
-	Attempts, MaxAttempts                              int
-	Fence, CreatedRevision                             int64
-	AvailableAt                                        time.Time
-	LeaseUntil                                         *time.Time
+	ID, Scope, Kind, State, AttemptID, LastFailureCode, Purpose string
+	Attempts, MaxAttempts                                       int
+	Fence, CreatedRevision                                      int64
+	AvailableAt                                                 time.Time
+	LeaseUntil                                                  *time.Time
 }
 type ExtractionTx interface {
 	Tx
@@ -154,3 +154,11 @@ type ExtractionRunTx interface {
 	FinishExtraction(context.Context, string, string, int64, string, string, time.Duration) error
 	StageExtractionResult(context.Context, ExtractionResult) error
 }
+
+// ExtractionRunner is the authorized engine boundary used by explicit workers.
+type ExtractionRunner interface {
+	GetJob(context.Context, Caller, JobQuery) (JobStatus, error)
+	RunExtraction(context.Context, Caller, ExtractionRunRequest) (JobStatus, error)
+}
+
+func ExtractionConsumer(stream string) string { return "extraction-" + Digest(stream) }

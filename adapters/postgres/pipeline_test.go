@@ -94,7 +94,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal(err)
 	}
 	testConversations(t, ctx, l, store, c)
-	testExtraction(t, ctx, l, store, admin, c)
+	testExtraction(t, ctx, l, store, admin, projector, c)
 	query := model.RecallRequest{Scopes: []string{"case1"}, Query: "timeline", Purpose: "review", ValidAt: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC), Limit: 20, RequireRevision: 1}
 	if _, err := engine.Recall(ctx, c, query); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("coverage requirement bypassed", err)
