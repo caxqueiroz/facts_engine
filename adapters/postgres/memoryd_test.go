@@ -89,6 +89,8 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(tenantObject, "tenant", scopeObject), tuple(service, "member", tenantObject), tuple(service, "reader", scopeObject), tuple(service, "auditor", scopeObject), tuple(service, "operator", scopeObject), adminTuple}}})
 	auditWorker := "service:" + openfga.ObjectID(tenant, "audit-worker")
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(auditWorker, "member", tenantObject), tuple(auditWorker, "operator", scopeObject), tuple(auditWorker, "auditor", scopeObject)}}})
+	archiveWorker := "service:" + openfga.ObjectID(tenant, "archive-worker")
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(archiveWorker, "member", tenantObject), tuple(archiveWorker, "reader", scopeObject), tuple(archiveWorker, "auditor", scopeObject)}}})
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -166,6 +168,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	}
 	testStandaloneProjection(t, ctx, client, base, dsn, endpoint, store, modelID, principal, route)
 	testStandaloneAudit(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, principal, public)
+	testStandaloneArchive(t, ctx, client, base, dsn, endpoint, store, modelID, tenant)
 	request.Tenant = "bank1"
 	if _, err := identity.PutScope(ctx, request); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("tenant mismatch: %v", err)

@@ -1,8 +1,10 @@
 package workerdaemon
 
 import (
+	"encoding/hex"
 	"github.com/caxqueiroz/facts_engine/internal/runtimeconfig"
 	"github.com/caxqueiroz/facts_engine/model"
+	"path/filepath"
 )
 
 type AuditConfig struct {
@@ -10,7 +12,32 @@ type AuditConfig struct {
 	Stream string `json:"stream"`
 	KeyID  string `json:"key_id"`
 }
+type ArchiveConfig struct {
+	Tenant      string            `json:"tenant"`
+	Stream      string            `json:"stream"`
+	Directory   string            `json:"directory"`
+	KeyID       string            `json:"key_id"`
+	TrustedKeys map[string]string `json:"trusted_keys"`
+}
+
+func (c *ArchiveConfig) Validate() error {
+	if c == nil || !model.ValidID(c.Tenant) || !model.ValidID(c.Stream) || !model.ValidID(c.KeyID) || !filepath.IsAbs(c.Directory) || len(c.TrustedKeys) == 0 || len(c.TrustedKeys) > 32 {
+		return model.ErrInvalid
+	}
+	for id, value := range c.TrustedKeys {
+		key, err := hex.DecodeString(value)
+		if !model.ValidID(id) || err != nil || len(key) != 32 {
+			return model.ErrInvalid
+		}
+	}
+	if _, ok := c.TrustedKeys[c.KeyID]; !ok {
+		return model.ErrInvalid
+	}
+	return nil
+}
+
 type Config struct {
+	Archive                *ArchiveConfig             `json:"archive"`
 	Audit                  AuditConfig                `json:"audit"`
 	Mode                   string                     `json:"mode"`
 	Principal              string                     `json:"principal"`
@@ -40,11 +67,15 @@ func (c Config) Validate() error {
 	}
 	switch c.Mode {
 	case "projection":
-		if c.Audit != (AuditConfig{}) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil {
+		if c.Archive != nil || c.Audit != (AuditConfig{}) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil {
 			return model.ErrInvalid
 		}
 	case "audit":
-		if c.Projection != (runtimeconfig.LexicalRoute{}) || !model.ValidID(c.Audit.Tenant) || !model.ValidID(c.Audit.Stream) || !model.ValidID(c.Audit.KeyID) {
+		if c.Archive != nil || c.Projection != (runtimeconfig.LexicalRoute{}) || !model.ValidID(c.Audit.Tenant) || !model.ValidID(c.Audit.Stream) || !model.ValidID(c.Audit.KeyID) {
+			return model.ErrInvalid
+		}
+	case "archive":
+		if c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.Archive.Validate() != nil {
 			return model.ErrInvalid
 		}
 	default:

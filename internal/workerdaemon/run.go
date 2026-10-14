@@ -1,10 +1,13 @@
 package workerdaemon
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	facts "github.com/caxqueiroz/facts_engine"
+	"github.com/caxqueiroz/facts_engine/adapters/archive"
 	"github.com/caxqueiroz/facts_engine/adapters/audit"
 	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/adapters/openfga"
@@ -72,6 +75,44 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 			return errors.New("cannot initialize projection handler")
 		}
 		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ProjectionConsumer(c.Projection.Generation)}
+	case "archive":
+		archiveKey, err := runtimeconfig.HexKey("MEMORY_ARCHIVE_ENCRYPTION_KEY_HEX", 32)
+		if err != nil {
+			return err
+		}
+		archiveCipher, err := postgres.NewAESGCM(archiveKey)
+		if err != nil {
+			return errors.New("invalid archive encryption key")
+		}
+		objects, err := archive.NewFiles(c.Archive.Directory, archiveCipher)
+		if err != nil {
+			return errors.New("cannot initialize configured archive directory")
+		}
+		private, err := runtimeconfig.HexKey("MEMORY_ARCHIVE_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
+		if err != nil {
+			return err
+		}
+		keys := make(map[string]ed25519.PublicKey, len(c.Archive.TrustedKeys))
+		for id, value := range c.Archive.TrustedKeys {
+			key, err := hex.DecodeString(value)
+			if err != nil {
+				return errors.New("invalid trusted archive public key")
+			}
+			keys[id] = key
+		}
+		if !bytes.Equal(ed25519.PrivateKey(private).Public().(ed25519.PublicKey), keys[c.Archive.KeyID]) {
+			return errors.New("archive signing key does not match configured trust")
+		}
+		signer, err := audit.NewEd25519(c.Archive.KeyID, private)
+		if err != nil {
+			return errors.New("invalid archive signing key")
+		}
+		caller := model.Caller{Tenant: c.Archive.Tenant, Principal: c.Principal, Service: true}
+		handler, err = workers.NewArchive(ledger, objects, signer, keys, auth, caller, c.Archive.Stream)
+		if err != nil {
+			return errors.New("cannot initialize archive handler")
+		}
+		consumer = model.ConsumerKey{Tenant: caller.Tenant, Consumer: model.ArchiveConsumer(c.Archive.Stream)}
 	case "audit":
 		signingKey, err := runtimeconfig.HexKey("MEMORY_AUDIT_PRIVATE_KEY_HEX", ed25519.PrivateKeySize)
 		if err != nil {
