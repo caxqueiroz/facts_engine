@@ -135,6 +135,36 @@ func TestPostgresLedger(t *testing.T) {
 		if _, err = engine.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("restricted-approval"), Scope: "case1", RecordID: accepted.RecordID, VersionID: accepted.VersionID, ExpectedRevision: accepted.StreamRevision}); err != nil {
 			t.Fatal(err)
 		}
+		paged, err := facts.NewWithReads(ledger, allow{}, store, model.ReadOptions{PaginationKey: bytes.Repeat([]byte{8}, 32)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		historyQuery := model.HistoryPageQuery{HistoryQuery: model.HistoryQuery{Scope: "case1", RecordID: accepted.RecordID, Purpose: "audit"}, Limit: 1}
+		first, err := paged.ListFactHistory(ctx, reviewer, historyQuery)
+		if err != nil || len(first.Events) != 1 || first.NextPageToken == "" || first.StreamRevision != 2 {
+			t.Fatal(first, err)
+		}
+		request.Command = cmd("restricted-later-proposal")
+		request.ExpectedRevision = 2
+		if _, err = paged.ProposeFact(ctx, caller, request); err != nil {
+			t.Fatal(err)
+		}
+		historyQuery.PageToken = first.NextPageToken
+		second, err := paged.ListFactHistory(ctx, reviewer, historyQuery)
+		if err != nil || len(second.Events) != 1 || second.Events[0].StreamRevision != 2 || second.NextPageToken != "" || second.LedgerRevision != first.LedgerRevision {
+			t.Fatal("history page moved with later commit", second, err)
+		}
+		changedQuery := historyQuery
+		changedQuery.Purpose = "different-purpose"
+		if _, err = paged.ListFactHistory(ctx, reviewer, changedQuery); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal("history token binding bypass", err)
+		}
+		historyQuery.PageToken = ""
+		historyQuery.Limit = 100
+		latest, err := paged.ListFactHistory(ctx, reviewer, historyQuery)
+		if err != nil || len(latest.Events) != 3 {
+			t.Fatal("fresh history missing later commit", latest, err)
+		}
 		if err = ledger.Transact(ctx, caller.Tenant, func(tx model.Tx) error {
 			stored, err := tx.Predicate(ctx, "case1", restricted.Definition.Predicate, "v1")
 			if err != nil {

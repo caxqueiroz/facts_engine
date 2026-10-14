@@ -28,3 +28,19 @@ type ReadTx interface {
 	RevisionAt(context.Context, time.Time) (int64, error)
 	FactRecords(context.Context, FactsQuery, int64, string, int) ([]Record, error)
 }
+
+// HistoryPageQuery orders one record's immutable events by stream revision.
+type HistoryPageQuery struct {
+	HistoryQuery
+	Limit     int
+	PageToken string
+}
+type HistoryPage struct {
+	Events                         []Event
+	LedgerRevision, StreamRevision int64
+	NextPageToken                  string
+}
+type HistoryPageTx interface {
+	Tx
+	HistoryPage(context.Context, string, int64, int64, int) ([]Event, error)
+}

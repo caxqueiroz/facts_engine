@@ -268,3 +268,10 @@ type ProjectionWaitRequest = model.ProjectionWaitRequest
 type ProjectionReceipt = model.ProjectionReceipt
 
 type RevisionConflict = model.RevisionConflict
+
+func (e *Engine) ListFactHistory(ctx context.Context, c Caller, q model.HistoryPageQuery) (model.HistoryPage, error) {
+	return e.service.ListFactHistory(ctx, c, q)
+}
+
+type HistoryPageQuery = model.HistoryPageQuery
+type HistoryPage = model.HistoryPage

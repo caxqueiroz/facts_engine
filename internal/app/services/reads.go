@@ -12,6 +12,7 @@ import (
 )
 
 type factPageToken struct {
+	StreamRevision                            int64 `json:",omitempty"`
 	Version, CallerDigest, QueryDigest, After string
 	Revision                                  int64
 	EvaluatedAt, ExpiresAt                    time.Time
@@ -51,6 +52,9 @@ func (s *Service) signFactPage(p factPageToken) string {
 	return base64.RawURLEncoding.EncodeToString(b) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 func (s *Service) parseFactPage(raw string, c model.Caller, q model.FactsQuery, now time.Time) (factPageToken, error) {
+	return s.parsePage(raw, c, "facts-page-v1", pageQueryDigest(q), now)
+}
+func (s *Service) parsePage(raw string, c model.Caller, version, queryDigest string, now time.Time) (factPageToken, error) {
 	var token factPageToken
 	if len(raw) > 4096 {
 		return token, model.ErrInvalid
@@ -75,7 +79,7 @@ func (s *Service) parseFactPage(raw string, c model.Caller, q model.FactsQuery, 
 	if err = json.Unmarshal(body, &token); err != nil {
 		return token, model.ErrInvalid
 	}
-	if token.Version != "facts-page-v1" || token.CallerDigest != model.Digest(c) || token.QueryDigest != pageQueryDigest(q) || !model.ValidID(token.After) || token.Revision < 1 || token.EvaluatedAt.IsZero() || !token.ExpiresAt.After(now) {
+	if token.Version != version || token.CallerDigest != model.Digest(c) || token.QueryDigest != queryDigest || !model.ValidID(token.After) || token.Revision < 1 || token.EvaluatedAt.IsZero() || !token.ExpiresAt.After(now) {
 		return factPageToken{}, model.ErrInvalid
 	}
 	return token, nil

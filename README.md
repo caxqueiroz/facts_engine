@@ -16,7 +16,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 - Immutable fact snapshots over ordered explicit selectors, with one PostgreSQL selection view, per-item outcomes, exact values and provenance, canonical content digests, separate selection/creation revisions, and current authorization on reads. Retries retain the original selection even after facts change.
 - External calculation receipts bind an application/run identity to immutable snapshots, executable/configuration digests, normalization version, and verified input/output evidence. Concurrent retries converge; changed run content conflicts. Reads recheck snapshot and artifact permissions.
 - Durable, leased audit exports with fenced completion, revision-bound scope contents, signed entry manifests, explicit coverage gaps, and trusted-key verification.
-- Bounded authorized record event history, including actor/check receipts, correction intervals, reason codes, and replaced versions. Histories exceeding 1,000 events fail explicitly pending paginated history support.
+- Authorized record event history, including actor/check receipts, correction intervals, reason codes, and replaced versions. Revision-pinned pagination supports long histories with explicit gap detection; the legacy single-response API retains its 1,000-event limit.
 - Durable generation rebuilds with full canonical-content verification, destination write fencing, atomic active-generation cutover, and restartable cleanup.
 - Tenant-bound CortexDB projections of accepted historical versions, injected embeddings, explicit database provisioning, canonical ledger revalidation on recall, and reported indexing lag.
 - Signed event archive consumers with immutable encrypted object versions, predecessor links, standalone coverage verification, and crash-safe duplicate delivery. Local storage is a development adapter; production immutable storage remains host-provisioned.
@@ -385,3 +385,32 @@ Publication checks the active predecessor under a database lock, then atomically
 The supported rule leaves accepted facts, historical resolutions, evidence, snapshots and calculation receipts unchanged. Pending proposals under an inactive schema cannot be accepted. New values must be proposed against the active schema and pass its policy; replacing an overlapping accepted value still requires ordinary supersession with evidence and review. The engine does not reinterpret old payloads, convert units, or carry attestations onto a new version. Schema rollback likewise means publishing a new version derived from the current active version; existing immutable version IDs cannot be reactivated by republishing them.
 
 The migration reason and rule are retained inside the encrypted predicate definition and therefore appear in authorized audit exports and event archives. Legacy definitions remain readable; the deployment migration does not invent predecessor links or reasons for publications made before this contract. Tests cover missing rules, concurrent replacement conflicts, committed retries and preserved accepted history.
+
+
+### Paginated fact history
+
+Use `ListFactHistory` for histories that may exceed one response. Configure `EngineOptions.Reads` with a stable 32-byte pagination signing key (the same configuration used by `ListFacts`), then pass `HistoryPageQuery` with scope, record ID, purpose and a limit from 1 to 100. The first page selects the current committed tenant revision and record stream revision. Every continuation page uses that fixed boundary, even if more events commit between calls.
+
+```go
+query := model.HistoryPageQuery{
+    HistoryQuery: model.HistoryQuery{Scope: scope, RecordID: recordID, Purpose: "audit"},
+    Limit: 100,
+}
+for {
+    page, err := engine.ListFactHistory(ctx, caller, query)
+    if err != nil {
+        return err
+    }
+    // Consume page.Events in ascending stream-revision order.
+    if page.NextPageToken == "" {
+        break
+    }
+    query.PageToken = page.NextPageToken
+}
+```
+
+Tokens are integrity-protected and bound to tenant, authenticated caller, scope, record, purpose, page size and the pinned revision. Keep query fields unchanged while following a token. Key rotation or expiry requires restarting the traversal. Each page rechecks `can_read_history` before reading and before returning content. The response reports both `LedgerRevision` and `StreamRevision`; starting a fresh traversal includes later commits.
+
+Missing, reordered or inconsistent stream events fail with `ErrPrecondition` rather than producing a shortened history. Pages contain event metadata and authorization receipts, not source bytes or a recomputed current value. `GetFactHistory` remains available for existing callers and keeps its explicit 1,000-event bound; use `ListFactHistory` for larger histories. No database migration is required for pagination.
+
+Tests traverse a 1,002-event history and reject an injected stream gap. Real PostgreSQL integration verifies that an intervening proposal does not enter an existing page sequence, that a fresh traversal includes it, and that changing the purpose invalidates the continuation token.
