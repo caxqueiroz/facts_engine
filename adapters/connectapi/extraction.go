@@ -2,12 +2,15 @@ package connectapi
 
 import (
 	"context"
+	"time"
 
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 type ExtractionEngine interface {
+	ScanMemoryRefresh(context.Context, model.Caller, model.MemoryRefreshScan) (model.MemoryRefreshScanResult, error)
+	StartMemoryRefreshSweep(context.Context, model.Caller, model.MemoryRefreshSweepRequest) (model.CommitResult, error)
 	StartExtraction(context.Context, model.Caller, model.ExtractionRequest) (model.JobStatus, error)
 	PlanExtractionChunks(context.Context, model.Caller, model.ExtractionChunkQuery) (model.ExtractionChunkPlan, error)
 	GetJob(context.Context, model.Caller, model.JobQuery) (model.JobStatus, error)
@@ -150,4 +153,23 @@ func (c *responseConverter) extractionResult(r model.ExtractionResult) *v1.Extra
 		out.Authorization = append(out.Authorization, c.authorization(a))
 	}
 	return out
+}
+
+func (s *extractionService) ScanMemoryRefresh(ctx context.Context, r *v1.ScanMemoryRefreshRequest) (*v1.ScanMemoryRefreshResponse, error) {
+	out, err := s.engine.ScanMemoryRefresh(ctx, callerFrom(ctx), model.MemoryRefreshScan{Scope: r.Scope, Purpose: r.Purpose, Trigger: model.MemoryRefreshTrigger{EventID: r.Trigger.EventId, LedgerRevision: r.Trigger.LedgerRevision}, AfterVersionID: r.AfterVersionId, Limit: int(r.Limit)})
+	if err != nil {
+		return nil, err
+	}
+	response := &v1.ScanMemoryRefreshResponse{}
+	for _, version := range out.Versions {
+		response.Versions = append(response.Versions, &v1.VersionReference{RecordId: version.RecordID, VersionId: version.VersionID})
+	}
+	return response, nil
+}
+func (s *extractionService) StartMemoryRefreshSweep(ctx context.Context, r *v1.StartMemoryRefreshSweepRequest) (*v1.StartMemoryRefreshSweepResponse, error) {
+	out, err := s.engine.StartMemoryRefreshSweep(ctx, callerFrom(ctx), model.MemoryRefreshSweepRequest{Command: command(r.Command), Scope: r.Scope, Stream: r.Stream, ProfileID: r.ProfileId, ScheduledFor: r.ScheduledFor.AsTime(), Interval: time.Duration(r.IntervalMinutes) * time.Minute})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.StartMemoryRefreshSweepResponse{Result: commit(out)}, nil
 }

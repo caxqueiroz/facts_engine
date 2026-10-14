@@ -2065,11 +2065,277 @@ func (x *ExtractedProposal) GetRecordKind() string {
 	return ""
 }
 
+// Operational pages use the retained event/revision and a version-ID cursor.
+type ScanMemoryRefreshRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Tenant         string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Scope          string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	Purpose        string                 `protobuf:"bytes,3,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	Trigger        *MemoryRefreshTrigger  `protobuf:"bytes,4,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	AfterVersionId string                 `protobuf:"bytes,5,opt,name=after_version_id,json=afterVersionId,proto3" json:"after_version_id,omitempty"`
+	Limit          int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ScanMemoryRefreshRequest) Reset() {
+	*x = ScanMemoryRefreshRequest{}
+	mi := &file_memory_v1_extraction_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScanMemoryRefreshRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScanMemoryRefreshRequest) ProtoMessage() {}
+
+func (x *ScanMemoryRefreshRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_extraction_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScanMemoryRefreshRequest.ProtoReflect.Descriptor instead.
+func (*ScanMemoryRefreshRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ScanMemoryRefreshRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *ScanMemoryRefreshRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *ScanMemoryRefreshRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *ScanMemoryRefreshRequest) GetTrigger() *MemoryRefreshTrigger {
+	if x != nil {
+		return x.Trigger
+	}
+	return nil
+}
+
+func (x *ScanMemoryRefreshRequest) GetAfterVersionId() string {
+	if x != nil {
+		return x.AfterVersionId
+	}
+	return ""
+}
+
+func (x *ScanMemoryRefreshRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ScanMemoryRefreshResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Versions      []*VersionReference    `protobuf:"bytes,1,rep,name=versions,proto3" json:"versions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScanMemoryRefreshResponse) Reset() {
+	*x = ScanMemoryRefreshResponse{}
+	mi := &file_memory_v1_extraction_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScanMemoryRefreshResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScanMemoryRefreshResponse) ProtoMessage() {}
+
+func (x *ScanMemoryRefreshResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_extraction_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScanMemoryRefreshResponse.ProtoReflect.Descriptor instead.
+func (*ScanMemoryRefreshResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ScanMemoryRefreshResponse) GetVersions() []*VersionReference {
+	if x != nil {
+		return x.Versions
+	}
+	return nil
+}
+
+// Commits a sweep event; it does not scan, execute a provider, or accept memory.
+type StartMemoryRefreshSweepRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Tenant          string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command         *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Scope           string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	Stream          string                 `protobuf:"bytes,4,opt,name=stream,proto3" json:"stream,omitempty"`
+	ProfileId       string                 `protobuf:"bytes,5,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ScheduledFor    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	IntervalMinutes int32                  `protobuf:"varint,7,opt,name=interval_minutes,json=intervalMinutes,proto3" json:"interval_minutes,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StartMemoryRefreshSweepRequest) Reset() {
+	*x = StartMemoryRefreshSweepRequest{}
+	mi := &file_memory_v1_extraction_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartMemoryRefreshSweepRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartMemoryRefreshSweepRequest) ProtoMessage() {}
+
+func (x *StartMemoryRefreshSweepRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_extraction_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartMemoryRefreshSweepRequest.ProtoReflect.Descriptor instead.
+func (*StartMemoryRefreshSweepRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetStream() string {
+	if x != nil {
+		return x.Stream
+	}
+	return ""
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *StartMemoryRefreshSweepRequest) GetIntervalMinutes() int32 {
+	if x != nil {
+		return x.IntervalMinutes
+	}
+	return 0
+}
+
+type StartMemoryRefreshSweepResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *CommitResult          `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartMemoryRefreshSweepResponse) Reset() {
+	*x = StartMemoryRefreshSweepResponse{}
+	mi := &file_memory_v1_extraction_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartMemoryRefreshSweepResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartMemoryRefreshSweepResponse) ProtoMessage() {}
+
+func (x *StartMemoryRefreshSweepResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_extraction_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartMemoryRefreshSweepResponse.ProtoReflect.Descriptor instead.
+func (*StartMemoryRefreshSweepResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *StartMemoryRefreshSweepResponse) GetResult() *CommitResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_memory_v1_extraction_proto protoreflect.FileDescriptor
 
 const file_memory_v1_extraction_proto_rawDesc = "" +
 	"\n" +
-	"\x1amemory/v1/extraction.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/memories.proto\"\xe9\x01\n" +
+	"\x1amemory/v1/extraction.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/contexts.proto\x1a\x18memory/v1/memories.proto\"\xe9\x01\n" +
 	"\x14ExtractionInputRange\x12J\n" +
 	"\vevidence_id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\n" +
 	"evidenceId\x12\x1d\n" +
@@ -2260,8 +2526,32 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"\n" +
 	"version_id\x18\x03 \x01(\tR\tversionId\x12\x1f\n" +
 	"\vrecord_kind\x18\x04 \x01(\tR\n" +
-	"recordKind2\x9a\x04\n" +
-	"\x11ExtractionService\x12X\n" +
+	"recordKind\"\x80\x03\n" +
+	"\x18ScanMemoryRefreshRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x12?\n" +
+	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12$\n" +
+	"\apurpose\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\x02R\apurpose\x12A\n" +
+	"\atrigger\x18\x04 \x01(\v2\x1f.memory.v1.MemoryRefreshTriggerB\x06\xbaH\x03\xc8\x01\x01R\atrigger\x12V\n" +
+	"\x10after_version_id\x18\x05 \x01(\tB,\xbaH)r'2%^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$R\x0eafterVersionId\x12\x1f\n" +
+	"\x05limit\x18\x06 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\"T\n" +
+	"\x19ScanMemoryRefreshResponse\x127\n" +
+	"\bversions\x18\x01 \x03(\v2\x1b.memory.v1.VersionReferenceR\bversions\"\xe7\x03\n" +
+	"\x1eStartMemoryRefreshSweepRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
+	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
+	"\x05scope\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12A\n" +
+	"\x06stream\x18\x04 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06stream\x12H\n" +
+	"\n" +
+	"profile_id\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\tprofileId\x12G\n" +
+	"\rscheduled_for\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\fscheduledFor\x125\n" +
+	"\x10interval_minutes\x18\a \x01(\x05B\n" +
+	"\xbaH\a\x1a\x05\x18\xa0\v(\x01R\x0fintervalMinutes\"R\n" +
+	"\x1fStartMemoryRefreshSweepResponse\x12/\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result2\xec\x05\n" +
+	"\x11ExtractionService\x12^\n" +
+	"\x11ScanMemoryRefresh\x12#.memory.v1.ScanMemoryRefreshRequest\x1a$.memory.v1.ScanMemoryRefreshResponse\x12p\n" +
+	"\x17StartMemoryRefreshSweep\x12).memory.v1.StartMemoryRefreshSweepRequest\x1a*.memory.v1.StartMemoryRefreshSweepResponse\x12X\n" +
 	"\x0fStartExtraction\x12!.memory.v1.StartExtractionRequest\x1a\".memory.v1.StartExtractionResponse\x12g\n" +
 	"\x14PlanExtractionChunks\x12&.memory.v1.PlanExtractionChunksRequest\x1a'.memory.v1.PlanExtractionChunksResponse\x12=\n" +
 	"\x06GetJob\x12\x18.memory.v1.GetJobRequest\x1a\x19.memory.v1.GetJobResponse\x12C\n" +
@@ -2281,43 +2571,49 @@ func file_memory_v1_extraction_proto_rawDescGZIP() []byte {
 	return file_memory_v1_extraction_proto_rawDescData
 }
 
-var file_memory_v1_extraction_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_memory_v1_extraction_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_memory_v1_extraction_proto_goTypes = []any{
-	(*ExtractionInputRange)(nil),         // 0: memory.v1.ExtractionInputRange
-	(*PredicateBinding)(nil),             // 1: memory.v1.PredicateBinding
-	(*MemoryExtractionTarget)(nil),       // 2: memory.v1.MemoryExtractionTarget
-	(*StartExtractionRequest)(nil),       // 3: memory.v1.StartExtractionRequest
-	(*StartExtractionResponse)(nil),      // 4: memory.v1.StartExtractionResponse
-	(*PlanExtractionChunksRequest)(nil),  // 5: memory.v1.PlanExtractionChunksRequest
-	(*PlanExtractionChunksResponse)(nil), // 6: memory.v1.PlanExtractionChunksResponse
-	(*ExtractionChunkPlan)(nil),          // 7: memory.v1.ExtractionChunkPlan
-	(*ExtractionChunk)(nil),              // 8: memory.v1.ExtractionChunk
-	(*GetJobRequest)(nil),                // 9: memory.v1.GetJobRequest
-	(*GetExtractionRunRequest)(nil),      // 10: memory.v1.GetExtractionRunRequest
-	(*GetJobResponse)(nil),               // 11: memory.v1.GetJobResponse
-	(*GetExtractionRunResponse)(nil),     // 12: memory.v1.GetExtractionRunResponse
-	(*RetryJobRequest)(nil),              // 13: memory.v1.RetryJobRequest
-	(*RetryJobResponse)(nil),             // 14: memory.v1.RetryJobResponse
-	(*StartMemoryRefreshRequest)(nil),    // 15: memory.v1.StartMemoryRefreshRequest
-	(*MemoryRefreshTrigger)(nil),         // 16: memory.v1.MemoryRefreshTrigger
-	(*StartMemoryRefreshResponse)(nil),   // 17: memory.v1.StartMemoryRefreshResponse
-	(*JobStatus)(nil),                    // 18: memory.v1.JobStatus
-	(*ExtractionRun)(nil),                // 19: memory.v1.ExtractionRun
-	(*ExtractionAttempt)(nil),            // 20: memory.v1.ExtractionAttempt
-	(*ExtractionReservation)(nil),        // 21: memory.v1.ExtractionReservation
-	(*ExtractionResult)(nil),             // 22: memory.v1.ExtractionResult
-	(*ExtractionIssue)(nil),              // 23: memory.v1.ExtractionIssue
-	(*ExtractionRelation)(nil),           // 24: memory.v1.ExtractionRelation
-	(*ExtractedProposal)(nil),            // 25: memory.v1.ExtractedProposal
-	(*MemoryDependency)(nil),             // 26: memory.v1.MemoryDependency
-	(*Command)(nil),                      // 27: memory.v1.Command
-	(*timestamppb.Timestamp)(nil),        // 28: google.protobuf.Timestamp
-	(*Caller)(nil),                       // 29: memory.v1.Caller
-	(*AuthorizationDecision)(nil),        // 30: memory.v1.AuthorizationDecision
+	(*ExtractionInputRange)(nil),            // 0: memory.v1.ExtractionInputRange
+	(*PredicateBinding)(nil),                // 1: memory.v1.PredicateBinding
+	(*MemoryExtractionTarget)(nil),          // 2: memory.v1.MemoryExtractionTarget
+	(*StartExtractionRequest)(nil),          // 3: memory.v1.StartExtractionRequest
+	(*StartExtractionResponse)(nil),         // 4: memory.v1.StartExtractionResponse
+	(*PlanExtractionChunksRequest)(nil),     // 5: memory.v1.PlanExtractionChunksRequest
+	(*PlanExtractionChunksResponse)(nil),    // 6: memory.v1.PlanExtractionChunksResponse
+	(*ExtractionChunkPlan)(nil),             // 7: memory.v1.ExtractionChunkPlan
+	(*ExtractionChunk)(nil),                 // 8: memory.v1.ExtractionChunk
+	(*GetJobRequest)(nil),                   // 9: memory.v1.GetJobRequest
+	(*GetExtractionRunRequest)(nil),         // 10: memory.v1.GetExtractionRunRequest
+	(*GetJobResponse)(nil),                  // 11: memory.v1.GetJobResponse
+	(*GetExtractionRunResponse)(nil),        // 12: memory.v1.GetExtractionRunResponse
+	(*RetryJobRequest)(nil),                 // 13: memory.v1.RetryJobRequest
+	(*RetryJobResponse)(nil),                // 14: memory.v1.RetryJobResponse
+	(*StartMemoryRefreshRequest)(nil),       // 15: memory.v1.StartMemoryRefreshRequest
+	(*MemoryRefreshTrigger)(nil),            // 16: memory.v1.MemoryRefreshTrigger
+	(*StartMemoryRefreshResponse)(nil),      // 17: memory.v1.StartMemoryRefreshResponse
+	(*JobStatus)(nil),                       // 18: memory.v1.JobStatus
+	(*ExtractionRun)(nil),                   // 19: memory.v1.ExtractionRun
+	(*ExtractionAttempt)(nil),               // 20: memory.v1.ExtractionAttempt
+	(*ExtractionReservation)(nil),           // 21: memory.v1.ExtractionReservation
+	(*ExtractionResult)(nil),                // 22: memory.v1.ExtractionResult
+	(*ExtractionIssue)(nil),                 // 23: memory.v1.ExtractionIssue
+	(*ExtractionRelation)(nil),              // 24: memory.v1.ExtractionRelation
+	(*ExtractedProposal)(nil),               // 25: memory.v1.ExtractedProposal
+	(*ScanMemoryRefreshRequest)(nil),        // 26: memory.v1.ScanMemoryRefreshRequest
+	(*ScanMemoryRefreshResponse)(nil),       // 27: memory.v1.ScanMemoryRefreshResponse
+	(*StartMemoryRefreshSweepRequest)(nil),  // 28: memory.v1.StartMemoryRefreshSweepRequest
+	(*StartMemoryRefreshSweepResponse)(nil), // 29: memory.v1.StartMemoryRefreshSweepResponse
+	(*MemoryDependency)(nil),                // 30: memory.v1.MemoryDependency
+	(*Command)(nil),                         // 31: memory.v1.Command
+	(*timestamppb.Timestamp)(nil),           // 32: google.protobuf.Timestamp
+	(*Caller)(nil),                          // 33: memory.v1.Caller
+	(*AuthorizationDecision)(nil),           // 34: memory.v1.AuthorizationDecision
+	(*VersionReference)(nil),                // 35: memory.v1.VersionReference
+	(*CommitResult)(nil),                    // 36: memory.v1.CommitResult
 }
 var file_memory_v1_extraction_proto_depIdxs = []int32{
-	26, // 0: memory.v1.MemoryExtractionTarget.dependencies:type_name -> memory.v1.MemoryDependency
-	27, // 1: memory.v1.StartExtractionRequest.command:type_name -> memory.v1.Command
+	30, // 0: memory.v1.MemoryExtractionTarget.dependencies:type_name -> memory.v1.MemoryDependency
+	31, // 1: memory.v1.StartExtractionRequest.command:type_name -> memory.v1.Command
 	1,  // 2: memory.v1.StartExtractionRequest.predicates:type_name -> memory.v1.PredicateBinding
 	2,  // 3: memory.v1.StartExtractionRequest.memory_targets:type_name -> memory.v1.MemoryExtractionTarget
 	0,  // 4: memory.v1.StartExtractionRequest.input_ranges:type_name -> memory.v1.ExtractionInputRange
@@ -2329,42 +2625,51 @@ var file_memory_v1_extraction_proto_depIdxs = []int32{
 	0,  // 10: memory.v1.ExtractionChunk.input_ranges:type_name -> memory.v1.ExtractionInputRange
 	18, // 11: memory.v1.GetJobResponse.job:type_name -> memory.v1.JobStatus
 	19, // 12: memory.v1.GetExtractionRunResponse.run:type_name -> memory.v1.ExtractionRun
-	27, // 13: memory.v1.RetryJobRequest.command:type_name -> memory.v1.Command
+	31, // 13: memory.v1.RetryJobRequest.command:type_name -> memory.v1.Command
 	18, // 14: memory.v1.RetryJobResponse.job:type_name -> memory.v1.JobStatus
-	27, // 15: memory.v1.StartMemoryRefreshRequest.command:type_name -> memory.v1.Command
+	31, // 15: memory.v1.StartMemoryRefreshRequest.command:type_name -> memory.v1.Command
 	16, // 16: memory.v1.StartMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
 	18, // 17: memory.v1.StartMemoryRefreshResponse.job:type_name -> memory.v1.JobStatus
-	28, // 18: memory.v1.JobStatus.available_at:type_name -> google.protobuf.Timestamp
-	28, // 19: memory.v1.JobStatus.lease_until:type_name -> google.protobuf.Timestamp
+	32, // 18: memory.v1.JobStatus.available_at:type_name -> google.protobuf.Timestamp
+	32, // 19: memory.v1.JobStatus.lease_until:type_name -> google.protobuf.Timestamp
 	20, // 20: memory.v1.ExtractionRun.attempt:type_name -> memory.v1.ExtractionAttempt
 	22, // 21: memory.v1.ExtractionRun.result:type_name -> memory.v1.ExtractionResult
-	29, // 22: memory.v1.ExtractionAttempt.caller:type_name -> memory.v1.Caller
-	28, // 23: memory.v1.ExtractionAttempt.lease_until:type_name -> google.protobuf.Timestamp
-	28, // 24: memory.v1.ExtractionAttempt.started_at:type_name -> google.protobuf.Timestamp
-	30, // 25: memory.v1.ExtractionAttempt.authorization:type_name -> memory.v1.AuthorizationDecision
+	33, // 22: memory.v1.ExtractionAttempt.caller:type_name -> memory.v1.Caller
+	32, // 23: memory.v1.ExtractionAttempt.lease_until:type_name -> google.protobuf.Timestamp
+	32, // 24: memory.v1.ExtractionAttempt.started_at:type_name -> google.protobuf.Timestamp
+	34, // 25: memory.v1.ExtractionAttempt.authorization:type_name -> memory.v1.AuthorizationDecision
 	21, // 26: memory.v1.ExtractionAttempt.reservation:type_name -> memory.v1.ExtractionReservation
 	23, // 27: memory.v1.ExtractionResult.issues:type_name -> memory.v1.ExtractionIssue
 	24, // 28: memory.v1.ExtractionResult.relations:type_name -> memory.v1.ExtractionRelation
 	25, // 29: memory.v1.ExtractionResult.proposals:type_name -> memory.v1.ExtractedProposal
-	30, // 30: memory.v1.ExtractionResult.authorization:type_name -> memory.v1.AuthorizationDecision
-	28, // 31: memory.v1.ExtractionResult.completed_at:type_name -> google.protobuf.Timestamp
-	3,  // 32: memory.v1.ExtractionService.StartExtraction:input_type -> memory.v1.StartExtractionRequest
-	5,  // 33: memory.v1.ExtractionService.PlanExtractionChunks:input_type -> memory.v1.PlanExtractionChunksRequest
-	9,  // 34: memory.v1.ExtractionService.GetJob:input_type -> memory.v1.GetJobRequest
-	13, // 35: memory.v1.ExtractionService.RetryJob:input_type -> memory.v1.RetryJobRequest
-	10, // 36: memory.v1.ExtractionService.GetExtractionRun:input_type -> memory.v1.GetExtractionRunRequest
-	15, // 37: memory.v1.ExtractionService.StartMemoryRefresh:input_type -> memory.v1.StartMemoryRefreshRequest
-	4,  // 38: memory.v1.ExtractionService.StartExtraction:output_type -> memory.v1.StartExtractionResponse
-	6,  // 39: memory.v1.ExtractionService.PlanExtractionChunks:output_type -> memory.v1.PlanExtractionChunksResponse
-	11, // 40: memory.v1.ExtractionService.GetJob:output_type -> memory.v1.GetJobResponse
-	14, // 41: memory.v1.ExtractionService.RetryJob:output_type -> memory.v1.RetryJobResponse
-	12, // 42: memory.v1.ExtractionService.GetExtractionRun:output_type -> memory.v1.GetExtractionRunResponse
-	17, // 43: memory.v1.ExtractionService.StartMemoryRefresh:output_type -> memory.v1.StartMemoryRefreshResponse
-	38, // [38:44] is the sub-list for method output_type
-	32, // [32:38] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	34, // 30: memory.v1.ExtractionResult.authorization:type_name -> memory.v1.AuthorizationDecision
+	32, // 31: memory.v1.ExtractionResult.completed_at:type_name -> google.protobuf.Timestamp
+	16, // 32: memory.v1.ScanMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
+	35, // 33: memory.v1.ScanMemoryRefreshResponse.versions:type_name -> memory.v1.VersionReference
+	31, // 34: memory.v1.StartMemoryRefreshSweepRequest.command:type_name -> memory.v1.Command
+	32, // 35: memory.v1.StartMemoryRefreshSweepRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	36, // 36: memory.v1.StartMemoryRefreshSweepResponse.result:type_name -> memory.v1.CommitResult
+	26, // 37: memory.v1.ExtractionService.ScanMemoryRefresh:input_type -> memory.v1.ScanMemoryRefreshRequest
+	28, // 38: memory.v1.ExtractionService.StartMemoryRefreshSweep:input_type -> memory.v1.StartMemoryRefreshSweepRequest
+	3,  // 39: memory.v1.ExtractionService.StartExtraction:input_type -> memory.v1.StartExtractionRequest
+	5,  // 40: memory.v1.ExtractionService.PlanExtractionChunks:input_type -> memory.v1.PlanExtractionChunksRequest
+	9,  // 41: memory.v1.ExtractionService.GetJob:input_type -> memory.v1.GetJobRequest
+	13, // 42: memory.v1.ExtractionService.RetryJob:input_type -> memory.v1.RetryJobRequest
+	10, // 43: memory.v1.ExtractionService.GetExtractionRun:input_type -> memory.v1.GetExtractionRunRequest
+	15, // 44: memory.v1.ExtractionService.StartMemoryRefresh:input_type -> memory.v1.StartMemoryRefreshRequest
+	27, // 45: memory.v1.ExtractionService.ScanMemoryRefresh:output_type -> memory.v1.ScanMemoryRefreshResponse
+	29, // 46: memory.v1.ExtractionService.StartMemoryRefreshSweep:output_type -> memory.v1.StartMemoryRefreshSweepResponse
+	4,  // 47: memory.v1.ExtractionService.StartExtraction:output_type -> memory.v1.StartExtractionResponse
+	6,  // 48: memory.v1.ExtractionService.PlanExtractionChunks:output_type -> memory.v1.PlanExtractionChunksResponse
+	11, // 49: memory.v1.ExtractionService.GetJob:output_type -> memory.v1.GetJobResponse
+	14, // 50: memory.v1.ExtractionService.RetryJob:output_type -> memory.v1.RetryJobResponse
+	12, // 51: memory.v1.ExtractionService.GetExtractionRun:output_type -> memory.v1.GetExtractionRunResponse
+	17, // 52: memory.v1.ExtractionService.StartMemoryRefresh:output_type -> memory.v1.StartMemoryRefreshResponse
+	45, // [45:53] is the sub-list for method output_type
+	37, // [37:45] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_extraction_proto_init() }
@@ -2373,6 +2678,7 @@ func file_memory_v1_extraction_proto_init() {
 		return
 	}
 	file_memory_v1_common_proto_init()
+	file_memory_v1_contexts_proto_init()
 	file_memory_v1_memories_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2380,7 +2686,7 @@ func file_memory_v1_extraction_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_extraction_proto_rawDesc), len(file_memory_v1_extraction_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

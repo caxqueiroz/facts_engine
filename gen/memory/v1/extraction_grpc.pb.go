@@ -19,18 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ExtractionService_StartExtraction_FullMethodName      = "/memory.v1.ExtractionService/StartExtraction"
-	ExtractionService_PlanExtractionChunks_FullMethodName = "/memory.v1.ExtractionService/PlanExtractionChunks"
-	ExtractionService_GetJob_FullMethodName               = "/memory.v1.ExtractionService/GetJob"
-	ExtractionService_RetryJob_FullMethodName             = "/memory.v1.ExtractionService/RetryJob"
-	ExtractionService_GetExtractionRun_FullMethodName     = "/memory.v1.ExtractionService/GetExtractionRun"
-	ExtractionService_StartMemoryRefresh_FullMethodName   = "/memory.v1.ExtractionService/StartMemoryRefresh"
+	ExtractionService_ScanMemoryRefresh_FullMethodName       = "/memory.v1.ExtractionService/ScanMemoryRefresh"
+	ExtractionService_StartMemoryRefreshSweep_FullMethodName = "/memory.v1.ExtractionService/StartMemoryRefreshSweep"
+	ExtractionService_StartExtraction_FullMethodName         = "/memory.v1.ExtractionService/StartExtraction"
+	ExtractionService_PlanExtractionChunks_FullMethodName    = "/memory.v1.ExtractionService/PlanExtractionChunks"
+	ExtractionService_GetJob_FullMethodName                  = "/memory.v1.ExtractionService/GetJob"
+	ExtractionService_RetryJob_FullMethodName                = "/memory.v1.ExtractionService/RetryJob"
+	ExtractionService_GetExtractionRun_FullMethodName        = "/memory.v1.ExtractionService/GetExtractionRun"
+	ExtractionService_StartMemoryRefresh_FullMethodName      = "/memory.v1.ExtractionService/StartMemoryRefresh"
 )
 
 // ExtractionServiceClient is the client API for ExtractionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ExtractionServiceClient interface {
+	ScanMemoryRefresh(ctx context.Context, in *ScanMemoryRefreshRequest, opts ...grpc.CallOption) (*ScanMemoryRefreshResponse, error)
+	StartMemoryRefreshSweep(ctx context.Context, in *StartMemoryRefreshSweepRequest, opts ...grpc.CallOption) (*StartMemoryRefreshSweepResponse, error)
 	StartExtraction(ctx context.Context, in *StartExtractionRequest, opts ...grpc.CallOption) (*StartExtractionResponse, error)
 	PlanExtractionChunks(ctx context.Context, in *PlanExtractionChunksRequest, opts ...grpc.CallOption) (*PlanExtractionChunksResponse, error)
 	GetJob(ctx context.Context, in *GetJobRequest, opts ...grpc.CallOption) (*GetJobResponse, error)
@@ -45,6 +49,26 @@ type extractionServiceClient struct {
 
 func NewExtractionServiceClient(cc grpc.ClientConnInterface) ExtractionServiceClient {
 	return &extractionServiceClient{cc}
+}
+
+func (c *extractionServiceClient) ScanMemoryRefresh(ctx context.Context, in *ScanMemoryRefreshRequest, opts ...grpc.CallOption) (*ScanMemoryRefreshResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ScanMemoryRefreshResponse)
+	err := c.cc.Invoke(ctx, ExtractionService_ScanMemoryRefresh_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *extractionServiceClient) StartMemoryRefreshSweep(ctx context.Context, in *StartMemoryRefreshSweepRequest, opts ...grpc.CallOption) (*StartMemoryRefreshSweepResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartMemoryRefreshSweepResponse)
+	err := c.cc.Invoke(ctx, ExtractionService_StartMemoryRefreshSweep_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *extractionServiceClient) StartExtraction(ctx context.Context, in *StartExtractionRequest, opts ...grpc.CallOption) (*StartExtractionResponse, error) {
@@ -111,6 +135,8 @@ func (c *extractionServiceClient) StartMemoryRefresh(ctx context.Context, in *St
 // All implementations must embed UnimplementedExtractionServiceServer
 // for forward compatibility.
 type ExtractionServiceServer interface {
+	ScanMemoryRefresh(context.Context, *ScanMemoryRefreshRequest) (*ScanMemoryRefreshResponse, error)
+	StartMemoryRefreshSweep(context.Context, *StartMemoryRefreshSweepRequest) (*StartMemoryRefreshSweepResponse, error)
 	StartExtraction(context.Context, *StartExtractionRequest) (*StartExtractionResponse, error)
 	PlanExtractionChunks(context.Context, *PlanExtractionChunksRequest) (*PlanExtractionChunksResponse, error)
 	GetJob(context.Context, *GetJobRequest) (*GetJobResponse, error)
@@ -127,6 +153,12 @@ type ExtractionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedExtractionServiceServer struct{}
 
+func (UnimplementedExtractionServiceServer) ScanMemoryRefresh(context.Context, *ScanMemoryRefreshRequest) (*ScanMemoryRefreshResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ScanMemoryRefresh not implemented")
+}
+func (UnimplementedExtractionServiceServer) StartMemoryRefreshSweep(context.Context, *StartMemoryRefreshSweepRequest) (*StartMemoryRefreshSweepResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartMemoryRefreshSweep not implemented")
+}
 func (UnimplementedExtractionServiceServer) StartExtraction(context.Context, *StartExtractionRequest) (*StartExtractionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartExtraction not implemented")
 }
@@ -164,6 +196,42 @@ func RegisterExtractionServiceServer(s grpc.ServiceRegistrar, srv ExtractionServ
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ExtractionService_ServiceDesc, srv)
+}
+
+func _ExtractionService_ScanMemoryRefresh_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ScanMemoryRefreshRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ExtractionServiceServer).ScanMemoryRefresh(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ExtractionService_ScanMemoryRefresh_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ExtractionServiceServer).ScanMemoryRefresh(ctx, req.(*ScanMemoryRefreshRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ExtractionService_StartMemoryRefreshSweep_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartMemoryRefreshSweepRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ExtractionServiceServer).StartMemoryRefreshSweep(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ExtractionService_StartMemoryRefreshSweep_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ExtractionServiceServer).StartMemoryRefreshSweep(ctx, req.(*StartMemoryRefreshSweepRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ExtractionService_StartExtraction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -281,6 +349,14 @@ var ExtractionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "memory.v1.ExtractionService",
 	HandlerType: (*ExtractionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ScanMemoryRefresh",
+			Handler:    _ExtractionService_ScanMemoryRefresh_Handler,
+		},
+		{
+			MethodName: "StartMemoryRefreshSweep",
+			Handler:    _ExtractionService_StartMemoryRefreshSweep_Handler,
+		},
 		{
 			MethodName: "StartExtraction",
 			Handler:    _ExtractionService_StartExtraction_Handler,

@@ -24,6 +24,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// ExtractionServiceScanMemoryRefreshProcedure is the procedure name of the ExtractionService's
+	// ScanMemoryRefresh RPC.
+	ExtractionServiceScanMemoryRefreshProcedure = "/memory.v1.ExtractionService/ScanMemoryRefresh"
+	// ExtractionServiceStartMemoryRefreshSweepProcedure is the procedure name of the
+	// ExtractionService's StartMemoryRefreshSweep RPC.
+	ExtractionServiceStartMemoryRefreshSweepProcedure = "/memory.v1.ExtractionService/StartMemoryRefreshSweep"
 	// ExtractionServiceStartExtractionProcedure is the procedure name of the ExtractionService's
 	// StartExtraction RPC.
 	ExtractionServiceStartExtractionProcedure = "/memory.v1.ExtractionService/StartExtraction"
@@ -43,6 +49,20 @@ const (
 )
 
 var (
+	extractionServiceScanMemoryRefreshSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_extraction_proto.Services().ByName("ExtractionService").Methods().ByName("ScanMemoryRefresh"),
+			Procedure:  ExtractionServiceScanMemoryRefreshProcedure,
+		}
+	})
+	extractionServiceStartMemoryRefreshSweepSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_extraction_proto.Services().ByName("ExtractionService").Methods().ByName("StartMemoryRefreshSweep"),
+			Procedure:  ExtractionServiceStartMemoryRefreshSweepProcedure,
+		}
+	})
 	extractionServiceStartExtractionSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -89,6 +109,8 @@ var (
 
 // ExtractionServiceClient is a client for the memory.v1.ExtractionService service.
 type ExtractionServiceClient interface {
+	ScanMemoryRefresh(context.Context, *v1.ScanMemoryRefreshRequest) (*v1.ScanMemoryRefreshResponse, error)
+	StartMemoryRefreshSweep(context.Context, *v1.StartMemoryRefreshSweepRequest) (*v1.StartMemoryRefreshSweepResponse, error)
 	StartExtraction(context.Context, *v1.StartExtractionRequest) (*v1.StartExtractionResponse, error)
 	PlanExtractionChunks(context.Context, *v1.PlanExtractionChunksRequest) (*v1.PlanExtractionChunksResponse, error)
 	GetJob(context.Context, *v1.GetJobRequest) (*v1.GetJobResponse, error)
@@ -105,6 +127,8 @@ func NewExtractionServiceClient(client *connect.Client) ExtractionServiceClient 
 
 // ExtractionServiceHandler is an implementation of the memory.v1.ExtractionService service.
 type ExtractionServiceHandler interface {
+	ScanMemoryRefresh(context.Context, *v1.ScanMemoryRefreshRequest) (*v1.ScanMemoryRefreshResponse, error)
+	StartMemoryRefreshSweep(context.Context, *v1.StartMemoryRefreshSweepRequest) (*v1.StartMemoryRefreshSweepResponse, error)
 	StartExtraction(context.Context, *v1.StartExtractionRequest) (*v1.StartExtractionResponse, error)
 	PlanExtractionChunks(context.Context, *v1.PlanExtractionChunksRequest) (*v1.PlanExtractionChunksResponse, error)
 	GetJob(context.Context, *v1.GetJobRequest) (*v1.GetJobResponse, error)
@@ -118,6 +142,8 @@ type ExtractionServiceHandler interface {
 func RegisterExtractionServiceHandler(server *connect.Server, svc ExtractionServiceHandler) {
 	adapter := extractionServiceHandler{svc: svc}
 	server.Register(
+		connect.Method{Spec: extractionServiceScanMemoryRefreshSpec(), Handler: adapter.scanMemoryRefresh},
+		connect.Method{Spec: extractionServiceStartMemoryRefreshSweepSpec(), Handler: adapter.startMemoryRefreshSweep},
 		connect.Method{Spec: extractionServiceStartExtractionSpec(), Handler: adapter.startExtraction},
 		connect.Method{Spec: extractionServicePlanExtractionChunksSpec(), Handler: adapter.planExtractionChunks},
 		connect.Method{Spec: extractionServiceGetJobSpec(), Handler: adapter.getJob},
@@ -129,6 +155,14 @@ func RegisterExtractionServiceHandler(server *connect.Server, svc ExtractionServ
 
 // UnimplementedExtractionServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedExtractionServiceHandler struct{}
+
+func (UnimplementedExtractionServiceHandler) ScanMemoryRefresh(context.Context, *v1.ScanMemoryRefreshRequest) (*v1.ScanMemoryRefreshResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.ExtractionService.ScanMemoryRefresh is not implemented")
+}
+
+func (UnimplementedExtractionServiceHandler) StartMemoryRefreshSweep(context.Context, *v1.StartMemoryRefreshSweepRequest) (*v1.StartMemoryRefreshSweepResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.ExtractionService.StartMemoryRefreshSweep is not implemented")
+}
 
 func (UnimplementedExtractionServiceHandler) StartExtraction(context.Context, *v1.StartExtractionRequest) (*v1.StartExtractionResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.ExtractionService.StartExtraction is not implemented")
@@ -156,6 +190,22 @@ func (UnimplementedExtractionServiceHandler) StartMemoryRefresh(context.Context,
 
 type extractionServiceClient struct {
 	client *connect.Client
+}
+
+func (c *extractionServiceClient) ScanMemoryRefresh(ctx context.Context, req *v1.ScanMemoryRefreshRequest) (*v1.ScanMemoryRefreshResponse, error) {
+	var res v1.ScanMemoryRefreshResponse
+	if err := c.client.CallUnary(ctx, extractionServiceScanMemoryRefreshSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *extractionServiceClient) StartMemoryRefreshSweep(ctx context.Context, req *v1.StartMemoryRefreshSweepRequest) (*v1.StartMemoryRefreshSweepResponse, error) {
+	var res v1.StartMemoryRefreshSweepResponse
+	if err := c.client.CallUnary(ctx, extractionServiceStartMemoryRefreshSweepSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *extractionServiceClient) StartExtraction(ctx context.Context, req *v1.StartExtractionRequest) (*v1.StartExtractionResponse, error) {
@@ -207,6 +257,30 @@ func (c *extractionServiceClient) StartMemoryRefresh(ctx context.Context, req *v
 }
 
 type extractionServiceHandler struct{ svc ExtractionServiceHandler }
+
+func (h extractionServiceHandler) scanMemoryRefresh(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ScanMemoryRefreshRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ScanMemoryRefresh(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h extractionServiceHandler) startMemoryRefreshSweep(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.StartMemoryRefreshSweepRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.StartMemoryRefreshSweep(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
 
 func (h extractionServiceHandler) startExtraction(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.StartExtractionRequest

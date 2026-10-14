@@ -4,10 +4,13 @@ package memory.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "memory/v1/common.proto";
+import "memory/v1/contexts.proto";
 import "memory/v1/memories.proto";
 
 option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 service ExtractionService {
+  rpc ScanMemoryRefresh(ScanMemoryRefreshRequest) returns (ScanMemoryRefreshResponse);
+  rpc StartMemoryRefreshSweep(StartMemoryRefreshSweepRequest) returns (StartMemoryRefreshSweepResponse);
   rpc StartExtraction(StartExtractionRequest) returns (StartExtractionResponse);
   rpc PlanExtractionChunks(PlanExtractionChunksRequest) returns (PlanExtractionChunksResponse);
   rpc GetJob(GetJobRequest) returns (GetJobResponse);
@@ -243,4 +246,39 @@ message ExtractedProposal {
   string record_id = 2;
   string version_id = 3;
   string record_kind = 4;
+}
+
+// Operational pages use the retained event/revision and a version-ID cursor.
+message ScanMemoryRefreshRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  MemoryRefreshTrigger trigger = 4 [(buf.validate.field).required = true];
+  string after_version_id = 5 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  int32 limit = 6 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+}
+message ScanMemoryRefreshResponse {
+  repeated VersionReference versions = 1;
+}
+// Commits a sweep event; it does not scan, execute a provider, or accept memory.
+message StartMemoryRefreshSweepRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string stream = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string profile_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  google.protobuf.Timestamp scheduled_for = 6 [(buf.validate.field).required = true];
+  int32 interval_minutes = 7 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 1440
+  }];
+}
+message StartMemoryRefreshSweepResponse {
+  CommitResult result = 1;
 }

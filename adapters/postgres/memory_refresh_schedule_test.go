@@ -137,5 +137,6 @@ func testAutomaticMemoryRefresh(t *testing.T, ctx context.Context, engine *facts
 	if err != nil || job.Kind != "memory_refresh" || job.State != "pending" {
 		t.Fatal(job, err)
 	}
+	testRemoteRefreshAdministration(t, ctx, engine, denied, c, scan, r.ProfileID)
 	return job
 }

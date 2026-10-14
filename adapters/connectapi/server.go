@@ -53,6 +53,7 @@ func NewHandlerWithOptions(engine Engine, verify IdentityVerifier, limits Limits
 		return nil, err
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.ScanMemoryRefreshRequest{}, &v1.StartMemoryRefreshSweepRequest{},
 		&v1.RegisterRetentionPolicyRequest{}, &v1.PlaceLegalHoldRequest{}, &v1.ReleaseLegalHoldRequest{}, &v1.DisposeEvidenceRequest{}, &v1.GetRetentionStatusRequest{},
 		&v1.GetProjectionStatusRequest{}, &v1.RebuildIndexRequest{},
 		&v1.PutScopeRequest{}, &v1.PutSubjectRequest{}, &v1.GetScopeRequest{}, &v1.GetSubjectRequest{}, &v1.LookupSubjectRequest{},
