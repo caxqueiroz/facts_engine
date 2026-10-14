@@ -191,7 +191,9 @@ The callback exports gauges labeled only by bounded `worker.kind`: `facts.outbox
 
 All target reads must succeed before any samples are emitted. Read failures, inconsistent snapshots, overflow or deadlines fail collection without partial or cached healthy values; storage error text is sanitized. Configure exporter/collector alerts for missing samples and collection errors as well as lag thresholds. The monitor does not poll independently or automatically attach to packaged workers.
 
-Archive-chain verification metrics, full internal-stage coverage and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
+For archive-chain monitoring, `archive.NewChainVerifier(trustedKeys, telemetryOptions)` copies the independently configured trust map. Its `Verify` method accepts the store, tenant, stream, independently retained head, expected revision and maximum batch count, recording a `verify.archive` stage and `facts.export.integrity_failures{export.check="archive_chain"}` for confirmed failed checks or missing referenced objects. Both this method and the original `archive.VerifyChain` independently compare manifest/payload sizes and digests with their references before parsing, in addition to checking signatures and revision continuity. Custom storage adapters cannot bypass those byte checks by returning unchecked content. Read outages, invalid request bounds and cancellation are not counted as confirmed integrity failures; opaque storage errors remain operation failures, including errors from adapter-internal decryption checks. Repeated verification failures count separately. No tenant, stream, object locator or signing-key ID is emitted in telemetry.
+
+Full internal-stage coverage and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
 
 ## Standalone workers and lexical retrieval
 

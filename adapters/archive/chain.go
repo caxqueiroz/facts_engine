@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/model"
 )
@@ -37,40 +38,60 @@ func VerifyBatch(b model.ArchiveBatch, keys map[string]ed25519.PublicKey) error 
 // Without that anchor, deleting the tail could masquerade as a shorter archive.
 // The explicit maximum bounds work; exceeding it fails instead of truncating.
 func VerifyChain(ctx context.Context, store model.ArchiveStore, tenant, stream string, head model.ObjectRef, expected int64, maxBatches int, keys map[string]ed25519.PublicKey) error {
-	if expected < 1 || maxBatches < 1 || expected > int64(maxBatches) {
-		return model.ErrInvalid
+	_, err := verifyChain(ctx, store, tenant, stream, head, expected, maxBatches, keys)
+	return err
+}
+
+func verifyChain(ctx context.Context, store model.ArchiveStore, tenant, stream string, head model.ObjectRef, expected int64, maxBatches int, keys map[string]ed25519.PublicKey) (bool, error) {
+	if store == nil || !model.ValidID(tenant) || !model.ValidID(stream) || expected < 1 || maxBatches < 1 || expected > int64(maxBatches) {
+		return false, model.ErrInvalid
 	}
 	ref := head
 	for revision := expected; revision >= 1; revision-- {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
 		raw, err := store.Read(ctx, tenant, ref)
+		if canceled := ctx.Err(); canceled != nil {
+			return false, canceled
+		}
 		if err != nil {
-			return err
+			return errors.Is(err, model.ErrNotFound), err
+		}
+		if int64(len(raw)) != ref.Size || model.BytesDigest(raw) != ref.Digest {
+			return true, model.ErrPrecondition
 		}
 		var b model.ArchiveBatch
 		if err = json.Unmarshal(raw, &b); err != nil {
-			return err
+			return true, err
 		}
 		if err = VerifyBatch(b, keys); err != nil {
-			return err
+			return true, err
 		}
 		m := b.Manifest
 		if m.Tenant != tenant || m.Stream != stream || m.ThroughRevision != revision {
-			return model.ErrPrecondition
+			return true, model.ErrPrecondition
 		}
 		payload, err := store.Read(ctx, tenant, m.Payload)
+		if canceled := ctx.Err(); canceled != nil {
+			return false, canceled
+		}
 		if err != nil {
-			return err
+			return errors.Is(err, model.ErrNotFound), err
+		}
+		if int64(len(payload)) != m.Payload.Size || model.BytesDigest(payload) != m.Payload.Digest {
+			return true, model.ErrPrecondition
 		}
 		var p model.ArchivePayload
 		if err = json.Unmarshal(payload, &p); err != nil {
-			return err
+			return true, err
 		}
 		if p.Event.Caller.Tenant != tenant || p.Event.LedgerRevision != revision || !model.ValidID(p.Event.ID) {
-			return model.ErrPrecondition
+			return true, model.ErrPrecondition
 		}
 		if m.Previous != nil {
 			ref = *m.Previous
 		}
 	}
-	return nil
+	return false, nil
 }

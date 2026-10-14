@@ -12,7 +12,7 @@ func (o *Observer) ExportIntegrityFailure(ctx context.Context, kind string) {
 		return
 	}
 	switch kind {
-	case "audit_bundle", "evidence_content":
+	case "audit_bundle", "evidence_content", "archive_chain":
 	default:
 		kind = "other"
 	}

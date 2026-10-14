@@ -78,6 +78,7 @@ func TestArchiveChainRecovery(t *testing.T) {
 	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, keys); err != nil {
 		t.Fatal(err)
 	}
+	testObservedArchiveVerification(t, store, head, keys)
 	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 3, 3, keys); err == nil {
 		t.Fatal("truncated chain accepted")
 	}
