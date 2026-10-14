@@ -2,13 +2,15 @@ package postgres
 
 import (
 	"context"
+
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 func (t *transaction) stageConfirmation(ctx context.Context, a model.Attestation, kind string) error {
 	if a.Delegation != nil {
 		r := a.Delegation.Receipt
-		if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_delegations VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, r.Authority, r.BindingID, r.RequestDigest, a.ID, a.Scope, kind); err != nil {
+		if err := ledgerdb.New(t.tx).InsertAttestationDelegation(ctx, ledgerdb.InsertAttestationDelegationParams{TenantID: t.tenant, Authority: r.Authority, BindingID: r.BindingID, RequestDigest: r.RequestDigest, AttestationID: a.ID, ScopeID: a.Scope, Kind: kind}); err != nil {
 			return err
 		}
 	}
@@ -29,7 +31,7 @@ func (t *transaction) stageConfirmation(ctx context.Context, a model.Attestation
 		if evidence.Scope != a.Scope || evidence.Object.Digest != binding.ref.Digest {
 			return model.ErrPrecondition
 		}
-		if _, err = t.tx.Exec(ctx, `INSERT INTO confirmation_artifacts VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, t.tenant, a.ID, a.Scope, kind, binding.role, binding.ref.EvidenceID, binding.ref.Digest, evidence.Object.Locator, evidence.Object.Version); err != nil {
+		if err = ledgerdb.New(t.tx).InsertConfirmationArtifact(ctx, ledgerdb.InsertConfirmationArtifactParams{TenantID: t.tenant, AttestationID: a.ID, ScopeID: a.Scope, Kind: kind, Role: binding.role, EvidenceID: binding.ref.EvidenceID, Digest: binding.ref.Digest, ObjectLocator: evidence.Object.Locator, ObjectVersion: evidence.Object.Version}); err != nil {
 			return err
 		}
 	}

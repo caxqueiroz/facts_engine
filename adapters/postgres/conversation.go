@@ -2,12 +2,19 @@ package postgres
 
 import (
 	"context"
+	"math"
+
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
 func (t *transaction) Conversation(ctx context.Context, id string) (model.ConversationRecord, error) {
 	var r model.ConversationRecord
-	err := t.read(ctx, &r, `SELECT payload FROM conversations WHERE tenant_id=$1 AND id=$2`, t.tenant, id)
+	b, err := ledgerdb.New(t.tx).GetConversationPayload(ctx, ledgerdb.GetConversationPayloadParams{TenantID: t.tenant, ID: id})
+	if err != nil {
+		return r, translate(err)
+	}
+	err = t.decode(b, &r)
 	return r, err
 }
 func (t *transaction) StageConversation(ctx context.Context, r model.ConversationRecord) error {
@@ -32,11 +39,14 @@ func (t *transaction) flushConversation(ctx context.Context, e model.Event) erro
 	if err != nil {
 		return err
 	}
-	if _, err = t.tx.Exec(ctx, `INSERT INTO conversations VALUES($1,$2,$3,$4,$5)`, t.tenant, r.ID, r.Request.Scope, e.LedgerRevision, b); err != nil {
+	if err = ledgerdb.New(t.tx).InsertConversationPayload(ctx, ledgerdb.InsertConversationPayloadParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Request.Scope, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
 		return err
 	}
 	for ordinal, id := range r.EvidenceIDs {
-		if _, err = t.tx.Exec(ctx, `INSERT INTO conversation_messages VALUES($1,$2,$3,$4)`, t.tenant, r.ID, ordinal, id); err != nil {
+		if ordinal > math.MaxInt32 {
+			return model.ErrInvalid
+		}
+		if err = ledgerdb.New(t.tx).InsertConversationMessage(ctx, ledgerdb.InsertConversationMessageParams{TenantID: t.tenant, ConversationID: r.ID, Ordinal: int32(ordinal), EvidenceID: id}); err != nil {
 			return err
 		}
 	}

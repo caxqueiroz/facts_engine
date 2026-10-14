@@ -151,23 +151,21 @@ func (t *transaction) read(ctx context.Context, v any, query string, args ...any
 func (t *transaction) Receipt(ctx context.Context, c model.Caller, op, key, digest string) (*model.CommitResult, error) {
 	// Serialize retries before looking up a receipt. Repeatable-read conflicts are retried by the caller.
 	lock := model.Digest([]string{t.tenant, c.Principal, op, key})
-	if _, err := t.tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, lock); err != nil {
+	if err := ledgerdb.New(t.tx).LockCommandReceipt(ctx, lock); err != nil {
 		return nil, err
 	}
-	var stored string
-	var b []byte
-	err := t.tx.QueryRow(ctx, `SELECT digest,payload FROM command_receipts WHERE tenant_id=$1 AND principal=$2 AND operation=$3 AND command_key=$4`, t.tenant, c.Principal, op, key).Scan(&stored, &b)
+	receipt, err := ledgerdb.New(t.tx).GetCommandReceipt(ctx, ledgerdb.GetCommandReceiptParams{TenantID: t.tenant, Principal: c.Principal, Operation: op, CommandKey: key})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if stored != digest {
+	if receipt.Digest != digest {
 		return nil, model.ErrConflict
 	}
 	var r model.CommitResult
-	err = t.decode(b, &r)
+	err = t.decode(receipt.Payload, &r)
 	return &r, err
 }
 func (t *transaction) SaveReceipt(ctx context.Context, c model.Caller, op, key, digest string, r model.CommitResult) error {
@@ -175,12 +173,16 @@ func (t *transaction) SaveReceipt(ctx context.Context, c model.Caller, op, key, 
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO command_receipts VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, c.Principal, op, key, digest, b)
+	err = ledgerdb.New(t.tx).InsertCommandReceipt(ctx, ledgerdb.InsertCommandReceiptParams{TenantID: t.tenant, Principal: c.Principal, Operation: op, CommandKey: key, Digest: digest, Payload: b})
 	return err
 }
 func (t *transaction) Policy(ctx context.Context, scope, id string) (model.AcceptancePolicy, error) {
 	var p model.AcceptancePolicy
-	err := t.read(ctx, &p, `SELECT payload FROM policy_versions WHERE tenant_id=$1 AND scope_id=$2 AND id=$3`, t.tenant, scope, id)
+	b, err := ledgerdb.New(t.tx).GetPolicyPayload(ctx, ledgerdb.GetPolicyPayloadParams{TenantID: t.tenant, ScopeID: scope, ID: id})
+	if err != nil {
+		return p, translate(err)
+	}
+	err = t.decode(b, &p)
 	return p, err
 }
 func (t *transaction) InsertPolicy(ctx context.Context, p model.AcceptancePolicy) error {
@@ -188,12 +190,16 @@ func (t *transaction) InsertPolicy(ctx context.Context, p model.AcceptancePolicy
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO policy_versions VALUES($1,$2,$3,$4)`, t.tenant, p.Scope, p.ID, b)
+	err = ledgerdb.New(t.tx).InsertPolicyPayload(ctx, ledgerdb.InsertPolicyPayloadParams{TenantID: t.tenant, ScopeID: p.Scope, ID: p.ID, Payload: b})
 	return err
 }
 func (t *transaction) Predicate(ctx context.Context, scope, predicate, version string) (model.PredicateVersion, error) {
 	var d model.PredicateVersion
-	err := t.read(ctx, &d, `SELECT payload FROM predicate_versions WHERE tenant_id=$1 AND scope_id=$2 AND predicate=$3 AND version=$4`, t.tenant, scope, predicate, version)
+	b, err := ledgerdb.New(t.tx).GetPredicatePayload(ctx, ledgerdb.GetPredicatePayloadParams{TenantID: t.tenant, ScopeID: scope, Predicate: predicate, Version: version})
+	if err != nil {
+		return d, translate(err)
+	}
+	err = t.decode(b, &d)
 	return d, err
 }
 func (t *transaction) InsertPredicate(ctx context.Context, d model.PredicateVersion) error {
@@ -201,21 +207,25 @@ func (t *transaction) InsertPredicate(ctx context.Context, d model.PredicateVers
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO predicate_versions VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, d.Scope, d.Predicate, d.Version, d.PolicyID, b)
+	err = ledgerdb.New(t.tx).InsertPredicatePayload(ctx, ledgerdb.InsertPredicatePayloadParams{TenantID: t.tenant, ScopeID: d.Scope, Predicate: d.Predicate, Version: d.Version, PolicyID: d.PolicyID, Payload: b})
 	if err != nil {
 		return err
 	}
 	if d.Migration != nil {
-		if _, err = t.tx.Exec(ctx, `INSERT INTO predicate_migrations VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, d.Scope, d.Predicate, d.Version, d.Migration.FromVersion, d.Migration.Mode); err != nil {
+		if err = ledgerdb.New(t.tx).InsertPredicateMigration(ctx, ledgerdb.InsertPredicateMigrationParams{TenantID: t.tenant, ScopeID: d.Scope, Predicate: d.Predicate, Version: d.Version, FromVersion: d.Migration.FromVersion, Mode: d.Migration.Mode}); err != nil {
 			return err
 		}
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO active_predicates VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,scope_id,predicate) DO UPDATE SET version=EXCLUDED.version`, t.tenant, d.Scope, d.Predicate, d.Version)
+	err = ledgerdb.New(t.tx).SetActivePredicate(ctx, ledgerdb.SetActivePredicateParams{TenantID: t.tenant, ScopeID: d.Scope, Predicate: d.Predicate, Version: d.Version})
 	return err
 }
 func (t *transaction) Evidence(ctx context.Context, id string) (model.Evidence, error) {
 	var e model.Evidence
-	err := t.read(ctx, &e, `SELECT payload FROM evidence WHERE tenant_id=$1 AND id=$2`, t.tenant, id)
+	b, err := ledgerdb.New(t.tx).GetEvidencePayload(ctx, ledgerdb.GetEvidencePayloadParams{TenantID: t.tenant, ID: id})
+	if err != nil {
+		return e, translate(err)
+	}
+	err = t.decode(b, &e)
 	return e, err
 }
 func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (string, error) {
@@ -238,13 +248,12 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 		return "", err
 	}
 	source := model.Digest([]string{e.SourceSystem, e.SourceObject, e.SourceRevision})
-	var existing, digest string
-	err := t.tx.QueryRow(ctx, `SELECT id,digest FROM evidence WHERE tenant_id=$1 AND scope_id=$2 AND source_identity=$3`, t.tenant, e.Scope, source).Scan(&existing, &digest)
+	sourceRow, err := ledgerdb.New(t.tx).FindEvidenceSource(ctx, ledgerdb.FindEvidenceSourceParams{TenantID: t.tenant, ScopeID: e.Scope, SourceIdentity: source})
 	if err == nil {
-		if digest != e.Object.Digest {
+		if sourceRow.Digest != e.Object.Digest {
 			return "", model.ErrConflict
 		}
-		stored, err := t.Evidence(ctx, existing)
+		stored, err := t.Evidence(ctx, sourceRow.ID)
 		if err != nil {
 			return "", err
 		}
@@ -255,7 +264,7 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 		if model.Digest(stored) != model.Digest(candidate) {
 			return "", model.ErrConflict
 		}
-		return existing, nil
+		return sourceRow.ID, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
@@ -264,30 +273,29 @@ func (t *transaction) InsertEvidence(ctx context.Context, e model.Evidence) (str
 	if err != nil {
 		return "", err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO evidence VALUES($1,$2,$3,$4,$5,$6)`, t.tenant, e.ID, e.Scope, source, e.Object.Digest, b)
+	err = ledgerdb.New(t.tx).InsertEvidencePayload(ctx, ledgerdb.InsertEvidencePayloadParams{TenantID: t.tenant, ID: e.ID, ScopeID: e.Scope, SourceIdentity: source, Digest: e.Object.Digest, Payload: b})
 	if err != nil {
 		return "", err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO evidence_retention(tenant_id,evidence_id,scope_id,locator,object_version) VALUES($1,$2,$3,$4,$5)`, t.tenant, e.ID, e.Scope, e.Object.Locator, e.Object.Version)
+	err = ledgerdb.New(t.tx).InsertEvidenceRetention(ctx, ledgerdb.InsertEvidenceRetentionParams{TenantID: t.tenant, EvidenceID: e.ID, ScopeID: e.Scope, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
 	if err != nil {
 		return "", err
 	}
 	if e.Derivation != nil {
-		_, err = t.tx.Exec(ctx, `INSERT INTO evidence_derivations(tenant_id,scope_id,evidence_id,parent_evidence_id) VALUES($1,$2,$3,$4)`, t.tenant, e.Scope, e.ID, e.Derivation.ParentEvidenceID)
+		err = ledgerdb.New(t.tx).InsertEvidenceDerivation(ctx, ledgerdb.InsertEvidenceDerivationParams{TenantID: t.tenant, ScopeID: e.Scope, EvidenceID: e.ID, ParentEvidenceID: e.Derivation.ParentEvidenceID})
 	}
 	return e.ID, err
 }
 func (t *transaction) Record(ctx context.Context, id string) (model.Record, error) {
-	var r model.Record
-	err := t.tx.QueryRow(ctx, `SELECT id,scope_id,subject_id,predicate,discriminator,stream_revision,kind FROM records WHERE tenant_id=$1 AND id=$2`, t.tenant, id).Scan(&r.ID, &r.Key.Scope, &r.Key.Subject, &r.Key.Predicate, &r.Key.Discriminator, &r.Revision, &r.Kind)
-	return r, translate(err)
+	row, err := ledgerdb.New(t.tx).GetRecord(ctx, ledgerdb.GetRecordParams{TenantID: t.tenant, ID: id})
+	return model.Record{ID: row.ID, Key: model.FactKey{Scope: row.ScopeID, Subject: row.SubjectID, Predicate: row.Predicate, Discriminator: row.Discriminator}, Revision: row.StreamRevision, Kind: row.Kind}, translate(err)
 }
 func (t *transaction) LockRecord(ctx context.Context, k model.FactKey) (model.Record, error) {
 	if err := t.RequireSubject(ctx, k.Scope, k.Subject); err != nil {
 		return model.Record{}, err
 	}
 	id := model.Digest(k)
-	_, err := t.tx.Exec(ctx, `INSERT INTO records(tenant_id,id,scope_id,subject_id,predicate,discriminator,stream_revision) VALUES($1,$2,$3,$4,$5,$6,0) ON CONFLICT DO NOTHING`, t.tenant, id, k.Scope, k.Subject, k.Predicate, k.Discriminator)
+	err := ledgerdb.New(t.tx).EnsureFactRecord(ctx, ledgerdb.EnsureFactRecordParams{TenantID: t.tenant, ID: id, ScopeID: k.Scope, SubjectID: k.Subject, Predicate: k.Predicate, Discriminator: k.Discriminator})
 	if err != nil {
 		return model.Record{}, err
 	}
@@ -300,7 +308,11 @@ func (t *transaction) SetRevision(ctx context.Context, id string, rev int64) err
 }
 func (t *transaction) Version(ctx context.Context, record, id string) (model.Version, error) {
 	var v model.Version
-	err := t.read(ctx, &v, `SELECT payload FROM record_versions WHERE tenant_id=$1 AND record_id=$2 AND id=$3`, t.tenant, record, id)
+	b, err := ledgerdb.New(t.tx).GetVersionPayload(ctx, ledgerdb.GetVersionPayloadParams{TenantID: t.tenant, RecordID: record, ID: id})
+	if err != nil {
+		return v, translate(err)
+	}
+	err = t.decode(b, &v)
 	return v, err
 }
 func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error {
@@ -313,12 +325,12 @@ func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error 
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO record_versions VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, t.tenant, v.RecordID, v.ID, v.Proposal.Key.Scope, v.Proposal.Key.Predicate, v.Proposal.SchemaVersion, v.Digest, b)
+	err = ledgerdb.New(t.tx).InsertVersionPayload(ctx, ledgerdb.InsertVersionPayloadParams{TenantID: t.tenant, RecordID: v.RecordID, ID: v.ID, ScopeID: v.Proposal.Key.Scope, Predicate: v.Proposal.Key.Predicate, SchemaVersion: v.Proposal.SchemaVersion, Digest: v.Digest, Payload: b})
 	if err != nil {
 		return err
 	}
 	for _, s := range v.Proposal.Sources {
-		_, err = t.tx.Exec(ctx, `INSERT INTO version_evidence VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, t.tenant, v.ID, s.EvidenceID, v.Proposal.Key.Scope)
+		err = ledgerdb.New(t.tx).InsertVersionEvidence(ctx, ledgerdb.InsertVersionEvidenceParams{TenantID: t.tenant, VersionID: v.ID, EvidenceID: s.EvidenceID, ScopeID: v.Proposal.Key.Scope})
 		if err != nil {
 			return err
 		}
