@@ -181,7 +181,9 @@ Outbound OpenFGA and extraction-gateway adapters support `PropagateTraceContext:
 
 For packaged runtimes, `memoryd` accepts `accept_trace_context: true` for incoming RPC trace parenting. Both `memoryd` and `memoryworker` accept `openfga_trace_context: true`; extraction gateway bindings accept `propagate_trace_context: true`. These are separate, default-off decisions for each boundary. They propagate an existing context and do not create SDK providers or configure exporters. Hosts remain responsible for trusted endpoints and sampling; trace metadata never establishes a caller identity.
 
-Projection/archive revision lag and queue-depth gauges, recall-filtering and export-integrity outcome counters, full internal-stage coverage and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
+`facts.recall.filtered` counts candidates excluded by successful ledger revalidation in fact and memory recall. Its only labels are bounded `recall.kind` (`fact`, `memory`, or `other`) and `recall.reason` (`missing_version` or `ineligible_version`). Ineligible includes superseded/retracted versions and unresolved lifecycle or dependency state at the requested knowledge revision. Malformed hits, duplicates, other record kinds, out-of-scope candidates and later disclosure failures are not counted as stale versions. Counts reset on transaction retries and are emitted after the read transaction succeeds, even if a later disclosure or generation check fails. They measure revalidation work, not unique records or successful responses.
+
+Projection/archive revision lag and queue-depth gauges, export-integrity outcome counters, full internal-stage coverage and standalone exporter configuration remain unfinished. The packaged binaries currently retain their existing sanitized lifecycle logs and health endpoints; they do not configure an OpenTelemetry backend.
 
 ## Standalone workers and lexical retrieval
 
@@ -426,6 +428,18 @@ Follow the slices in [spec.md](spec.md). The current API is intentionally incomp
 The integration scenario now preserves an external calculation on snapshot A through later fact corrections and verifies its signed audit export. The full specification remains incomplete. CortexDB and encrypted local archive adapters are exercised in integration tests. Remote fact, memory, snapshot, evidence, definition, attestation, ingestion, extraction, calculation, audit, retrieval, context/decision and scope/subject administration and projection operations handlers are available for host integration; a local standalone workload service is available, but no remote service deployment, production gateway identity verifier, production embedding/extraction model, independently administered immutable archive, or production deployment has been configured. The engine does not implement wealth allocation, profile completeness, or any business decision algorithm.
 
 Production acceptance also requires the named domain, security, retention, and operational owners described in the spec, plus workload benchmarks and restore drills. Database roles protect normal runtime operations; they do not protect against a malicious database owner. Retained digests are integrity metadata, not anonymization.
+
+The following deployment acceptance gates require external infrastructure or a named accountable owner. Repository tests do not establish these approvals; no owner assignment or production sign-off is recorded here.
+
+| Required owner | Acceptance evidence required before production |
+| --- | --- |
+| Domain/application owner | Approved versioned schemas, acceptance/review policies, allowed principals and source classes, and domain validation/confirmation rules tested with the consuming application. |
+| Model/provider owner | Approved gateway/provider endpoints and model identities, data-processing approval, extraction evaluation results on bank-approved datasets, and approved resource/cost budgets. |
+| Identity/security owner | Production identity-to-tenant mapping, service and delegated-user trust configuration, authorization model rollout, certificate issuance/rotation/revocation procedures, and managed signing/encryption key custody and recovery. |
+| Retention/legal owner | Approved purpose/retention schedules, legal-hold handling, and evidence that disposal covers derivative payloads, indexes, caches, object versions, archives and backups as applicable. Coordinated disposal remains implementation work. |
+| Archive/infrastructure owner | Separately administered immutable storage and signing keys, verified chain/head monitoring and missing-batch detection. The local reference archive does not establish production immutability. |
+| Operations owner | Provisioned runtime services, telemetry collection/alerts, approved capacity/latency/RPO/RTO targets, workload benchmarks including append-lock contention, and recorded ledger/evidence/key restore plus search-rebuild drills. |
+
 
 
 ### Context manifests and decision receipts

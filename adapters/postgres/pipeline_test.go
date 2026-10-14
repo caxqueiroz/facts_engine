@@ -19,6 +19,8 @@ import (
 	"github.com/caxqueiroz/facts_engine/workers"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"os"
 	"testing"
 	"time"
@@ -91,7 +93,28 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil {
 		t.Fatal(err)
 	}
-	engine, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	reader := sdkmetric.NewManualReader()
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	defer func() { _ = meterProvider.Shutdown(context.Background()) }()
+	filtered := func() int64 {
+		t.Helper()
+		var data metricdata.ResourceMetrics
+		if err := reader.Collect(ctx, &data); err != nil {
+			t.Fatal(err)
+		}
+		var total int64
+		for _, scope := range data.ScopeMetrics {
+			for _, m := range scope.Metrics {
+				if m.Name == "facts.recall.filtered" {
+					for _, point := range m.Data.(metricdata.Sum[int64]).DataPoints {
+						total += point.Value
+					}
+				}
+			}
+		}
+		return total
+	}
+	engine, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Telemetry: model.TelemetryOptions{MeterProvider: meterProvider}, Retrieval: model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,12 +168,12 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil || result.Incomplete || len(result.Items) == 0 {
 		t.Fatal(result, err)
 	}
-	lexicalEngine, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: index.Lexical(), Progress: l, Generation: "g1"})
+	lexicalEngine, err := facts.NewWithOptions(l, allow{}, store, model.EngineOptions{Telemetry: model.TelemetryOptions{MeterProvider: meterProvider}, Retrieval: model.RetrievalOptions{Index: index.Lexical(), Progress: l, Generation: "g1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	testRemoteRecall(t, ctx, engine, c, query, 0)
-	testMemoryRecall(t, ctx, lexicalEngine, c, query)
+	testMemoryRecall(t, ctx, lexicalEngine, c, query, filtered)
 	lexicalManifest, err := lexicalEngine.PrepareContext(ctx, c, model.ContextRequest{Command: model.Command{Key: "lexical-context", Purpose: query.Purpose}, Scope: "case1", Query: query})
 	if err != nil || len(lexicalManifest.Items) == 0 || lexicalManifest.Retrieval.EmbeddingID != "none" || lexicalManifest.Retrieval.Dimensions != 0 {
 		t.Fatal("lexical context provenance", lexicalManifest, err)
@@ -238,9 +261,13 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil {
 		t.Fatal(err)
 	}
+	beforeFiltered := filtered()
 	stale, err := engine.Recall(ctx, c, query)
 	if err != nil || !stale.Incomplete {
 		t.Fatal("stale coverage hidden", stale, err)
+	}
+	if filtered() <= beforeFiltered {
+		t.Fatal("stale recall exclusion not measured")
 	}
 	for _, item := range stale.Items {
 		if item.Fact.RecordID == expected.RecordID {

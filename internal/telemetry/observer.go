@@ -18,6 +18,7 @@ import (
 )
 
 type Observer struct {
+	recallFiltered                                                               metric.Int64Counter
 	extractionResults, extractionProposals, extractionIssues, extractionRejected metric.Int64Counter
 	tracer                                                                       trace.Tracer
 	count                                                                        metric.Int64Counter
@@ -60,7 +61,11 @@ func New(o model.TelemetryOptions) (*Observer, error) {
 	if err != nil {
 		return nil, model.ErrInvalid
 	}
-	return &Observer{tracer: o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count: count, duration: duration, logger: o.Logger, extractionResults: results, extractionProposals: proposals, extractionIssues: issues, extractionRejected: rejected}, nil
+	filtered, err := meter.Int64Counter("facts.recall.filtered", metric.WithDescription("Search candidates excluded by ledger revalidation"))
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	return &Observer{recallFiltered: filtered, tracer: o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count: count, duration: duration, logger: o.Logger, extractionResults: results, extractionProposals: proposals, extractionIssues: issues, extractionRejected: rejected}, nil
 }
 
 type Operation struct {

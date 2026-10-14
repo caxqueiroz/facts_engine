@@ -21,7 +21,9 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 	}
 	items := []model.SnapshotItem{}
 	scores := []float64{}
+	var missing, ineligible int64
 	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		missing, ineligible = 0, 0
 		items = nil
 		scores = nil
 		revision, at, err := selection(ctx, tx, q.KnowledgeRevision)
@@ -40,6 +42,7 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 			seen[hit.VersionID] = true
 			v, err := tx.Version(ctx, hit.RecordID, hit.VersionID)
 			if errors.Is(err, model.ErrNotFound) {
+				missing++
 				continue
 			}
 			if err != nil {
@@ -53,6 +56,7 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 				return err
 			}
 			if item.Resolution.VersionID != hit.VersionID || (item.Resolution.State != "resolved" && item.Resolution.State != "unknown") {
+				ineligible++
 				continue
 			}
 			items = append(items, item)
@@ -63,6 +67,7 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 	if err != nil {
 		return out, err
 	}
+	s.telemetry.RecallFiltered(ctx, "fact", missing, ineligible)
 	for j, item := range items {
 		// Recheck permissions after retrieval, before disclosing ledger content.
 		if _, err := s.authorize(ctx, c, item.Selector.Scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {

@@ -24,7 +24,9 @@ func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.Re
 	}
 	views := []memoryRead{}
 	scores := []float64{}
+	var missing, ineligible int64
 	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		missing, ineligible = 0, 0
 		views = nil
 		scores = nil
 		t, err := memoryTx(tx)
@@ -44,6 +46,7 @@ func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.Re
 			seen[hit.VersionID] = true
 			version, err := t.MemoryVersion(ctx, hit.RecordID, hit.VersionID)
 			if errors.Is(err, model.ErrNotFound) {
+				missing++
 				continue
 			}
 			if err != nil {
@@ -57,6 +60,7 @@ func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.Re
 				return err
 			}
 			if view.Result.State != "resolved" || view.Result.VersionID != hit.VersionID {
+				ineligible++
 				continue
 			}
 			views = append(views, view)
@@ -67,6 +71,7 @@ func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.Re
 	if err != nil {
 		return model.MemoryRecallResult{}, err
 	}
+	s.telemetry.RecallFiltered(ctx, "memory", missing, ineligible)
 	for i, view := range views {
 		query := model.MemoryQuery{Key: view.Version.Proposal.Key, ValidAt: q.ValidAt, KnowledgeRevision: q.KnowledgeRevision, Purpose: q.Purpose}
 		resolved, err := s.discloseMemory(ctx, c, query, view)

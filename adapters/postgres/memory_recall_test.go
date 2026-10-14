@@ -9,7 +9,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
-func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, caller model.Caller, query model.RecallRequest) {
+func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, caller model.Caller, query model.RecallRequest, filtered func() int64) {
 	t.Helper()
 	query.Query = "preference"
 	// Reused below as a PostgreSQL lifecycle interval boundary.
@@ -36,9 +36,13 @@ func testMemoryRecall(t *testing.T, ctx context.Context, engine *facts.Engine, c
 	if err != nil {
 		t.Fatal(err)
 	}
+	beforeFiltered := filtered()
 	stale, err := engine.RecallMemories(ctx, caller, query)
 	if err != nil || len(stale.Items) != 0 || !stale.Incomplete {
 		t.Fatal("stale memory index disclosed body", stale, err)
+	}
+	if filtered() <= beforeFiltered {
+		t.Fatal("stale memory exclusion not measured")
 	}
 	testRemoteRecall(t, ctx, engine, caller, query, 0)
 	query.KnowledgeRevision = result.LedgerRevision
