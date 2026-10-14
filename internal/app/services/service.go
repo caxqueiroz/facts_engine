@@ -299,17 +299,27 @@ func validKind(k string) bool {
 }
 func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest) (model.CommitResult, error) {
 	a := r.Attestation
-	// The trusted caller is the attestor in this first slice. Delegated identity flows are not inferred.
-	if !validKind(a.Kind) || !model.ValidID(a.ID) || a.Attestor != c || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+	// The trusted caller is the attestor. Delegated identity flows are not inferred.
+	if a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || a.Attestor != c || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if _, err := s.authorize(ctx, c, a.Scope, "can_attest", r.Command); err != nil {
 		return model.CommitResult{}, err
 	}
-	if _, err := s.loadEvidence(ctx, c, a.Scope, []string{a.EvidenceID}); err != nil {
+	if a.Confirmation != nil {
+		check, err := s.authorize(ctx, c, a.Scope, "can_read_evidence", r.Command)
+		if err != nil {
+			return model.CommitResult{}, err
+		}
+		a.EvidenceAuthorization = &check
+	}
+	if err := s.verifyAttestationEvidence(ctx, c, a); err != nil {
 		return model.CommitResult{}, err
 	}
 	return s.mutate(ctx, c, a.Scope, "record_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		if a.EvidenceAuthorization != nil && time.Since(a.EvidenceAuthorization.CheckedAt) > 30*time.Second {
+			return model.ErrUnavailable
+		}
 		record, err := tx.Record(ctx, a.RecordID)
 		if err != nil {
 			return err
@@ -318,7 +328,9 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 			return model.ErrDenied
 		}
 		if record.Kind == "memory" {
-			return s.recordMemoryAttestation(ctx, tx, c, r, out)
+			stored := r
+			stored.Attestation = a
+			return s.recordMemoryAttestation(ctx, tx, c, stored, out)
 		}
 		if err := tx.RequireSubject(ctx, record.Key.Scope, record.Key.Subject); err != nil {
 			return err
@@ -362,7 +374,7 @@ func versionPrerequisites(p model.AcceptancePolicy, versionID, digest string, as
 	for _, req := range p.Required {
 		found := false
 		for _, a := range as {
-			if a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
+			if validConfirmation(a) && (a.Confirmation == nil || !a.Confirmation.RespondedAt.After(now)) && a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
 				ids = append(ids, a.ID)
 				found = true
 				break
@@ -407,6 +419,10 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 	if _, err := s.loadEvidence(ctx, c, r.Scope, ids); err != nil {
 		return model.CommitResult{}, err
 	}
+	verified, err := s.verifiedPrerequisites(ctx, c, r.Scope, preliminary.ID, preliminary.Digest, preliminary.PolicyID, false)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
 	return s.mutate(ctx, c, r.Scope, op, permission, r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		rec, err := tx.LockRecord(ctx, preliminary.Proposal.Key)
 		if err != nil {
@@ -424,6 +440,9 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		}
 		p, attIDs, err := s.acceptanceChecks(ctx, tx, c, rec, v, automatic)
 		if err != nil {
+			return err
+		}
+		if err := requireVerifiedPrerequisites(attIDs, verified); err != nil {
 			return err
 		}
 		accepted, err := tx.Acceptances(ctx, rec.ID, 0)

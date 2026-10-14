@@ -171,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
+1. Finish foundation contracts: trusted delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
 2. Complete extraction input chunking and redaction policies. Conversation memory candidate extraction is implemented. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -459,7 +459,7 @@ Use the existing `RecordAttestation` API for both facts and memories. The engine
 
 Only the recorded attestor can withdraw its attestation through an authorized, idempotent `WithdrawAttestation` command. Withdrawal takes the memory record lock, advances its stream and tenant revisions, and appends an immutable event. Concurrent acceptance therefore cannot commit against a withdrawal that won the record lock first. Historical reads use the requested ledger revision and its recorded time, preserving eligibility before a later withdrawal or expiry.
 
-Memory attestations and withdrawals participate in signed audit/export and event archive coverage. Their evidence references block disposal, and resolved memory reads verify bound attestation evidence before disclosure. Presentation/response artifacts for client confirmation and delegated external identity flows remain separate unfinished requirements; this API authenticates the recording attestor through the host's trusted caller boundary.
+Memory attestations and withdrawals participate in signed audit/export and event archive coverage. Their evidence references block disposal, and resolved memory reads verify bound attestation evidence before disclosure. Client confirmations additionally require the presentation/response artifacts described below. Delegated external identity flows remain unfinished; this API authenticates the recording attestor through the host's trusted caller boundary.
 
 Integration tests cover forged attestors, wrong/obsolete digests, expired submissions, cross-kind ID collisions, idempotent recording/withdrawal, unauthorized withdrawal, acceptance with valid prerequisites, current ineligibility after withdrawal, preserved historical eligibility and a separately validated replacement.
 
@@ -683,3 +683,40 @@ For an existing deployment, the migration installs the foreign keys as `NOT VALI
 Custom ledger adapters must implement the new `Tx.RequireScope` and `Tx.RequireSubject` contracts; `LockRecord` must check subject registration before creating or locking a record. The PostgreSQL adapter enforces these checks and the database constraints. Registry identities cannot be deleted through the runtime API, so a successful check cannot race a supported identity-removal operation.
 
 Integration tests cover preservation and governed adoption of pre-registry records, refusal to validate unadopted history, successful constraint validation after adoption, direct-SQL foreign-key enforcement, tenant-qualified subjects, rejection of unknown proposal/extraction subjects, and all existing ingestion, lifecycle, snapshot, retention, outbox and retrieval scenarios. Production identity mapping and migration sign-off still require the named application/domain, security and database owners; fixture mappings are not a production identity source.
+
+
+## Client confirmation artifacts
+
+Apply forward-only migration `00023_confirmation_artifacts.sql` and refresh runtime/archive grants. `RecordAttestation` now requires `Confirmation` for `Kind: "client_confirmation"`, for both facts and memories:
+
+```go
+_, err := engine.RecordAttestation(ctx, authenticatedClient, model.AttestationRequest{
+    Command: model.Command{Key: confirmationCommandID, Purpose: "client_confirmation"},
+    Attestation: model.Attestation{
+        ID: attestationID, Scope: scope, RecordID: proposed.RecordID,
+        VersionID: proposed.VersionID, ContentDigest: proposed.ContentDigest,
+        Kind: "client_confirmation", EvidenceID: responseEvidenceID,
+        Attestor: authenticatedClient,
+        Confirmation: &model.ClientConfirmation{
+            Presentation: model.ArtifactReference{EvidenceID: presentationEvidenceID, Digest: presentationDigest},
+            Response: model.ArtifactReference{EvidenceID: responseEvidenceID, Digest: responseDigest},
+            PresentationVersion: "client-ui-v1",
+            PresentedAt: presentedAt, RespondedAt: respondedAt,
+        },
+    },
+})
+```
+
+Register the exact presentation and affirmative response as distinct immutable evidence objects in the record's scope before recording the attestation. The presentation should preserve what the client actually received, including the exact version being confirmed, wording, units and relevant context. The application owns its rendering and response capture; the engine verifies references, bytes and digests, but does not interpret an image, PDF, natural-language response or model output as consent. `PresentationVersion` identifies the host's rendering/template contract. Evidence locators and versions remain available through normal evidence and audit APIs.
+
+The trusted caller must be the authenticated human attestor, permitted for `client_confirmation` by the version's bound acceptance policy. Recording requires `can_attest` and `can_read_evidence`; the evidence authorization decision is retained in the encrypted attestation as server-owned `EvidenceAuthorization` (leave it unset in requests). Caller-supplied names, service principals and service-initiated identities do not establish client consent. Trusted delegated client recording is still a separate unfinished integration requirement.
+
+`EvidenceID` must equal the response evidence ID. Presentation and response evidence IDs must differ. Timestamps must be nonzero, at microsecond precision, and ordered; future response times beyond one second are rejected. Expiry, when provided, must follow the response and still be in the future at recording. A response does not satisfy a prerequisite before its recorded response time. Other attestation kinds must omit `Confirmation`.
+
+A response object can bind only one attestation in a tenant, including across fact and memory versions. Reusing it with a new command/attestation, or registering the same object locator/version under a different evidence ID, conflicts. Identical authorized command retries return the existing receipt. A replacement version or a renewed confirmation needs a fresh response; this API does not provide a multi-version batch-consent contract.
+
+Acceptance and supersession verify the selected prerequisite evidence before acquiring record/tenant locks, then require the transaction to use only the verified attestation IDs. A concurrently added prerequisite can require a retry. Resolved fact and memory reads verify their bound attestation evidence; missing or corrupted confirmation bytes make the result ineligible. Presentation and response references have tenant/scope-qualified foreign keys, block evidence disposal, and are included in scoped audit exports and event archives. Withdrawal preserves the original artifacts and adds its usual immutable event.
+
+Legacy client confirmations without these artifacts remain readable in retained history but no longer satisfy acceptance prerequisites, including when reconstructing eligibility. Their previously accepted versions can therefore become ineligible. Obtain a new valid confirmation and perform the governed lifecycle action required to replace the old acceptance; adding an unrelated attestation never silently repairs its bound prerequisites. No migration fabricates a presentation or client response.
+
+Tests exercise fact and memory confirmation, missing/mismatched artifacts, authorization denial, timestamp validation, legacy prerequisite rejection, response replay through evidence aliases, exact command retry, acceptance/read integrity failures, disposal blockers and archive inclusion. Production acceptance requires the application owner to approve the presentation/capture contract and security owner to verify the authenticated client boundary; no external client-identity deployment is configured by this change.

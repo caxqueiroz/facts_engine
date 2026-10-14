@@ -115,6 +115,10 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 	if !sameInterval(r.Valid, v.Proposal.Valid) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
+	verified, err := s.verifiedPrerequisites(ctx, c, r.Scope, v.ID, v.Digest, v.PolicyID, false)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
 	return s.mutate(ctx, c, r.Scope, "supersede_fact", permission, r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		t, err := temporal(tx)
 		if err != nil {
@@ -129,6 +133,9 @@ func (s *Service) SupersedeFact(ctx context.Context, c model.Caller, r model.Sup
 		}
 		p, attIDs, err := s.acceptanceChecks(ctx, tx, c, rec, v, r.Automated)
 		if err != nil {
+			return err
+		}
+		if err := requireVerifiedPrerequisites(attIDs, verified); err != nil {
 			return err
 		}
 		entries, err := tx.Acceptances(ctx, rec.ID, 0)
@@ -345,6 +352,7 @@ func (s *Service) resolve(ctx context.Context, tx model.Tx, q model.FactQuery, r
 		for _, att := range as {
 			if slices.Contains(a.AttestationIDs, att.ID) {
 				bound = append(bound, att)
+				item.EvidenceIDs = append(item.EvidenceIDs, model.AttestationEvidence(att)...)
 			}
 		}
 		if _, err := prerequisites(p, v, bound, evaluatedAt); err != nil {

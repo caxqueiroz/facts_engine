@@ -91,3 +91,6 @@ GRANT SELECT ON scopes,subjects,scope_versions,subject_versions,subject_lookup T
 
 GRANT SELECT,INSERT ON extraction_subjects TO facts_runtime;
 GRANT SELECT ON extraction_subjects TO facts_archiver;
+
+GRANT SELECT,INSERT ON confirmation_artifacts TO facts_runtime;
+GRANT SELECT ON confirmation_artifacts TO facts_archiver;

@@ -118,6 +118,10 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 	if err = s.memoryDependencyEvidence(ctx, c, v); err != nil {
 		return model.CommitResult{}, err
 	}
+	verified, err := s.verifiedPrerequisites(ctx, c, r.Scope, v.ID, v.Digest, v.PolicyID, true)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
 	return s.mutate(ctx, c, r.Scope, op, permission, r.Command, input, func(tx model.Tx, out *model.CommitResult) error {
 		t, err := memoryLifecycleTx(tx)
 		if err != nil {
@@ -165,6 +169,9 @@ func (s *Service) acceptMemory(ctx context.Context, c model.Caller, r model.Appr
 		}
 		attestationIDs, err := versionPrerequisites(policy, v.ID, v.Digest, attestations, time.Now())
 		if err != nil {
+			return err
+		}
+		if err := requireVerifiedPrerequisites(attestationIDs, verified); err != nil {
 			return err
 		}
 		for _, span := range v.Proposal.Sources {

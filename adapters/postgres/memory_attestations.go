@@ -12,6 +12,9 @@ func (t *transaction) StageMemoryAttestation(ctx context.Context, a model.Attest
 	if _, err := t.tx.Exec(ctx, `INSERT INTO attestation_identities VALUES($1,$2,$3,'memory')`, t.tenant, a.ID, a.Scope); err != nil {
 		return err
 	}
+	if err := t.stageConfirmation(ctx, a, "memory"); err != nil {
+		return err
+	}
 	t.pendingMemoryAttestation = &a
 	return nil
 }

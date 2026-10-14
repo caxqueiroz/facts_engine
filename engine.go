@@ -371,3 +371,5 @@ type SubjectVersion = model.SubjectVersion
 type IdentityQuery = model.IdentityQuery
 type SubjectLookupQuery = model.SubjectLookupQuery
 type IdentityTx = model.IdentityTx
+
+type ClientConfirmation = model.ClientConfirmation

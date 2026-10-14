@@ -208,7 +208,7 @@ func (s *Service) resolveMemory(ctx context.Context, tx model.Tx, q model.Memory
 		for _, a := range attestations {
 			if slices.Contains(entry.AttestationIDs, a.ID) {
 				bound = append(bound, a)
-				view.AttestationEvidence = append(view.AttestationEvidence, a.EvidenceID)
+				view.AttestationEvidence = append(view.AttestationEvidence, model.AttestationEvidence(a)...)
 			}
 		}
 		if _, err = versionPrerequisites(policy, v.ID, v.Digest, bound, at); err != nil {

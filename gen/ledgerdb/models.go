@@ -124,6 +124,18 @@ type CommandReceipt struct {
 	Payload    []byte
 }
 
+type ConfirmationArtifact struct {
+	TenantID      string
+	AttestationID string
+	ScopeID       string
+	Kind          string
+	Role          string
+	EvidenceID    string
+	Digest        string
+	ObjectLocator string
+	ObjectVersion string
+}
+
 type ConsumerOffset struct {
 	TenantID             string
 	ConsumerID           string
