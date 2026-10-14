@@ -39,7 +39,7 @@ func TestPostgresContract(t *testing.T) {
 		if _, err := cortex.New(ctx, db, c, embedder{}); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal("owner allowed at runtime", err)
 		}
-		if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='cortex_test_runtime') THEN CREATE ROLE cortex_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO cortex_test_runtime; GRANT SELECT ON collections,facts_projection_identity TO cortex_test_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO cortex_test_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO cortex_test_runtime`); err != nil {
+		if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='cortex_test_runtime') THEN CREATE ROLE cortex_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO cortex_test_runtime; GRANT SELECT ON collections,facts_projection_identity TO cortex_test_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO cortex_test_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO cortex_test_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO cortex_test_runtime`); err != nil {
 			t.Fatal(err)
 		}
 		// Dedicated session runtime parameter applies to every pooled connection.

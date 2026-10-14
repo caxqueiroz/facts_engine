@@ -32,6 +32,7 @@ type Embedder interface {
 	Embed(context.Context, string) ([]float32, error)
 }
 type RetrievalOptions struct {
+	Registry   ProjectionRegistry
 	Index      RetrievalIndex
 	Progress   Outbox
 	Generation string

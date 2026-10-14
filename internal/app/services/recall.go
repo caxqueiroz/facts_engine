@@ -31,7 +31,16 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 			}
 		}
 	}
-	progress, err := s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(s.retrieval.Generation)})
+	var active model.ActiveProjection
+	if s.retrieval.Registry != nil {
+		var err error
+		active, err = s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
+		if err != nil || active.Generation == "" {
+			return out, model.ErrUnavailable
+		}
+		out.Generation = active.Generation
+	}
+	progress, err := s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(out.Generation)})
 	if err != nil {
 		return out, model.ErrUnavailable
 	}
@@ -41,7 +50,7 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 	}
 	candidates := []model.SearchCandidate{}
 	for _, scope := range q.Scopes {
-		hits, err := s.retrieval.Index.Candidates(ctx, c.Tenant, s.retrieval.Generation, scope, q.Query, min(100, q.Limit*5))
+		hits, err := s.retrieval.Index.Candidates(ctx, c.Tenant, out.Generation, scope, q.Query, min(100, q.Limit*5))
 		if err != nil {
 			return out, model.ErrUnavailable
 		}
@@ -115,11 +124,17 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 			break
 		}
 	}
+	if s.retrieval.Registry != nil {
+		now, err := s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
+		if err != nil || now != active {
+			return model.RecallResult{}, model.ErrUnavailable
+		}
+	}
 	out.Incomplete = out.IndexedRevision < out.LedgerRevision || progress.State == "failed"
 	return out, nil
 }
 func NewWithRetrieval(l model.Ledger, a model.Authorizer, e model.EvidenceStore, options model.RetrievalOptions) (*Service, error) {
-	if options.Index == nil || options.Progress == nil || !model.ValidID(options.Generation) {
+	if options.Index == nil || options.Progress == nil || (options.Registry == nil && !model.ValidID(options.Generation)) || (options.Registry != nil && options.Generation != "") {
 		return nil, model.ErrInvalid
 	}
 	s, err := New(l, a, e)

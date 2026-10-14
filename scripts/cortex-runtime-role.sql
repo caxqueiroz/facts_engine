@@ -5,3 +5,6 @@ GRANT USAGE ON SCHEMA public TO facts_cortex_runtime;
 GRANT SELECT ON collections,facts_projection_identity TO facts_cortex_runtime;
 GRANT SELECT,INSERT,UPDATE ON embeddings TO facts_cortex_runtime;
 GRANT SELECT,INSERT ON facts_projection_receipts TO facts_cortex_runtime;
+-- SELECT FOR SHARE requires UPDATE privileges; this login is a trusted projection
+-- writer. Keep management APIs behind the host's operator authorization boundary.
+GRANT SELECT,UPDATE ON facts_projection_gate TO facts_cortex_runtime;

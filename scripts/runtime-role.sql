@@ -25,3 +25,13 @@ DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_archiver')
 GRANT facts_worker TO facts_projector,facts_archiver;
 GRANT SELECT ON record_versions,predicate_versions,policy_versions,evidence,timeline_generations,timeline_history,accepted_intervals TO facts_projector,facts_archiver;
 GRANT SELECT ON fact_snapshots,calculation_receipts,attestations,audit_exports TO facts_archiver;
+GRANT SELECT ON active_projections TO facts_runtime;
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_rebuild') THEN CREATE ROLE facts_rebuild NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
+GRANT facts_projector TO facts_rebuild;
+GRANT SELECT ON record_events TO facts_rebuild;
+-- UPDATE is needed for row locks at the tenant revision barrier; this is an
+-- administrative role, never an end-user runtime identity.
+GRANT UPDATE ON tenant_revisions TO facts_rebuild;
+GRANT SELECT,INSERT,UPDATE ON projection_generations,active_projections TO facts_rebuild;
+GRANT SELECT,INSERT ON projection_rebuild_events TO facts_rebuild;
+GRANT INSERT ON tenant_revisions TO facts_rebuild;

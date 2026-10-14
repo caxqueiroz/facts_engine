@@ -26,6 +26,12 @@ type ActivePredicate struct {
 	Version   string
 }
 
+type ActiveProjection struct {
+	TenantID   string
+	Generation string
+	Epoch      int64
+}
+
 type Attestation struct {
 	TenantID       string
 	ID             string
@@ -188,6 +194,27 @@ type PredicateVersion struct {
 	Version   string
 	PolicyID  string
 	Payload   []byte
+}
+
+type ProjectionGeneration struct {
+	TenantID           string
+	Generation         string
+	State              string
+	Fence              int64
+	ThroughRevision    int64
+	BaseEpoch          int64
+	PreviousGeneration string
+	EntryCount         int32
+	Digest             string
+}
+
+type ProjectionRebuildEvent struct {
+	TenantID   string
+	Generation string
+	Fence      int64
+	Operation  string
+	Payload    []byte
+	RecordedAt pgtype.Timestamptz
 }
 
 type Record struct {

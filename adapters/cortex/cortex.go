@@ -50,7 +50,7 @@ func Provision(ctx context.Context, db *sql.DB, c Config) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `CREATE TABLE facts_projection_identity(singleton boolean PRIMARY KEY CHECK(singleton),tenant text NOT NULL,generation text NOT NULL,embedding_id text NOT NULL,dimensions integer NOT NULL,cortex_version text NOT NULL); CREATE TABLE facts_projection_receipts(id text PRIMARY KEY,digest text NOT NULL)`); err != nil {
+	if _, err = tx.ExecContext(ctx, `CREATE TABLE facts_projection_identity(singleton boolean PRIMARY KEY CHECK(singleton),tenant text NOT NULL,generation text NOT NULL,embedding_id text NOT NULL,dimensions integer NOT NULL,cortex_version text NOT NULL); CREATE TABLE facts_projection_receipts(id text PRIMARY KEY,digest text NOT NULL); CREATE TABLE facts_projection_gate(singleton boolean PRIMARY KEY CHECK(singleton),fence bigint NOT NULL CHECK(fence>=0),sealed boolean NOT NULL); INSERT INTO facts_projection_gate VALUES(true,0,false)`); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO facts_projection_identity VALUES(true,$1,$2,$3,$4,$5)`, c.Tenant, c.Generation, c.EmbeddingID, c.Dimensions, Version); err != nil {
@@ -85,6 +85,13 @@ func New(ctx context.Context, db *sql.DB, c Config, embedder model.Embedder) (*I
 	if tenant != c.Tenant || generation != c.Generation || embedding != c.EmbeddingID || dimensions != c.Dimensions || version != Version {
 		return nil, model.ErrPrecondition
 	}
+	var gate bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_gate WHERE singleton)`).Scan(&gate); err != nil {
+		return nil, err
+	}
+	if !gate {
+		return nil, model.ErrPrecondition
+	}
 	return &Index{db, core.NewPostgresStore(db, coreConfig(c)), c, embedder}, nil
 }
 func (i *Index) vector(ctx context.Context, text string) ([]float32, error) {
@@ -116,15 +123,9 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 	if !model.ValidID(d.RecordID) || !model.ValidID(d.VersionID) || !model.ValidID(d.Key.Scope) || d.Value.Validate() != nil {
 		return model.ErrInvalid
 	}
-	content, err := json.Marshal(struct {
-		Key   model.FactKey
-		Value model.Value
-	}{d.Key, d.Value})
+	content, metadata, err := projectionContent(d)
 	if err != nil {
 		return err
-	}
-	if len(content) > 1<<20 {
-		return model.ErrInvalid
 	}
 	id, digest := model.ProjectionID(d), model.Digest(d)
 	var retained string
@@ -149,6 +150,15 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 		return err
 	}
 	defer tx.Rollback()
+	// Hold a shared gate lock through commit. Sealing waits for prior writes;
+	// work that was still embedding when sealed cannot write afterward.
+	var sealed bool
+	if err = tx.QueryRowContext(ctx, `SELECT sealed FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&sealed); err != nil {
+		return err
+	}
+	if sealed {
+		return model.ErrPrecondition
+	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, id); err != nil {
 		return err
 	}
@@ -163,12 +173,6 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	metadata := map[string]string{"tenant": d.Tenant, "generation": d.Generation, "scope": d.Key.Scope, "record": d.RecordID, "version": d.VersionID, "digest": d.VersionDigest, "policy": d.PolicyID, "classification": d.Classification}
-	provenance, _ := json.Marshal(struct {
-		Valid         model.Interval
-		SourceClasses []string
-	}{d.Valid, d.SourceClasses})
-	metadata["provenance"] = string(provenance)
 	if err = i.store.UpsertBatchTx(ctx, tx, []*core.Embedding{{ID: id, Vector: vector, Content: string(content), Metadata: metadata}}); err != nil {
 		return err
 	}
@@ -220,4 +224,25 @@ func (r Router) Candidates(ctx context.Context, t, g, s, q string, n int) ([]mod
 		return nil, model.ErrUnavailable
 	}
 	return i.Candidates(ctx, t, g, s, q, n)
+}
+
+func projectionContent(d model.ProjectionDocument) ([]byte, map[string]string, error) {
+	content, err := json.Marshal(struct {
+		Key   model.FactKey
+		Value model.Value
+	}{d.Key, d.Value})
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(content) > 1<<20 {
+		return nil, nil, model.ErrInvalid
+	}
+	metadata := map[string]string{"tenant": d.Tenant, "generation": d.Generation, "scope": d.Key.Scope, "record": d.RecordID, "version": d.VersionID, "digest": d.VersionDigest, "policy": d.PolicyID, "classification": d.Classification}
+	provenance, _ := json.Marshal(struct {
+		Valid         model.Interval
+		SourceClasses []string
+	}{d.Valid, d.SourceClasses})
+	metadata["provenance"] = string(provenance)
+
+	return content, metadata, nil
 }
