@@ -9,7 +9,7 @@ import (
 	"context"
 )
 
-const deleteSubjectLookups = `-- name: DeleteSubjectLookups :exec
+const DeleteSubjectLookups = `-- name: DeleteSubjectLookups :exec
 DELETE
 FROM subject_lookup
 WHERE tenant_id=$1 AND scope_id=$2 AND subject_id=$3
@@ -22,11 +22,11 @@ type DeleteSubjectLookupsParams struct {
 }
 
 func (q *Queries) DeleteSubjectLookups(ctx context.Context, arg DeleteSubjectLookupsParams) error {
-	_, err := q.db.Exec(ctx, deleteSubjectLookups, arg.TenantID, arg.ScopeID, arg.SubjectID)
+	_, err := q.db.Exec(ctx, DeleteSubjectLookups, arg.TenantID, arg.ScopeID, arg.SubjectID)
 	return err
 }
 
-const ensureScopeIdentity = `-- name: EnsureScopeIdentity :exec
+const EnsureScopeIdentity = `-- name: EnsureScopeIdentity :exec
 INSERT INTO scopes (tenant_id,id,current_revision)
 VALUES ($1,$2,0)
 ON CONFLICT DO NOTHING
@@ -38,11 +38,11 @@ type EnsureScopeIdentityParams struct {
 }
 
 func (q *Queries) EnsureScopeIdentity(ctx context.Context, arg EnsureScopeIdentityParams) error {
-	_, err := q.db.Exec(ctx, ensureScopeIdentity, arg.TenantID, arg.ID)
+	_, err := q.db.Exec(ctx, EnsureScopeIdentity, arg.TenantID, arg.ID)
 	return err
 }
 
-const ensureSubjectIdentity = `-- name: EnsureSubjectIdentity :exec
+const EnsureSubjectIdentity = `-- name: EnsureSubjectIdentity :exec
 INSERT INTO subjects (tenant_id,scope_id,id,kind,current_revision)
 VALUES ($1,$2,$3,$4,0)
 ON CONFLICT DO NOTHING
@@ -56,7 +56,7 @@ type EnsureSubjectIdentityParams struct {
 }
 
 func (q *Queries) EnsureSubjectIdentity(ctx context.Context, arg EnsureSubjectIdentityParams) error {
-	_, err := q.db.Exec(ctx, ensureSubjectIdentity,
+	_, err := q.db.Exec(ctx, EnsureSubjectIdentity,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.ID,
@@ -65,7 +65,7 @@ func (q *Queries) EnsureSubjectIdentity(ctx context.Context, arg EnsureSubjectId
 	return err
 }
 
-const getScopeIdentity = `-- name: GetScopeIdentity :one
+const GetScopeIdentity = `-- name: GetScopeIdentity :one
 SELECT v.payload
 FROM scope_versions v
 JOIN scopes s ON s.tenant_id=v.tenant_id AND s.id=v.scope_id
@@ -79,13 +79,13 @@ type GetScopeIdentityParams struct {
 }
 
 func (q *Queries) GetScopeIdentity(ctx context.Context, arg GetScopeIdentityParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getScopeIdentity, arg.TenantID, arg.ScopeID, arg.Revision)
+	row := q.db.QueryRow(ctx, GetScopeIdentity, arg.TenantID, arg.ScopeID, arg.Revision)
 	var payload []byte
 	err := row.Scan(&payload)
 	return payload, err
 }
 
-const getSubjectIdentity = `-- name: GetSubjectIdentity :one
+const GetSubjectIdentity = `-- name: GetSubjectIdentity :one
 SELECT v.payload
 FROM subject_versions v
 JOIN subjects s ON s.tenant_id=v.tenant_id AND s.scope_id=v.scope_id AND s.id=v.subject_id
@@ -100,7 +100,7 @@ type GetSubjectIdentityParams struct {
 }
 
 func (q *Queries) GetSubjectIdentity(ctx context.Context, arg GetSubjectIdentityParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getSubjectIdentity,
+	row := q.db.QueryRow(ctx, GetSubjectIdentity,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.SubjectID,
@@ -111,7 +111,7 @@ func (q *Queries) GetSubjectIdentity(ctx context.Context, arg GetSubjectIdentity
 	return payload, err
 }
 
-const insertScopeVersion = `-- name: InsertScopeVersion :exec
+const InsertScopeVersion = `-- name: InsertScopeVersion :exec
 INSERT INTO scope_versions (tenant_id,scope_id,revision,ledger_revision,payload)
 VALUES ($1,$2,$3,$4,$5)
 `
@@ -125,7 +125,7 @@ type InsertScopeVersionParams struct {
 }
 
 func (q *Queries) InsertScopeVersion(ctx context.Context, arg InsertScopeVersionParams) error {
-	_, err := q.db.Exec(ctx, insertScopeVersion,
+	_, err := q.db.Exec(ctx, InsertScopeVersion,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Revision,
@@ -135,7 +135,7 @@ func (q *Queries) InsertScopeVersion(ctx context.Context, arg InsertScopeVersion
 	return err
 }
 
-const insertSubjectLookup = `-- name: InsertSubjectLookup :exec
+const InsertSubjectLookup = `-- name: InsertSubjectLookup :exec
 INSERT INTO subject_lookup (tenant_id,scope_id,namespace,value_digest,subject_id)
 VALUES ($1,$2,$3,$4,$5)
 `
@@ -149,7 +149,7 @@ type InsertSubjectLookupParams struct {
 }
 
 func (q *Queries) InsertSubjectLookup(ctx context.Context, arg InsertSubjectLookupParams) error {
-	_, err := q.db.Exec(ctx, insertSubjectLookup,
+	_, err := q.db.Exec(ctx, InsertSubjectLookup,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Namespace,
@@ -159,7 +159,7 @@ func (q *Queries) InsertSubjectLookup(ctx context.Context, arg InsertSubjectLook
 	return err
 }
 
-const insertSubjectVersion = `-- name: InsertSubjectVersion :exec
+const InsertSubjectVersion = `-- name: InsertSubjectVersion :exec
 INSERT INTO subject_versions (tenant_id,scope_id,subject_id,revision,ledger_revision,payload)
 VALUES ($1,$2,$3,$4,$5,$6)
 `
@@ -174,7 +174,7 @@ type InsertSubjectVersionParams struct {
 }
 
 func (q *Queries) InsertSubjectVersion(ctx context.Context, arg InsertSubjectVersionParams) error {
-	_, err := q.db.Exec(ctx, insertSubjectVersion,
+	_, err := q.db.Exec(ctx, InsertSubjectVersion,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.SubjectID,
@@ -185,7 +185,7 @@ func (q *Queries) InsertSubjectVersion(ctx context.Context, arg InsertSubjectVer
 	return err
 }
 
-const lockScopeIdentity = `-- name: LockScopeIdentity :one
+const LockScopeIdentity = `-- name: LockScopeIdentity :one
 SELECT current_revision
 FROM scopes
 WHERE tenant_id=$1 AND id=$2
@@ -198,13 +198,13 @@ type LockScopeIdentityParams struct {
 }
 
 func (q *Queries) LockScopeIdentity(ctx context.Context, arg LockScopeIdentityParams) (int64, error) {
-	row := q.db.QueryRow(ctx, lockScopeIdentity, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, LockScopeIdentity, arg.TenantID, arg.ID)
 	var current_revision int64
 	err := row.Scan(&current_revision)
 	return current_revision, err
 }
 
-const lockSubjectIdentity = `-- name: LockSubjectIdentity :one
+const LockSubjectIdentity = `-- name: LockSubjectIdentity :one
 SELECT current_revision,kind
 FROM subjects
 WHERE tenant_id=$1 AND scope_id=$2 AND id=$3
@@ -223,13 +223,13 @@ type LockSubjectIdentityRow struct {
 }
 
 func (q *Queries) LockSubjectIdentity(ctx context.Context, arg LockSubjectIdentityParams) (LockSubjectIdentityRow, error) {
-	row := q.db.QueryRow(ctx, lockSubjectIdentity, arg.TenantID, arg.ScopeID, arg.ID)
+	row := q.db.QueryRow(ctx, LockSubjectIdentity, arg.TenantID, arg.ScopeID, arg.ID)
 	var i LockSubjectIdentityRow
 	err := row.Scan(&i.CurrentRevision, &i.Kind)
 	return i, err
 }
 
-const lookupSubjectIdentity = `-- name: LookupSubjectIdentity :one
+const LookupSubjectIdentity = `-- name: LookupSubjectIdentity :one
 SELECT subject_id
 FROM subject_lookup
 WHERE tenant_id=$1 AND scope_id=$2 AND namespace=$3 AND value_digest=$4
@@ -243,7 +243,7 @@ type LookupSubjectIdentityParams struct {
 }
 
 func (q *Queries) LookupSubjectIdentity(ctx context.Context, arg LookupSubjectIdentityParams) (string, error) {
-	row := q.db.QueryRow(ctx, lookupSubjectIdentity,
+	row := q.db.QueryRow(ctx, LookupSubjectIdentity,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Namespace,
@@ -254,7 +254,7 @@ func (q *Queries) LookupSubjectIdentity(ctx context.Context, arg LookupSubjectId
 	return subject_id, err
 }
 
-const scopeIdentityExists = `-- name: ScopeIdentityExists :one
+const ScopeIdentityExists = `-- name: ScopeIdentityExists :one
 SELECT EXISTS(SELECT 1
 FROM scopes
 WHERE tenant_id=$1 AND id=$2 AND current_revision>0)
@@ -266,13 +266,13 @@ type ScopeIdentityExistsParams struct {
 }
 
 func (q *Queries) ScopeIdentityExists(ctx context.Context, arg ScopeIdentityExistsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, scopeIdentityExists, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, ScopeIdentityExists, arg.TenantID, arg.ID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const subjectIdentityExists = `-- name: SubjectIdentityExists :one
+const SubjectIdentityExists = `-- name: SubjectIdentityExists :one
 SELECT EXISTS(SELECT 1
 FROM subjects
 WHERE tenant_id=$1 AND scope_id=$2 AND id=$3 AND current_revision>0)
@@ -285,13 +285,13 @@ type SubjectIdentityExistsParams struct {
 }
 
 func (q *Queries) SubjectIdentityExists(ctx context.Context, arg SubjectIdentityExistsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, subjectIdentityExists, arg.TenantID, arg.ScopeID, arg.ID)
+	row := q.db.QueryRow(ctx, SubjectIdentityExists, arg.TenantID, arg.ScopeID, arg.ID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const updateScopeIdentity = `-- name: UpdateScopeIdentity :exec
+const UpdateScopeIdentity = `-- name: UpdateScopeIdentity :exec
 UPDATE scopes SET current_revision=$3
 WHERE tenant_id=$1 AND id=$2
 `
@@ -303,11 +303,11 @@ type UpdateScopeIdentityParams struct {
 }
 
 func (q *Queries) UpdateScopeIdentity(ctx context.Context, arg UpdateScopeIdentityParams) error {
-	_, err := q.db.Exec(ctx, updateScopeIdentity, arg.TenantID, arg.ID, arg.CurrentRevision)
+	_, err := q.db.Exec(ctx, UpdateScopeIdentity, arg.TenantID, arg.ID, arg.CurrentRevision)
 	return err
 }
 
-const updateSubjectIdentity = `-- name: UpdateSubjectIdentity :exec
+const UpdateSubjectIdentity = `-- name: UpdateSubjectIdentity :exec
 UPDATE subjects SET current_revision=$4
 WHERE tenant_id=$1 AND scope_id=$2 AND id=$3
 `
@@ -320,7 +320,7 @@ type UpdateSubjectIdentityParams struct {
 }
 
 func (q *Queries) UpdateSubjectIdentity(ctx context.Context, arg UpdateSubjectIdentityParams) error {
-	_, err := q.db.Exec(ctx, updateSubjectIdentity,
+	_, err := q.db.Exec(ctx, UpdateSubjectIdentity,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.ID,

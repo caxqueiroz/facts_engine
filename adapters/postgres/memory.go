@@ -4,18 +4,23 @@ import (
 	"context"
 	"errors"
 
+	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (t *transaction) MemoryType(ctx context.Context, scope, subtype, version string) (model.MemoryType, error) {
 	var d model.MemoryType
-	err := t.read(ctx, &d, `SELECT payload FROM memory_types WHERE tenant_id=$1 AND scope_id=$2 AND subtype=$3 AND version=$4`, t.tenant, scope, subtype, version)
+	payload, err := ledgerdb.New(t.tx).GetMemoryTypePayload(ctx, ledgerdb.GetMemoryTypePayloadParams{TenantID: t.tenant, ScopeID: scope, Subtype: subtype, Version: version})
+	if err != nil {
+		return d, translate(err)
+	}
+	err = t.decode(payload, &d)
 	return d, err
 }
 func (t *transaction) ActiveMemoryType(ctx context.Context, scope, subtype string) (string, error) {
-	var version string
-	err := t.tx.QueryRow(ctx, `SELECT version FROM active_memory_types WHERE tenant_id=$1 AND scope_id=$2 AND subtype=$3 FOR SHARE`, t.tenant, scope, subtype).Scan(&version)
+	version, err := ledgerdb.New(t.tx).GetActiveMemoryType(ctx, ledgerdb.GetActiveMemoryTypeParams{TenantID: t.tenant, ScopeID: scope, Subtype: subtype})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", model.ErrNotFound
 	}
@@ -24,7 +29,7 @@ func (t *transaction) ActiveMemoryType(ctx context.Context, scope, subtype strin
 func (t *transaction) StageMemoryType(ctx context.Context, d model.MemoryType) error {
 	// Lock/update the active pointer before taking the tenant append lock. Its
 	// deferred FK is satisfied by the immutable definition flushed with the event.
-	_, err := t.tx.Exec(ctx, `INSERT INTO active_memory_types VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,scope_id,subtype) DO UPDATE SET version=EXCLUDED.version`, t.tenant, d.Scope, d.Subtype, d.Version)
+	err := ledgerdb.New(t.tx).SetActiveMemoryType(ctx, ledgerdb.SetActiveMemoryTypeParams{TenantID: t.tenant, ScopeID: d.Scope, Subtype: d.Subtype, Version: d.Version})
 	if err != nil {
 		return err
 	}
@@ -33,12 +38,13 @@ func (t *transaction) StageMemoryType(ctx context.Context, d model.MemoryType) e
 }
 func (t *transaction) LockMemory(ctx context.Context, k model.MemoryKey) (model.Record, error) {
 	id := model.MemoryRecordID(k)
-	_, err := t.tx.Exec(ctx, `INSERT INTO records(tenant_id,id,scope_id,subject_id,predicate,discriminator,kind) VALUES($1,$2,$3,'','',$4,'memory') ON CONFLICT DO NOTHING`, t.tenant, id, k.Scope, k.ID)
+	err := ledgerdb.New(t.tx).EnsureMemoryRecord(ctx, ledgerdb.EnsureMemoryRecordParams{TenantID: t.tenant, ID: id, ScopeID: k.Scope, Discriminator: k.ID})
 	if err != nil {
 		return model.Record{}, err
 	}
 	var r model.Record
-	err = t.tx.QueryRow(ctx, `SELECT stream_revision,kind FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, t.tenant, id).Scan(&r.Revision, &r.Kind)
+	locked, err := ledgerdb.New(t.tx).LockMemoryRecord(ctx, ledgerdb.LockMemoryRecordParams{TenantID: t.tenant, ID: id})
+	r.Revision, r.Kind = locked.StreamRevision, locked.Kind
 	r.ID = id
 	if err == nil && r.Kind != "memory" {
 		return r, model.ErrPrecondition
@@ -56,7 +62,11 @@ func (t *transaction) StageMemoryVersion(ctx context.Context, v model.MemoryVers
 }
 func (t *transaction) MemoryVersion(ctx context.Context, record, version string) (model.MemoryVersion, error) {
 	var v model.MemoryVersion
-	err := t.read(ctx, &v, `SELECT payload FROM memory_versions WHERE tenant_id=$1 AND record_id=$2 AND id=$3`, t.tenant, record, version)
+	payload, err := ledgerdb.New(t.tx).GetMemoryVersionPayload(ctx, ledgerdb.GetMemoryVersionPayloadParams{TenantID: t.tenant, RecordID: record, ID: version})
+	if err != nil {
+		return v, translate(err)
+	}
+	err = t.decode(payload, &v)
 	return v, err
 }
 func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
@@ -66,11 +76,11 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		var from *string
+		var from pgtype.Text
 		if d.Migration != nil {
-			from = &d.Migration.FromVersion
+			from = pgtype.Text{String: d.Migration.FromVersion, Valid: true}
 		}
-		_, err = t.tx.Exec(ctx, `INSERT INTO memory_types VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, t.tenant, d.Scope, d.Subtype, d.Version, d.PolicyID, from, e.LedgerRevision, payload)
+		err = ledgerdb.New(t.tx).InsertMemoryTypePayload(ctx, ledgerdb.InsertMemoryTypePayloadParams{TenantID: t.tenant, ScopeID: d.Scope, Subtype: d.Subtype, Version: d.Version, PolicyID: d.PolicyID, FromVersion: from, LedgerRevision: e.LedgerRevision, Payload: payload})
 		if err != nil {
 			return err
 		}
@@ -83,7 +93,7 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		_, err = t.tx.Exec(ctx, `INSERT INTO memory_versions(tenant_id,id,record_id,scope_id,subtype,schema_version,ledger_revision,payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, t.tenant, v.ID, v.RecordID, v.Proposal.Key.Scope, v.Proposal.Subtype, v.Proposal.SchemaVersion, e.LedgerRevision, payload)
+		err = ledgerdb.New(t.tx).InsertMemoryVersionPayload(ctx, ledgerdb.InsertMemoryVersionPayloadParams{TenantID: t.tenant, ID: v.ID, RecordID: v.RecordID, ScopeID: v.Proposal.Key.Scope, Subtype: v.Proposal.Subtype, SchemaVersion: v.Proposal.SchemaVersion, LedgerRevision: e.LedgerRevision, Payload: payload})
 		if err != nil {
 			return err
 		}
@@ -93,12 +103,12 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 				continue
 			}
 			seen[span.EvidenceID] = true
-			if _, err = t.tx.Exec(ctx, `INSERT INTO memory_evidence VALUES($1,$2,$3,$4)`, t.tenant, v.Proposal.Key.Scope, v.ID, span.EvidenceID); err != nil {
+			if err = ledgerdb.New(t.tx).InsertMemoryEvidence(ctx, ledgerdb.InsertMemoryEvidenceParams{TenantID: t.tenant, ScopeID: v.Proposal.Key.Scope, VersionID: v.ID, EvidenceID: span.EvidenceID}); err != nil {
 				return err
 			}
 		}
 		for _, d := range v.Proposal.Dependencies {
-			if _, err = t.tx.Exec(ctx, `INSERT INTO memory_dependencies VALUES($1,$2,$3,$4,$5)`, t.tenant, v.ID, d.Scope, d.RecordID, d.VersionID); err != nil {
+			if err = ledgerdb.New(t.tx).InsertMemoryDependency(ctx, ledgerdb.InsertMemoryDependencyParams{TenantID: t.tenant, MemoryVersionID: v.ID, ScopeID: d.Scope, RecordID: d.RecordID, VersionID: d.VersionID}); err != nil {
 				return err
 			}
 		}
@@ -109,7 +119,8 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 }
 
 func (t *transaction) MemoryVersions(ctx context.Context, record string, revision int64) ([]model.MemoryVersion, error) {
-	rows, err := t.tx.Query(ctx, `SELECT payload FROM memory_versions WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision<=$3 ORDER BY ledger_revision,id LIMIT 10001`, t.tenant, record, revision)
+	// Stream the generated query so count/byte limits apply before all payloads are collected.
+	rows, err := t.tx.Query(ctx, ledgerdb.ListMemoryVersionPayloads, t.tenant, record, revision)
 	if err != nil {
 		return nil, err
 	}

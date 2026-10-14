@@ -9,47 +9,47 @@ import (
 	"context"
 )
 
-const allocateRevision = `-- name: AllocateRevision :one
+const AllocateRevision = `-- name: AllocateRevision :one
 UPDATE tenant_revisions SET revision=revision+1 WHERE tenant_id=$1 RETURNING revision
 `
 
 func (q *Queries) AllocateRevision(ctx context.Context, tenantID string) (int64, error) {
-	row := q.db.QueryRow(ctx, allocateRevision, tenantID)
+	row := q.db.QueryRow(ctx, AllocateRevision, tenantID)
 	var revision int64
 	err := row.Scan(&revision)
 	return revision, err
 }
 
-const bindTenant = `-- name: BindTenant :exec
+const BindTenant = `-- name: BindTenant :exec
 SELECT set_config('app.tenant_id', $1::text, true)
 `
 
 func (q *Queries) BindTenant(ctx context.Context, tenantID string) error {
-	_, err := q.db.Exec(ctx, bindTenant, tenantID)
+	_, err := q.db.Exec(ctx, BindTenant, tenantID)
 	return err
 }
 
-const ensureTenant = `-- name: EnsureTenant :exec
+const EnsureTenant = `-- name: EnsureTenant :exec
 INSERT INTO tenant_revisions (tenant_id, revision) VALUES ($1,0) ON CONFLICT DO NOTHING
 `
 
 func (q *Queries) EnsureTenant(ctx context.Context, tenantID string) error {
-	_, err := q.db.Exec(ctx, ensureTenant, tenantID)
+	_, err := q.db.Exec(ctx, EnsureTenant, tenantID)
 	return err
 }
 
-const getTenantRevision = `-- name: GetTenantRevision :one
+const GetTenantRevision = `-- name: GetTenantRevision :one
 SELECT revision FROM tenant_revisions WHERE tenant_id=$1
 `
 
 func (q *Queries) GetTenantRevision(ctx context.Context, tenantID string) (int64, error) {
-	row := q.db.QueryRow(ctx, getTenantRevision, tenantID)
+	row := q.db.QueryRow(ctx, GetTenantRevision, tenantID)
 	var revision int64
 	err := row.Scan(&revision)
 	return revision, err
 }
 
-const insertOutbox = `-- name: InsertOutbox :exec
+const InsertOutbox = `-- name: InsertOutbox :exec
 INSERT INTO outbox (tenant_id,event_id,ledger_revision) VALUES ($1,$2,$3)
 `
 
@@ -60,11 +60,11 @@ type InsertOutboxParams struct {
 }
 
 func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
-	_, err := q.db.Exec(ctx, insertOutbox, arg.TenantID, arg.EventID, arg.LedgerRevision)
+	_, err := q.db.Exec(ctx, InsertOutbox, arg.TenantID, arg.EventID, arg.LedgerRevision)
 	return err
 }
 
-const lockRecord = `-- name: LockRecord :one
+const LockRecord = `-- name: LockRecord :one
 SELECT stream_revision FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE
 `
 
@@ -74,13 +74,13 @@ type LockRecordParams struct {
 }
 
 func (q *Queries) LockRecord(ctx context.Context, arg LockRecordParams) (int64, error) {
-	row := q.db.QueryRow(ctx, lockRecord, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, LockRecord, arg.TenantID, arg.ID)
 	var stream_revision int64
 	err := row.Scan(&stream_revision)
 	return stream_revision, err
 }
 
-const updateStreamRevision = `-- name: UpdateStreamRevision :exec
+const UpdateStreamRevision = `-- name: UpdateStreamRevision :exec
 UPDATE records SET stream_revision=$3 WHERE tenant_id=$1 AND id=$2
 `
 
@@ -91,6 +91,6 @@ type UpdateStreamRevisionParams struct {
 }
 
 func (q *Queries) UpdateStreamRevision(ctx context.Context, arg UpdateStreamRevisionParams) error {
-	_, err := q.db.Exec(ctx, updateStreamRevision, arg.TenantID, arg.ID, arg.StreamRevision)
+	_, err := q.db.Exec(ctx, UpdateStreamRevision, arg.TenantID, arg.ID, arg.StreamRevision)
 	return err
 }

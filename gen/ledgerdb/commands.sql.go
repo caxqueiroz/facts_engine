@@ -9,7 +9,7 @@ import (
 	"context"
 )
 
-const ensureFactRecord = `-- name: EnsureFactRecord :exec
+const EnsureFactRecord = `-- name: EnsureFactRecord :exec
 INSERT INTO records(tenant_id,id,scope_id,subject_id,predicate,discriminator,stream_revision)
 VALUES ($1,$2,$3,$4,$5,$6,0)
 ON CONFLICT DO NOTHING
@@ -25,7 +25,7 @@ type EnsureFactRecordParams struct {
 }
 
 func (q *Queries) EnsureFactRecord(ctx context.Context, arg EnsureFactRecordParams) error {
-	_, err := q.db.Exec(ctx, ensureFactRecord,
+	_, err := q.db.Exec(ctx, EnsureFactRecord,
 		arg.TenantID,
 		arg.ID,
 		arg.ScopeID,
@@ -36,7 +36,7 @@ func (q *Queries) EnsureFactRecord(ctx context.Context, arg EnsureFactRecordPara
 	return err
 }
 
-const findEvidenceSource = `-- name: FindEvidenceSource :one
+const FindEvidenceSource = `-- name: FindEvidenceSource :one
 SELECT id,digest
 FROM evidence
 WHERE tenant_id=$1 AND scope_id=$2 AND source_identity=$3
@@ -54,13 +54,13 @@ type FindEvidenceSourceRow struct {
 }
 
 func (q *Queries) FindEvidenceSource(ctx context.Context, arg FindEvidenceSourceParams) (FindEvidenceSourceRow, error) {
-	row := q.db.QueryRow(ctx, findEvidenceSource, arg.TenantID, arg.ScopeID, arg.SourceIdentity)
+	row := q.db.QueryRow(ctx, FindEvidenceSource, arg.TenantID, arg.ScopeID, arg.SourceIdentity)
 	var i FindEvidenceSourceRow
 	err := row.Scan(&i.ID, &i.Digest)
 	return i, err
 }
 
-const getCommandReceipt = `-- name: GetCommandReceipt :one
+const GetCommandReceipt = `-- name: GetCommandReceipt :one
 SELECT digest,payload
 FROM command_receipts
 WHERE tenant_id=$1 AND principal=$2 AND operation=$3 AND command_key=$4
@@ -79,7 +79,7 @@ type GetCommandReceiptRow struct {
 }
 
 func (q *Queries) GetCommandReceipt(ctx context.Context, arg GetCommandReceiptParams) (GetCommandReceiptRow, error) {
-	row := q.db.QueryRow(ctx, getCommandReceipt,
+	row := q.db.QueryRow(ctx, GetCommandReceipt,
 		arg.TenantID,
 		arg.Principal,
 		arg.Operation,
@@ -90,7 +90,7 @@ func (q *Queries) GetCommandReceipt(ctx context.Context, arg GetCommandReceiptPa
 	return i, err
 }
 
-const getConversationPayload = `-- name: GetConversationPayload :one
+const GetConversationPayload = `-- name: GetConversationPayload :one
 SELECT payload
 FROM conversations
 WHERE tenant_id=$1 AND id=$2
@@ -102,13 +102,13 @@ type GetConversationPayloadParams struct {
 }
 
 func (q *Queries) GetConversationPayload(ctx context.Context, arg GetConversationPayloadParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getConversationPayload, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, GetConversationPayload, arg.TenantID, arg.ID)
 	var payload []byte
 	err := row.Scan(&payload)
 	return payload, err
 }
 
-const getEvidencePayload = `-- name: GetEvidencePayload :one
+const GetEvidencePayload = `-- name: GetEvidencePayload :one
 SELECT payload
 FROM evidence
 WHERE tenant_id=$1 AND id=$2
@@ -120,13 +120,13 @@ type GetEvidencePayloadParams struct {
 }
 
 func (q *Queries) GetEvidencePayload(ctx context.Context, arg GetEvidencePayloadParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getEvidencePayload, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, GetEvidencePayload, arg.TenantID, arg.ID)
 	var payload []byte
 	err := row.Scan(&payload)
 	return payload, err
 }
 
-const getPolicyPayload = `-- name: GetPolicyPayload :one
+const GetPolicyPayload = `-- name: GetPolicyPayload :one
 SELECT payload
 FROM policy_versions
 WHERE tenant_id=$1 AND scope_id=$2 AND id=$3
@@ -139,13 +139,13 @@ type GetPolicyPayloadParams struct {
 }
 
 func (q *Queries) GetPolicyPayload(ctx context.Context, arg GetPolicyPayloadParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getPolicyPayload, arg.TenantID, arg.ScopeID, arg.ID)
+	row := q.db.QueryRow(ctx, GetPolicyPayload, arg.TenantID, arg.ScopeID, arg.ID)
 	var payload []byte
 	err := row.Scan(&payload)
 	return payload, err
 }
 
-const getPredicatePayload = `-- name: GetPredicatePayload :one
+const GetPredicatePayload = `-- name: GetPredicatePayload :one
 SELECT payload
 FROM predicate_versions
 WHERE tenant_id=$1 AND scope_id=$2 AND predicate=$3 AND version=$4
@@ -159,7 +159,7 @@ type GetPredicatePayloadParams struct {
 }
 
 func (q *Queries) GetPredicatePayload(ctx context.Context, arg GetPredicatePayloadParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getPredicatePayload,
+	row := q.db.QueryRow(ctx, GetPredicatePayload,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Predicate,
@@ -170,7 +170,7 @@ func (q *Queries) GetPredicatePayload(ctx context.Context, arg GetPredicatePaylo
 	return payload, err
 }
 
-const getRecord = `-- name: GetRecord :one
+const GetRecord = `-- name: GetRecord :one
 SELECT id,scope_id,subject_id,predicate,discriminator,stream_revision,kind
 FROM records
 WHERE tenant_id=$1 AND id=$2
@@ -192,7 +192,7 @@ type GetRecordRow struct {
 }
 
 func (q *Queries) GetRecord(ctx context.Context, arg GetRecordParams) (GetRecordRow, error) {
-	row := q.db.QueryRow(ctx, getRecord, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, GetRecord, arg.TenantID, arg.ID)
 	var i GetRecordRow
 	err := row.Scan(
 		&i.ID,
@@ -206,7 +206,7 @@ func (q *Queries) GetRecord(ctx context.Context, arg GetRecordParams) (GetRecord
 	return i, err
 }
 
-const getVersionPayload = `-- name: GetVersionPayload :one
+const GetVersionPayload = `-- name: GetVersionPayload :one
 SELECT payload
 FROM record_versions
 WHERE tenant_id=$1 AND record_id=$2 AND id=$3
@@ -219,13 +219,13 @@ type GetVersionPayloadParams struct {
 }
 
 func (q *Queries) GetVersionPayload(ctx context.Context, arg GetVersionPayloadParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getVersionPayload, arg.TenantID, arg.RecordID, arg.ID)
+	row := q.db.QueryRow(ctx, GetVersionPayload, arg.TenantID, arg.RecordID, arg.ID)
 	var payload []byte
 	err := row.Scan(&payload)
 	return payload, err
 }
 
-const insertAttestationDelegation = `-- name: InsertAttestationDelegation :exec
+const InsertAttestationDelegation = `-- name: InsertAttestationDelegation :exec
 INSERT INTO attestation_delegations (tenant_id,authority,binding_id,request_digest,attestation_id,scope_id,kind)
 VALUES ($1,$2,$3,$4,$5,$6,$7)
 `
@@ -241,7 +241,7 @@ type InsertAttestationDelegationParams struct {
 }
 
 func (q *Queries) InsertAttestationDelegation(ctx context.Context, arg InsertAttestationDelegationParams) error {
-	_, err := q.db.Exec(ctx, insertAttestationDelegation,
+	_, err := q.db.Exec(ctx, InsertAttestationDelegation,
 		arg.TenantID,
 		arg.Authority,
 		arg.BindingID,
@@ -253,7 +253,7 @@ func (q *Queries) InsertAttestationDelegation(ctx context.Context, arg InsertAtt
 	return err
 }
 
-const insertCommandReceipt = `-- name: InsertCommandReceipt :exec
+const InsertCommandReceipt = `-- name: InsertCommandReceipt :exec
 INSERT INTO command_receipts (tenant_id,principal,operation,command_key,digest,payload)
 VALUES ($1,$2,$3,$4,$5,$6)
 `
@@ -268,7 +268,7 @@ type InsertCommandReceiptParams struct {
 }
 
 func (q *Queries) InsertCommandReceipt(ctx context.Context, arg InsertCommandReceiptParams) error {
-	_, err := q.db.Exec(ctx, insertCommandReceipt,
+	_, err := q.db.Exec(ctx, InsertCommandReceipt,
 		arg.TenantID,
 		arg.Principal,
 		arg.Operation,
@@ -279,7 +279,7 @@ func (q *Queries) InsertCommandReceipt(ctx context.Context, arg InsertCommandRec
 	return err
 }
 
-const insertConfirmationArtifact = `-- name: InsertConfirmationArtifact :exec
+const InsertConfirmationArtifact = `-- name: InsertConfirmationArtifact :exec
 INSERT INTO confirmation_artifacts (tenant_id,attestation_id,scope_id,kind,role,evidence_id,digest,object_locator,object_version)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
@@ -297,7 +297,7 @@ type InsertConfirmationArtifactParams struct {
 }
 
 func (q *Queries) InsertConfirmationArtifact(ctx context.Context, arg InsertConfirmationArtifactParams) error {
-	_, err := q.db.Exec(ctx, insertConfirmationArtifact,
+	_, err := q.db.Exec(ctx, InsertConfirmationArtifact,
 		arg.TenantID,
 		arg.AttestationID,
 		arg.ScopeID,
@@ -311,7 +311,7 @@ func (q *Queries) InsertConfirmationArtifact(ctx context.Context, arg InsertConf
 	return err
 }
 
-const insertConversationMessage = `-- name: InsertConversationMessage :exec
+const InsertConversationMessage = `-- name: InsertConversationMessage :exec
 INSERT INTO conversation_messages (tenant_id,conversation_id,ordinal,evidence_id)
 VALUES ($1,$2,$3,$4)
 `
@@ -324,7 +324,7 @@ type InsertConversationMessageParams struct {
 }
 
 func (q *Queries) InsertConversationMessage(ctx context.Context, arg InsertConversationMessageParams) error {
-	_, err := q.db.Exec(ctx, insertConversationMessage,
+	_, err := q.db.Exec(ctx, InsertConversationMessage,
 		arg.TenantID,
 		arg.ConversationID,
 		arg.Ordinal,
@@ -333,7 +333,7 @@ func (q *Queries) InsertConversationMessage(ctx context.Context, arg InsertConve
 	return err
 }
 
-const insertConversationPayload = `-- name: InsertConversationPayload :exec
+const InsertConversationPayload = `-- name: InsertConversationPayload :exec
 INSERT INTO conversations (tenant_id,id,scope_id,ledger_revision,payload)
 VALUES ($1,$2,$3,$4,$5)
 `
@@ -347,7 +347,7 @@ type InsertConversationPayloadParams struct {
 }
 
 func (q *Queries) InsertConversationPayload(ctx context.Context, arg InsertConversationPayloadParams) error {
-	_, err := q.db.Exec(ctx, insertConversationPayload,
+	_, err := q.db.Exec(ctx, InsertConversationPayload,
 		arg.TenantID,
 		arg.ID,
 		arg.ScopeID,
@@ -357,7 +357,7 @@ func (q *Queries) InsertConversationPayload(ctx context.Context, arg InsertConve
 	return err
 }
 
-const insertEvidenceDerivation = `-- name: InsertEvidenceDerivation :exec
+const InsertEvidenceDerivation = `-- name: InsertEvidenceDerivation :exec
 INSERT INTO evidence_derivations(tenant_id,scope_id,evidence_id,parent_evidence_id)
 VALUES ($1,$2,$3,$4)
 `
@@ -370,7 +370,7 @@ type InsertEvidenceDerivationParams struct {
 }
 
 func (q *Queries) InsertEvidenceDerivation(ctx context.Context, arg InsertEvidenceDerivationParams) error {
-	_, err := q.db.Exec(ctx, insertEvidenceDerivation,
+	_, err := q.db.Exec(ctx, InsertEvidenceDerivation,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.EvidenceID,
@@ -379,7 +379,7 @@ func (q *Queries) InsertEvidenceDerivation(ctx context.Context, arg InsertEviden
 	return err
 }
 
-const insertEvidencePayload = `-- name: InsertEvidencePayload :exec
+const InsertEvidencePayload = `-- name: InsertEvidencePayload :exec
 INSERT INTO evidence (tenant_id,id,scope_id,source_identity,digest,payload)
 VALUES ($1,$2,$3,$4,$5,$6)
 `
@@ -394,7 +394,7 @@ type InsertEvidencePayloadParams struct {
 }
 
 func (q *Queries) InsertEvidencePayload(ctx context.Context, arg InsertEvidencePayloadParams) error {
-	_, err := q.db.Exec(ctx, insertEvidencePayload,
+	_, err := q.db.Exec(ctx, InsertEvidencePayload,
 		arg.TenantID,
 		arg.ID,
 		arg.ScopeID,
@@ -405,7 +405,7 @@ func (q *Queries) InsertEvidencePayload(ctx context.Context, arg InsertEvidenceP
 	return err
 }
 
-const insertEvidenceRetention = `-- name: InsertEvidenceRetention :exec
+const InsertEvidenceRetention = `-- name: InsertEvidenceRetention :exec
 INSERT INTO evidence_retention(tenant_id,evidence_id,scope_id,locator,object_version)
 VALUES ($1,$2,$3,$4,$5)
 `
@@ -419,7 +419,7 @@ type InsertEvidenceRetentionParams struct {
 }
 
 func (q *Queries) InsertEvidenceRetention(ctx context.Context, arg InsertEvidenceRetentionParams) error {
-	_, err := q.db.Exec(ctx, insertEvidenceRetention,
+	_, err := q.db.Exec(ctx, InsertEvidenceRetention,
 		arg.TenantID,
 		arg.EvidenceID,
 		arg.ScopeID,
@@ -429,7 +429,7 @@ func (q *Queries) InsertEvidenceRetention(ctx context.Context, arg InsertEvidenc
 	return err
 }
 
-const insertPolicyPayload = `-- name: InsertPolicyPayload :exec
+const InsertPolicyPayload = `-- name: InsertPolicyPayload :exec
 INSERT INTO policy_versions (tenant_id,scope_id,id,payload)
 VALUES ($1,$2,$3,$4)
 `
@@ -442,7 +442,7 @@ type InsertPolicyPayloadParams struct {
 }
 
 func (q *Queries) InsertPolicyPayload(ctx context.Context, arg InsertPolicyPayloadParams) error {
-	_, err := q.db.Exec(ctx, insertPolicyPayload,
+	_, err := q.db.Exec(ctx, InsertPolicyPayload,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.ID,
@@ -451,7 +451,7 @@ func (q *Queries) InsertPolicyPayload(ctx context.Context, arg InsertPolicyPaylo
 	return err
 }
 
-const insertPredicateMigration = `-- name: InsertPredicateMigration :exec
+const InsertPredicateMigration = `-- name: InsertPredicateMigration :exec
 INSERT INTO predicate_migrations (tenant_id,scope_id,predicate,version,from_version,mode)
 VALUES ($1,$2,$3,$4,$5,$6)
 `
@@ -466,7 +466,7 @@ type InsertPredicateMigrationParams struct {
 }
 
 func (q *Queries) InsertPredicateMigration(ctx context.Context, arg InsertPredicateMigrationParams) error {
-	_, err := q.db.Exec(ctx, insertPredicateMigration,
+	_, err := q.db.Exec(ctx, InsertPredicateMigration,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Predicate,
@@ -477,7 +477,7 @@ func (q *Queries) InsertPredicateMigration(ctx context.Context, arg InsertPredic
 	return err
 }
 
-const insertPredicatePayload = `-- name: InsertPredicatePayload :exec
+const InsertPredicatePayload = `-- name: InsertPredicatePayload :exec
 INSERT INTO predicate_versions (tenant_id,scope_id,predicate,version,policy_id,payload)
 VALUES ($1,$2,$3,$4,$5,$6)
 `
@@ -492,7 +492,7 @@ type InsertPredicatePayloadParams struct {
 }
 
 func (q *Queries) InsertPredicatePayload(ctx context.Context, arg InsertPredicatePayloadParams) error {
-	_, err := q.db.Exec(ctx, insertPredicatePayload,
+	_, err := q.db.Exec(ctx, InsertPredicatePayload,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Predicate,
@@ -503,7 +503,7 @@ func (q *Queries) InsertPredicatePayload(ctx context.Context, arg InsertPredicat
 	return err
 }
 
-const insertVersionEvidence = `-- name: InsertVersionEvidence :exec
+const InsertVersionEvidence = `-- name: InsertVersionEvidence :exec
 INSERT INTO version_evidence (tenant_id,version_id,evidence_id,scope_id)
 VALUES ($1,$2,$3,$4)
 ON CONFLICT DO NOTHING
@@ -517,7 +517,7 @@ type InsertVersionEvidenceParams struct {
 }
 
 func (q *Queries) InsertVersionEvidence(ctx context.Context, arg InsertVersionEvidenceParams) error {
-	_, err := q.db.Exec(ctx, insertVersionEvidence,
+	_, err := q.db.Exec(ctx, InsertVersionEvidence,
 		arg.TenantID,
 		arg.VersionID,
 		arg.EvidenceID,
@@ -526,7 +526,7 @@ func (q *Queries) InsertVersionEvidence(ctx context.Context, arg InsertVersionEv
 	return err
 }
 
-const insertVersionPayload = `-- name: InsertVersionPayload :exec
+const InsertVersionPayload = `-- name: InsertVersionPayload :exec
 INSERT INTO record_versions (tenant_id,record_id,id,scope_id,predicate,schema_version,digest,payload)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 `
@@ -543,7 +543,7 @@ type InsertVersionPayloadParams struct {
 }
 
 func (q *Queries) InsertVersionPayload(ctx context.Context, arg InsertVersionPayloadParams) error {
-	_, err := q.db.Exec(ctx, insertVersionPayload,
+	_, err := q.db.Exec(ctx, InsertVersionPayload,
 		arg.TenantID,
 		arg.RecordID,
 		arg.ID,
@@ -556,16 +556,16 @@ func (q *Queries) InsertVersionPayload(ctx context.Context, arg InsertVersionPay
 	return err
 }
 
-const lockCommandReceipt = `-- name: LockCommandReceipt :exec
+const LockCommandReceipt = `-- name: LockCommandReceipt :exec
 SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
 `
 
 func (q *Queries) LockCommandReceipt(ctx context.Context, lockKey string) error {
-	_, err := q.db.Exec(ctx, lockCommandReceipt, lockKey)
+	_, err := q.db.Exec(ctx, LockCommandReceipt, lockKey)
 	return err
 }
 
-const setActivePredicate = `-- name: SetActivePredicate :exec
+const SetActivePredicate = `-- name: SetActivePredicate :exec
 INSERT INTO active_predicates (tenant_id,scope_id,predicate,version)
 VALUES ($1,$2,$3,$4)
 ON CONFLICT(tenant_id,scope_id,predicate) DO UPDATE SET version=EXCLUDED.version
@@ -579,7 +579,7 @@ type SetActivePredicateParams struct {
 }
 
 func (q *Queries) SetActivePredicate(ctx context.Context, arg SetActivePredicateParams) error {
-	_, err := q.db.Exec(ctx, setActivePredicate,
+	_, err := q.db.Exec(ctx, SetActivePredicate,
 		arg.TenantID,
 		arg.ScopeID,
 		arg.Predicate,
