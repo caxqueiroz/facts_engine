@@ -378,6 +378,27 @@ func (q *Queries) HasUnselectedEvidenceDerivative(ctx context.Context, arg HasUn
 	return exists, err
 }
 
+const HasUnselectedSharedEvidenceObject = `-- name: HasUnselectedSharedEvidenceObject :one
+SELECT EXISTS(SELECT 1
+FROM evidence_retention a
+JOIN evidence_retention b USING(tenant_id,locator,object_version)
+WHERE a.tenant_id=$1 AND a.evidence_id=$2
+AND NOT (b.evidence_id=ANY($3::text[])))
+`
+
+type HasUnselectedSharedEvidenceObjectParams struct {
+	TenantID    string
+	EvidenceID  string
+	SelectedIds []string
+}
+
+func (q *Queries) HasUnselectedSharedEvidenceObject(ctx context.Context, arg HasUnselectedSharedEvidenceObjectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, HasUnselectedSharedEvidenceObject, arg.TenantID, arg.EvidenceID, arg.SelectedIds)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const InsertLegalHold = `-- name: InsertLegalHold :execrows
 INSERT INTO legal_holds (tenant_id,scope_id,id)
 VALUES ($1,$2,$3)

@@ -136,3 +136,10 @@ VALUES ($1,$2,$3,$4,$5,$6,$7);
 -- name: HasUnselectedEvidenceDerivative :one
 SELECT EXISTS(SELECT 1 FROM evidence_derivations
 WHERE tenant_id=$1 AND parent_evidence_id=$2 AND NOT (evidence_id=ANY(sqlc.arg(selected_ids)::text[])));
+
+-- name: HasUnselectedSharedEvidenceObject :one
+SELECT EXISTS(SELECT 1
+FROM evidence_retention a
+JOIN evidence_retention b USING(tenant_id,locator,object_version)
+WHERE a.tenant_id=$1 AND a.evidence_id=$2
+AND NOT (b.evidence_id=ANY(sqlc.arg(selected_ids)::text[])));

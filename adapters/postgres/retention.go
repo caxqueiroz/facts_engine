@@ -128,7 +128,7 @@ func (t *transaction) DisposeEvidence(ctx context.Context, r model.EvidenceDispo
 	if len(r.DerivativeEvidenceIDs) != 0 {
 		return model.ErrPrecondition
 	}
-	e, _, err := t.prepareEvidenceDisposal(ctx, r, false, false)
+	e, _, err := t.prepareEvidenceDisposal(ctx, r, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -152,11 +152,12 @@ func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.Eviden
 	}
 	sort.Strings(ids)
 	objects := make([]model.Evidence, 0, len(ids))
+	seenObjects := map[struct{ locator, version string }]bool{}
 	for _, id := range ids {
 		item := r
 		item.EvidenceID = id
 		item.DerivativeEvidenceIDs = nil
-		e, disposed, err := t.prepareEvidenceDisposal(ctx, item, id == r.EvidenceID, id != r.EvidenceID)
+		e, disposed, err := t.prepareEvidenceDisposal(ctx, item, id == r.EvidenceID, id != r.EvidenceID, ids)
 		if err != nil {
 			return err
 		}
@@ -167,8 +168,10 @@ func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.Eviden
 		} else if e.Derivation == nil || e.Derivation.ParentEvidenceID != r.EvidenceID {
 			return model.ErrPrecondition
 		}
-		if !disposed {
+		objectKey := struct{ locator, version string }{e.Object.Locator, e.Object.Version}
+		if !disposed && !seenObjects[objectKey] {
 			objects = append(objects, e)
+			seenObjects[objectKey] = true
 		}
 	}
 	// The scope lock serializes registration and holds. Repeatable-read conflicts
@@ -190,7 +193,7 @@ func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.Eviden
 	return nil
 }
 
-func (t *transaction) prepareEvidenceDisposal(ctx context.Context, r model.EvidenceDisposalRequest, selectedDerivatives, allowDisposed bool) (model.Evidence, bool, error) {
+func (t *transaction) prepareEvidenceDisposal(ctx context.Context, r model.EvidenceDisposalRequest, selectedDerivatives, allowDisposed bool, selectedIDs []string) (model.Evidence, bool, error) {
 	if err := t.lockRetentionScope(ctx, r.Scope); err != nil {
 		return model.Evidence{}, false, err
 	}
@@ -213,9 +216,21 @@ func (t *transaction) prepareEvidenceDisposal(ctx context.Context, r model.Evide
 		return e, false, err
 	}
 	for _, blocker := range status.Blockers {
-		if blocker != "evidence_derivatives" || !selectedDerivatives {
-			return e, false, model.ErrPrecondition
+		if blocker == "evidence_derivatives" && selectedDerivatives {
+			continue
 		}
+		if blocker == "shared_object" && len(selectedIDs) > 0 {
+			// The object epoch lock also serializes aliases registered in other scopes.
+			// Never waive the blocker while an unselected evidence identity shares it.
+			unselected, err := ledgerdb.New(t.tx).HasUnselectedSharedEvidenceObject(ctx, ledgerdb.HasUnselectedSharedEvidenceObjectParams{TenantID: t.tenant, EvidenceID: r.EvidenceID, SelectedIds: selectedIDs})
+			if err != nil {
+				return e, false, err
+			}
+			if !unselected {
+				continue
+			}
+		}
+		return e, false, model.ErrPrecondition
 	}
 	if len(status.ActiveHolds) > 0 || (status.Disposed && !allowDisposed) || status.PolicyID != r.PolicyID {
 		return e, false, model.ErrPrecondition

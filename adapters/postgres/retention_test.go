@@ -198,6 +198,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		t.Fatal(err)
 	}
 	testRetentionLineage(t, ctx, ledger, store, engine, c, register)
+	testRetentionSharedLineage(t, ctx, ledger, store, engine, c, register)
 	public, private, _ := ed25519.GenerateKey(rand.Reader)
 	signer, _ := audit.NewEd25519("retention-key", private)
 	exporter, _ := facts.NewWithAudit(ledger, allow{}, store, model.AuditOptions{Signer: signer})
@@ -221,7 +222,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	if !found {
 		t.Fatal("missing disposal coverage gap")
 	}
-	for _, id := range []string{"lineage-root", "lineage-a", "lineage-b", "lineage-c", "lineage-prior-root", "lineage-prior-child"} {
+	for _, id := range []string{"lineage-root", "lineage-a", "lineage-b", "lineage-c", "lineage-prior-root", "lineage-prior-child", "shared-lineage-root", "shared-lineage-a", "shared-lineage-b"} {
 		found := false
 		for _, gap := range done.Bundle.Manifest.Gaps {
 			if gap.ID == id && gap.Reason == "disposed_under_retention_policy" {
