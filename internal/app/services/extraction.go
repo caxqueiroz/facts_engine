@@ -24,6 +24,9 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	s.extractors = map[string]model.ApprovedExtractor{}
 	for _, approved := range o.Profiles {
 		p := approved.Profile
+		if p.InputSelectionVersion != "" && (p.InputSelectionVersion != "original-ranges-v1" || p.ParserVersion == "memory-refresh-json-v1") {
+			return model.ErrInvalid
+		}
 		if p.CostUnit != o.CostUnit || (o.CostUnit == "" && p.MaxCostUnitsPerAttempt != 0) || (o.CostUnit != "" && (p.MaxCostUnitsPerAttempt < 1 || p.MaxCostUnitsPerAttempt > o.DailyCostBudgetUnits)) {
 			return model.ErrInvalid
 		}
@@ -94,12 +97,28 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 	if err != nil {
 		return model.JobStatus{}, err
 	}
-	var inputSize int64
-	for _, m := range conversation.Request.Messages {
-		inputSize += m.Object.Size
+	ranges, _, inputSize, err := planExtractionRanges(conversation, r.InputRanges, approved.Profile.InputSelectionVersion)
+	if err != nil {
+		return model.JobStatus{}, err
 	}
 	if inputSize > int64(approved.Profile.MaxInputBytes) {
 		return model.JobStatus{}, model.ErrPrecondition
+	}
+	if len(r.InputRanges) > 0 {
+		for i, selected := range ranges {
+			if len(selected) == 0 {
+				continue
+			}
+			content, err := s.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: conversation.EvidenceIDs[i], Scope: r.Scope, Purpose: r.Purpose})
+			if err != nil {
+				return model.JobStatus{}, err
+			}
+			for _, part := range selected {
+				if _, err := extractionRangeMessage(conversation.Request.Messages[i], part, content.Bytes); err != nil {
+					return model.JobStatus{}, err
+				}
+			}
+		}
 	}
 	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: r, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), Authorization: []model.AuthorizationDecision{receipt, evidenceAuth}}
 	if memoryMode {

@@ -334,4 +334,47 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 
 	testMemoryExtraction(t, ctx, l, store, c, reviewer, conversation, profile, result)
 
+	// Selected input retains original offsets; excluded messages never reach the provider.
+	slicedProfile := profile
+	slicedProfile.ID = "approved-ranges"
+	slicedProfile.InputSelectionVersion = "original-ranges-v1"
+	var slicedEngine *facts.Engine
+	slicedEngine = configured(extractionFunc(func(ctx context.Context, raw []byte) (model.ExtractionResponse, error) {
+		var input model.ExtractionInput
+		if err := json.Unmarshal(raw, &input); err != nil {
+			return model.ExtractionResponse{}, err
+		}
+		if len(input.Messages) != 1 || input.Messages[0].Content != "tea" || input.Messages[0].SourceStart != 9 || len(input.ExcludedRanges) != 3 || input.InputSelectionVersion != "original-ranges-v1" {
+			t.Fatal("incorrect selected provider input", input)
+		}
+		run, err := slicedEngine.GetExtractionRun(ctx, worker, model.ExtractionRunQuery{ID: input.AttemptID, Scope: scope, Purpose: "extraction-test"})
+		if err != nil || !bytes.Equal(run.Attempt.RequestBytes, raw) {
+			t.Fatal("selection not retained", err)
+		}
+		good := candidate("assistant-claim")
+		relative := candidate("negated-claim")
+		relative.Sources[0].Start, relative.Sources[0].End = 0, 3
+		body, _ := json.Marshal(model.ExtractionOutput{Candidates: []model.ExtractionCandidate{good, relative}})
+		return model.ExtractionResponse{ModelIdentity: "fixture-ranges", Body: body}, nil
+	}), slicedProfile, 100000)
+	slicedRequest := request
+	slicedRequest.Command = cmd("extract-ranges")
+	slicedRequest.InputRanges = []model.ExtractionInputRange{{EvidenceID: conversation.EvidenceIDs[0], Start: 9, End: 12}}
+	if _, err := engine.StartExtraction(ctx, c, slicedRequest); !errors.Is(err, model.ErrInvalid) {
+		t.Fatal("unapproved ranges", err)
+	}
+	slicedRequest.ProfileID = slicedProfile.ID
+	slicedJob, err := slicedEngine.StartExtraction(ctx, c, slicedRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slicedStatus, err := slicedEngine.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: cmd("run-ranges"), ID: slicedJob.ID, Scope: scope})
+	if err != nil || slicedStatus.State != "completed" {
+		t.Fatal(slicedStatus, err)
+	}
+	slicedRun, err := slicedEngine.GetExtractionRun(ctx, c, model.ExtractionRunQuery{ID: slicedStatus.AttemptID, Scope: scope, Purpose: "extraction-test"})
+	if err != nil || slicedRun.Result == nil || len(slicedRun.Result.Proposals) != 1 || len(slicedRun.Result.Issues) != 1 || slicedRun.Result.Issues[0].Code != "invalid_source_span" {
+		t.Fatal("range validation", slicedRun.Result, err)
+	}
+
 }

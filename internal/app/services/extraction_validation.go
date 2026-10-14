@@ -65,18 +65,26 @@ func extractionSourceIssue(sources []model.SourceSpan, input model.ExtractionInp
 	supported := false
 	for _, span := range sources {
 		var message *model.ExtractionInputMessage
+		found := false
 		for i := range input.Messages {
 			m := &input.Messages[i]
-			if m.EvidenceID == span.EvidenceID {
+			if m.EvidenceID != span.EvidenceID {
+				continue
+			}
+			found = true
+			if span.Start < m.SourceStart || span.End <= span.Start || span.End-m.SourceStart > len(m.Content) {
+				continue
+			}
+			quote := m.Content[span.Start-m.SourceStart : span.End-m.SourceStart]
+			if utf8.ValidString(quote) && quote == span.Quote {
 				message = m
 				break
 			}
 		}
-		if message == nil {
+		if !found {
 			return "source_not_supplied"
 		}
-		b := []byte(message.Content)
-		if span.Start < 0 || span.End <= span.Start || span.End > len(b) || !utf8.Valid(b[span.Start:span.End]) || string(b[span.Start:span.End]) != span.Quote {
+		if message == nil {
 			return "invalid_source_span"
 		}
 		if message.SpeakerRole != "assistant" && message.SpeakerRole != "system" {

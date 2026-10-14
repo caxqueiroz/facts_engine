@@ -18,6 +18,7 @@ type ExtractionResponse struct {
 	InputTokens, OutputTokens int64
 }
 type ExtractionProfile struct {
+	InputSelectionVersion                                                                        string `json:",omitempty"`
 	CostUnit                                                                                     string `json:",omitempty"`
 	MaxCostUnitsPerAttempt                                                                       int64  `json:",omitempty"`
 	ID, ProviderID, RequestedModel, PromptVersion, PromptDigest, ParserVersion, ApplicationBuild string
@@ -41,6 +42,7 @@ type ExtractionOptions struct {
 }
 type PredicateBinding struct{ Predicate, SchemaVersion string }
 type ExtractionRequest struct {
+	InputRanges []ExtractionInputRange `json:",omitempty"`
 	Command
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
@@ -85,12 +87,21 @@ type ExtractionTx interface {
 
 func ExtractionProfileDigest(p ExtractionProfile) string { return Digest(p) }
 
+// ExtractionInputRange uses half-open UTF-8 byte offsets in original evidence.
+type ExtractionInputRange struct {
+	EvidenceID string
+	Start, End int
+}
+
 type ExtractionInputMessage struct {
+	SourceStart                                   int `json:",omitempty"`
 	EvidenceID, Speaker, SpeakerRole, SourceClass string
 	SourceTime                                    time.Time
 	Content                                       string
 }
 type ExtractionInput struct {
+	InputSelectionVersion                                                          string                 `json:",omitempty"`
+	ExcludedRanges                                                                 []ExtractionInputRange `json:",omitempty"`
 	Schema, Tenant, JobID, AttemptID, ConversationID, ConversationDigest, Timezone string
 	Profile                                                                        ExtractionProfile
 	Subjects                                                                       []string
