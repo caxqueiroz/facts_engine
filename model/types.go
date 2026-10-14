@@ -243,6 +243,8 @@ type Acceptance struct {
 	LedgerRevision int64
 }
 type FactQuery struct {
+	KnownAt           *time.Time
+	Purpose           string
 	Key               FactKey
 	ValidAt           time.Time
 	KnowledgeRevision int64

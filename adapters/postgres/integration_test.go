@@ -82,6 +82,7 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
 	t.Run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })
 	t.Run("outbox delivery recovery", func(t *testing.T) { testOutbox(t, ctx, ledger, admin) })
 	caller := model.Caller{Tenant: "bank1", Principal: "proposer"}

@@ -206,3 +206,28 @@ func (e *Engine) GetEvidenceContent(ctx context.Context, c Caller, q model.Evide
 
 type EvidenceQuery = model.EvidenceQuery
 type EvidenceContent = model.EvidenceContent
+
+func NewWithReads(l Ledger, a Authorizer, e EvidenceStore, options model.ReadOptions) (*Engine, error) {
+	s, err := services.NewWithReads(l, a, e, options)
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{s}, nil
+}
+func (e *Engine) ListFacts(ctx context.Context, c Caller, q model.FactsQuery) (model.FactsPage, error) {
+	return e.service.ListFacts(ctx, c, q)
+}
+
+type FactsQuery = model.FactsQuery
+type FactsPage = model.FactsPage
+type ReadOptions = model.ReadOptions
+
+func NewWithOptions(l Ledger, a Authorizer, e EvidenceStore, options model.EngineOptions) (*Engine, error) {
+	s, err := services.NewWithOptions(l, a, e, options)
+	if err != nil {
+		return nil, err
+	}
+	return &Engine{s}, nil
+}
+
+type EngineOptions = model.EngineOptions

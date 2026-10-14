@@ -372,24 +372,31 @@ func (s *Service) resolve(ctx context.Context, tx model.Tx, q model.FactQuery, r
 	return item, nil
 }
 func (s *Service) GetFact(ctx context.Context, c model.Caller, q model.FactQuery) (model.FactResult, error) {
-	if !validSelector(q.Key) || q.ValidAt.IsZero() || q.KnowledgeRevision < 0 {
+	if !validSelector(q.Key) || q.ValidAt.IsZero() || q.KnowledgeRevision < 0 || (q.KnownAt != nil && (q.KnownAt.IsZero() || q.KnowledgeRevision != 0)) {
 		return model.FactResult{}, model.ErrInvalid
 	}
-	if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: "fact_read"}); err != nil {
+	if q.Purpose == "" {
+		q.Purpose = "fact_read"
+	}
+	if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: q.Purpose}); err != nil {
 		return model.FactResult{}, err
 	}
-	if q.KnowledgeRevision > 0 {
-		if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read_history", model.Command{Purpose: "fact_history"}); err != nil {
+	if q.KnowledgeRevision > 0 || q.KnownAt != nil {
+		if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read_history", model.Command{Purpose: q.Purpose}); err != nil {
 			return model.FactResult{}, err
 		}
 	}
 	var item model.SnapshotItem
 	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
-		revision, at, err := selection(ctx, tx, q.KnowledgeRevision)
+		revision, at, err := readSelection(ctx, tx, q.KnowledgeRevision, q.KnownAt)
 		if err != nil {
 			return err
 		}
-		item, err = s.resolve(ctx, tx, q, revision, at, q.KnowledgeRevision > 0)
+		if revision == 0 {
+			item = model.SnapshotItem{Selector: q.Key, Resolution: model.FactResult{State: "missing"}}
+			return nil
+		}
+		item, err = s.resolve(ctx, tx, q, revision, at, (q.KnowledgeRevision > 0 || q.KnownAt != nil))
 		return err
 	})
 	if err != nil {
@@ -400,6 +407,9 @@ func (s *Service) GetFact(ctx context.Context, c model.Caller, q model.FactQuery
 			item.Resolution.State = "ineligible"
 			item.Resolution.Value = nil
 		}
+	}
+	if _, err = s.snapshotAuthorization(ctx, c, []model.FactKey{q.Key}, model.Command{Purpose: q.Purpose}, q.KnowledgeRevision > 0 || q.KnownAt != nil, false); err != nil {
+		return model.FactResult{}, err
 	}
 	return item.Resolution, nil
 }

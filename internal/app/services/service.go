@@ -11,6 +11,7 @@ import (
 )
 
 type Service struct {
+	reads     model.ReadOptions
 	retrieval model.RetrievalOptions
 	ledger    model.Ledger
 	auth      model.Authorizer
