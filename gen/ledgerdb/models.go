@@ -16,6 +16,7 @@ type AcceptedInterval struct {
 	ValidTo        pgtype.Timestamptz
 	LedgerRevision pgtype.Int8
 	Payload        []byte
+	SegmentID      pgtype.Int8
 }
 
 type ActivePredicate struct {
@@ -26,20 +27,22 @@ type ActivePredicate struct {
 }
 
 type Attestation struct {
-	TenantID   string
-	ID         string
-	ScopeID    string
-	RecordID   string
-	VersionID  string
-	EvidenceID string
-	Payload    []byte
+	TenantID       string
+	ID             string
+	ScopeID        string
+	RecordID       string
+	VersionID      string
+	EvidenceID     string
+	Payload        []byte
+	LedgerRevision pgtype.Int8
 }
 
 type AttestationEvent struct {
-	TenantID      string
-	AttestationID string
-	Actor         string
-	RecordedAt    pgtype.Timestamptz
+	TenantID       string
+	AttestationID  string
+	Actor          string
+	RecordedAt     pgtype.Timestamptz
+	LedgerRevision pgtype.Int8
 }
 
 type CommandReceipt struct {
@@ -65,6 +68,25 @@ type EvidenceObject struct {
 	Locator       string
 	ObjectVersion string
 	Payload       []byte
+}
+
+type FactSnapshot struct {
+	TenantID          string
+	ID                string
+	SelectionRevision int64
+	CreationRevision  int64
+	Digest            string
+	Payload           []byte
+}
+
+type FactSnapshotItem struct {
+	TenantID       string
+	SnapshotID     string
+	Ordinal        int32
+	ScopeID        string
+	SelectorDigest string
+	RecordID       pgtype.Text
+	VersionID      pgtype.Text
 }
 
 type LedgerEvent struct {
@@ -128,9 +150,31 @@ type RecordVersion struct {
 	Payload       []byte
 }
 
+type RejectedVersion struct {
+	TenantID       string
+	RecordID       string
+	VersionID      string
+	LedgerRevision int64
+}
+
 type TenantRevision struct {
 	TenantID string
 	Revision int64
+}
+
+type TimelineGeneration struct {
+	TenantID       string
+	RecordID       string
+	LedgerRevision int64
+}
+
+type TimelineHistory struct {
+	TenantID       string
+	RecordID       string
+	LedgerRevision int64
+	Ordinal        int32
+	VersionID      string
+	Payload        []byte
 }
 
 type VersionEvidence struct {

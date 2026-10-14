@@ -41,7 +41,10 @@ func TestPostgresLedger(t *testing.T) {
 	if exists {
 		t.Fatal("TEST_DATABASE_URL must point to a fresh disposable database")
 	}
-	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql"} {
+	for _, name := range []string{"00001_ledger.sql", "00002_evidence_objects.sql", "00003_active_definitions.sql", "00004_temporal_snapshots.sql"} {
+		if name == "00004_temporal_snapshots.sql" {
+			seedLegacyTimeline(t, ctx, admin)
+		}
 		b, err := os.ReadFile(filepath.Join("../../sql/migrations", name))
 		if err != nil {
 			t.Fatal(err)
@@ -55,10 +58,10 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roleSQL := strings.Replace(string(role), "CREATE ROLE facts_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;", "", 1)
-	if _, err := admin.Exec(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_runtime') THEN CREATE ROLE facts_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;`+roleSQL); err != nil {
+	if _, err := admin.Exec(ctx, string(role)); err != nil {
 		t.Fatal(err)
 	}
+
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -316,7 +319,8 @@ func TestPostgresLedger(t *testing.T) {
 		if _, err := engine.RecordAttestation(ctx, caller, att); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := engine.AcceptFact(ctx, auto, accept); err != nil {
+		acceptedAuto, err := engine.AcceptFact(ctx, auto, accept)
+		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err := engine.WithdrawAttestation(ctx, caller, model.Withdrawal{Command: cmd("wrong-scope-withdraw"), Scope: "case2", AttestationID: "att1"}); !errors.Is(err, model.ErrDenied) {
@@ -328,6 +332,10 @@ func TestPostgresLedger(t *testing.T) {
 		result, err := engine.GetFact(ctx, caller, model.FactQuery{Key: proposalRequest.Key, ValidAt: now})
 		if err != nil || result.State != "ineligible" || result.Value != nil {
 			t.Fatal(result, err)
+		}
+		historicalAuto, err := engine.GetFact(ctx, caller, model.FactQuery{Key: proposalRequest.Key, ValidAt: now, KnowledgeRevision: acceptedAuto.LedgerRevision})
+		if err != nil || historicalAuto.State != "resolved" {
+			t.Fatal(historicalAuto, err)
 		}
 		second := proposalRequest
 		second.Command = cmd("auto-proposal-2")
@@ -358,6 +366,248 @@ func TestPostgresLedger(t *testing.T) {
 		old.Key.Subject = "subject-new"
 		if _, err := engine.ProposeFact(ctx, caller, old); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal(err)
+		}
+	})
+
+	t.Run("temporal lifecycle and immutable snapshots", func(t *testing.T) {
+		definition := def
+		definition.Command = cmd("timeline-schema")
+		definition.Definition.Predicate = "timeline"
+		if _, err := engine.RegisterPredicateVersion(ctx, caller, definition); err != nil {
+			t.Fatal(err)
+		}
+		day := func(month, day int) time.Time { return time.Date(2026, time.Month(month), day, 0, 0, 0, 0, time.UTC) }
+		jan1, jan10, jan12, jan15, jan20, feb1, feb10, feb15 := day(1, 1), day(1, 10), day(1, 12), day(1, 15), day(1, 20), day(2, 1), day(2, 10), day(2, 15)
+		key := model.FactKey{Scope: "case1", Subject: "temporal-subject", Predicate: "timeline"}
+		propose := func(command, value string, valid model.Interval, expected int64) model.CommitResult {
+			t.Helper()
+			r := q
+			r.Command = cmd(command)
+			r.Key = key
+			r.ExpectedRevision = expected
+			r.Valid = valid
+			r.Value = model.Value{Kind: model.Text, Text: &value}
+			out, err := engine.ProposeFact(ctx, caller, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return out
+		}
+		read := func(at time.Time, revision int64, state, value string) {
+			t.Helper()
+			r, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: key, ValidAt: at, KnowledgeRevision: revision})
+			if err != nil || r.State != state {
+				t.Fatalf("read %s at rev %d: %+v %v", at, revision, r, err)
+			}
+			if value != "" && (r.Value == nil || *r.Value.Text != value) {
+				t.Fatalf("wrong value: %+v", r)
+			}
+			if state == "disputed" || state == "retracted" {
+				if r.Value != nil {
+					t.Fatal("unusable value disclosed")
+				}
+			}
+		}
+		a := propose("timeline-a", "A", model.Interval{From: &jan1}, 0)
+		acceptedA, err := engine.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("timeline-approve-a"), Scope: "case1", RecordID: a.RecordID, VersionID: a.VersionID, ExpectedRevision: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		missing := key
+		missing.Subject = "missing-subject"
+		request := model.FactSnapshotRequest{Command: cmd("snapshot-a"), Selectors: []model.FactKey{key, missing}, ValidAt: jan15}
+		snap, err := engine.CreateFactSnapshot(ctx, reviewer, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(snap.Items) != 2 || snap.Items[0].Resolution.VersionID != a.VersionID || snap.Items[1].Resolution.State != "missing" || snap.SelectionRevision >= snap.CreationRevision {
+			t.Fatal(snap)
+		}
+		b := propose("timeline-b", "B", model.Interval{From: &feb1}, 2)
+		replacement := model.Supersession{Approval: model.Approval{Command: cmd("replace-b"), Scope: "case1", RecordID: b.RecordID, VersionID: b.VersionID, ExpectedRevision: 3}, ReplacedVersionIDs: []string{a.VersionID}, Valid: model.Interval{From: &feb1}, Reason: "updated_evidence"}
+		acceptedB, err := engine.SupersedeFact(ctx, reviewer, replacement)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read(jan15, 0, "resolved", "A")
+		read(feb15, 0, "resolved", "B")
+		read(feb15, acceptedA.LedgerRevision, "resolved", "A")
+		cVersion := propose("timeline-c", "C", model.Interval{From: &jan10, To: &feb10}, 4)
+		correction := model.Supersession{Approval: model.Approval{Command: cmd("replace-c"), Scope: "case1", RecordID: cVersion.RecordID, VersionID: cVersion.VersionID, ExpectedRevision: 5}, ReplacedVersionIDs: []string{a.VersionID}, Valid: model.Interval{From: &jan10, To: &feb10}, Reason: "backdated_correction"}
+		if _, err := engine.SupersedeFact(ctx, reviewer, correction); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("incomplete overlaps", err)
+		}
+		correction.ReplacedVersionIDs = append(correction.ReplacedVersionIDs, b.VersionID)
+		acceptedC, err := engine.SupersedeFact(ctx, reviewer, correction)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read(day(1, 9), 0, "resolved", "A")
+		read(jan15, 0, "resolved", "C")
+		read(feb15, 0, "resolved", "B")
+		read(day(2, 5), acceptedB.LedgerRevision, "resolved", "B")
+		change := model.LifecycleChange{Approval: model.Approval{Command: cmd("dispute-c"), Scope: "case1", RecordID: cVersion.RecordID, VersionID: cVersion.VersionID, ExpectedRevision: 6}, Valid: model.Interval{From: &jan12, To: &jan20}, Reason: "client_disputed"}
+		disputed, err := engine.DisputeFact(ctx, reviewer, change)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read(jan15, 0, "disputed", "")
+		read(jan15, acceptedC.LedgerRevision, "resolved", "C")
+		request2 := request
+		request2.Command = cmd("disputed-snapshot")
+		disputedSnap, err := engine.CreateFactSnapshot(ctx, reviewer, request2)
+		if err != nil || disputedSnap.Items[0].Resolution.State != "disputed" {
+			t.Fatal(disputedSnap, err)
+		}
+		change.Command = cmd("resolve-c")
+		change.ExpectedRevision = 7
+		if _, err := engine.ResolveDispute(ctx, reviewer, change); err != nil {
+			t.Fatal(err)
+		}
+		read(jan15, 0, "resolved", "C")
+		read(jan15, disputed.LedgerRevision, "disputed", "")
+		change.Command = cmd("retract-c")
+		change.ExpectedRevision = 8
+		if _, err := engine.RetractFact(ctx, reviewer, change); err != nil {
+			t.Fatal(err)
+		}
+		read(jan15, 0, "retracted", "")
+		// Approval can fill a retracted interval without losing its historical withdrawal.
+		d := propose("timeline-d", "D", model.Interval{From: &jan12, To: &jan20}, 9)
+		if _, err := engine.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("approve-d"), Scope: "case1", RecordID: d.RecordID, VersionID: d.VersionID, ExpectedRevision: 10}); err != nil {
+			t.Fatal(err)
+		}
+		read(jan15, 0, "resolved", "D")
+		stored, err := engine.GetFactSnapshot(ctx, reviewer, model.SnapshotQuery{ID: snap.ID, Purpose: "integration"})
+		if err != nil || stored.Digest != snap.Digest || *stored.Items[0].Resolution.Value.Text != "A" {
+			t.Fatal(stored, err)
+		}
+		retry, err := engine.CreateFactSnapshot(ctx, reviewer, request)
+		if err != nil || retry.ID != snap.ID || retry.Digest != snap.Digest {
+			t.Fatal(retry, err)
+		}
+		changed := request
+		changed.ValidAt = feb15
+		if _, err := engine.CreateFactSnapshot(ctx, reviewer, changed); !errors.Is(err, model.ErrConflict) {
+			t.Fatal(err)
+		}
+		request2.Command = cmd("historical-snapshot")
+		request2.KnowledgeRevision = acceptedA.LedgerRevision
+		request2.ValidAt = feb15
+		historical, err := engine.CreateFactSnapshot(ctx, reviewer, request2)
+		if err != nil || *historical.Items[0].Resolution.Value.Text != "A" {
+			t.Fatal(historical, err)
+		}
+		rejectedVersion := propose("timeline-rejected", "unaccepted", model.Interval{From: &jan1}, 11)
+		rejection := model.LifecycleChange{Approval: model.Approval{Command: cmd("reject-proposal"), Scope: "case1", RecordID: rejectedVersion.RecordID, VersionID: rejectedVersion.VersionID, ExpectedRevision: 12}, Reason: "unsupported"}
+		if _, err := engine.RejectFact(ctx, reviewer, rejection); err != nil {
+			t.Fatal(err)
+		}
+		attempt := rejection.Approval
+		attempt.Command = cmd("accept-rejected")
+		attempt.ExpectedRevision = 13
+		if _, err := engine.ApproveFact(ctx, reviewer, attempt); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal(err)
+		}
+		history, err := engine.GetFactHistory(ctx, reviewer, model.HistoryQuery{Scope: "case1", RecordID: a.RecordID, Purpose: "audit"})
+		if err != nil || len(history.Events) != 13 {
+			t.Fatal(history, err)
+		}
+		found := false
+		for _, event := range history.Events {
+			if event.Type == "supersede_fact" && event.Reason == "backdated_correction" && len(event.ReplacedVersionIDs) == 2 && event.Affected != nil {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("missing correction provenance")
+		}
+	})
+
+	t.Run("snapshot uses one database view", func(t *testing.T) {
+		gate := &pauseLedger{Ledger: ledger, read: make(chan struct{}), proceed: make(chan struct{})}
+		observer, err := facts.New(gate, allow{}, store)
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := model.FactKey{Scope: "case1", Subject: "temporal-subject", Predicate: "timeline"}
+		newKey := key
+		newKey.Subject = "created-during-snapshot"
+		at := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+		request := model.FactSnapshotRequest{Command: cmd("concurrent-snapshot"), Selectors: []model.FactKey{key, newKey}, ValidAt: at}
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		type outcome struct {
+			snapshot model.FactSnapshot
+			err      error
+		}
+		result := make(chan outcome, 1)
+		go func() {
+			snapshot, err := observer.CreateFactSnapshot(ctx, reviewer, request)
+			result <- outcome{snapshot, err}
+		}()
+		select {
+		case <-gate.read:
+		case <-ctx.Done():
+			t.Fatal("snapshot failed to reach barrier")
+		}
+		// Always release the read transaction, including when a mutation assertion fails.
+		var release sync.Once
+		defer release.Do(func() { close(gate.proceed) })
+		proposal := q
+		proposal.Command = cmd("during-snapshot-proposal")
+		proposal.Key = newKey
+		proposal.Valid.From = &at
+		pr, err := engine.ProposeFact(ctx, caller, proposal)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commit, err := engine.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("during-snapshot-approval"), Scope: "case1", RecordID: pr.RecordID, VersionID: pr.VersionID, ExpectedRevision: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		release.Do(func() { close(gate.proceed) })
+		out := <-result
+		if out.err != nil {
+			t.Fatal(out.err)
+		}
+		if out.snapshot.Items[1].Resolution.State != "missing" || out.snapshot.SelectionRevision >= commit.LedgerRevision || out.snapshot.CreationRevision <= commit.LedgerRevision {
+			t.Fatal("mixed snapshot boundary", out.snapshot)
+		}
+		current, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: newKey, ValidAt: at})
+		if err != nil || current.State != "resolved" {
+			t.Fatal(current, err)
+		}
+	})
+	t.Run("unauthorized snapshot selector fails", func(t *testing.T) {
+		restricted, err := facts.New(ledger, denyScope{scope: "forbidden"}, store)
+		if err != nil {
+			t.Fatal(err)
+		}
+		deniedKey := model.FactKey{Scope: "forbidden", Subject: "opaque", Predicate: "timeline"}
+		_, err = restricted.CreateFactSnapshot(ctx, caller, model.FactSnapshotRequest{Command: cmd("denied-snapshot"), Selectors: []model.FactKey{q.Key, deniedKey}, ValidAt: now})
+		if !errors.Is(err, model.ErrDenied) {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("upgrade retains earlier timeline generations", func(t *testing.T) {
+		var generations, entries int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM timeline_generations WHERE tenant_id='legacy'`).Scan(&generations); err != nil {
+			t.Fatal(err)
+		}
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM timeline_history WHERE tenant_id='legacy'`).Scan(&entries); err != nil {
+			t.Fatal(err)
+		}
+		if generations != 2 || entries != 3 {
+			t.Fatal(generations, entries)
+		}
+		var original []byte
+		if err := admin.QueryRow(ctx, `SELECT payload FROM timeline_history WHERE tenant_id='legacy' AND ledger_revision=1`).Scan(&original); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(original, []byte{1}) {
+			t.Fatal("encrypted historical payload changed")
 		}
 	})
 

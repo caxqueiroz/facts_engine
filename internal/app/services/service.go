@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/model"
 	"slices"
@@ -77,7 +76,19 @@ func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permiss
 		if time.Since(auth.CheckedAt) > 30*time.Second {
 			return model.ErrUnavailable
 		}
-		event, err := tx.Append(ctx, model.Event{ID: id(), Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth})
+		eventInput := model.Event{ID: id(), EntityID: result.ID, Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth}
+		switch request := input.(type) {
+		case model.Supersession:
+			eventInput.Reason = request.Reason
+			eventInput.Affected = &request.Valid
+			eventInput.ReplacedVersionIDs = request.ReplacedVersionIDs
+		case model.LifecycleChange:
+			eventInput.Reason = request.Reason
+			if op != "reject_fact" {
+				eventInput.Affected = &request.Valid
+			}
+		}
+		event, err := tx.Append(ctx, eventInput)
 		if err != nil {
 			return err
 		}
@@ -355,43 +366,7 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		if err != nil {
 			return err
 		}
-		active, err := tx.ActivePredicate(ctx, r.Scope, v.Proposal.Key.Predicate)
-		if err != nil {
-			return err
-		}
-		if active != v.Proposal.SchemaVersion {
-			return model.ErrPrecondition
-		}
-		p, err := tx.Policy(ctx, r.Scope, v.PolicyID)
-		if err != nil {
-			return err
-		}
-		if automatic {
-			if p.Mode != "automated" || !c.Service || !slices.Contains(p.AcceptingServices, c.Principal) {
-				return model.ErrPrecondition
-			}
-		} else {
-			if p.Mode != "manual" || c.Principal == v.Proposer.Principal || c.Human() == v.Proposer.Human() {
-				return model.ErrPrecondition
-			}
-		}
-		if v.Proposal.Valid.From == nil {
-			return model.ErrPrecondition
-		}
-		for _, span := range v.Proposal.Sources {
-			e, err := tx.Evidence(ctx, span.EvidenceID)
-			if err != nil {
-				return err
-			}
-			if e.SourceClass == "assistant" || !slices.Contains(p.SourceClasses, e.SourceClass) {
-				return model.ErrPrecondition
-			}
-		}
-		as, err := tx.Attestations(ctx, v.ID)
-		if err != nil {
-			return err
-		}
-		attIDs, err := prerequisites(p, v, as, time.Now())
+		p, attIDs, err := s.acceptanceChecks(ctx, tx, c, rec, v, automatic)
 		if err != nil {
 			return err
 		}
@@ -400,7 +375,7 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 			return err
 		}
 		for _, a := range accepted {
-			if a.Valid.Overlaps(v.Proposal.Valid) {
+			if a.State != "retracted" && a.Valid.Overlaps(v.Proposal.Valid) {
 				return model.ErrPrecondition
 			}
 		}
@@ -414,80 +389,4 @@ func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, 
 		out.StreamRevision = rec.Revision + 1
 		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
 	})
-}
-func (s *Service) GetFact(ctx context.Context, c model.Caller, q model.FactQuery) (model.FactResult, error) {
-	result := model.FactResult{State: "missing"}
-	if q.ValidAt.IsZero() || q.KnowledgeRevision != 0 {
-		return result, model.ErrInvalid
-	} // Historical eligibility is implemented in the temporal slice.
-	if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: "fact_read"}); err != nil {
-		return result, err
-	}
-	var selected model.Version
-	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
-		revision, err := tx.Revision(ctx)
-		if err != nil {
-			return err
-		}
-		result.LedgerRevision = revision
-		// Read without creating a record; natural key lookup uses its deterministic identity.
-		rec, err := tx.Record(ctx, model.Digest(q.Key))
-		if errors.Is(err, model.ErrNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		result.RecordID = rec.ID
-		result.StreamRevision = rec.Revision
-		accepted, err := tx.Acceptances(ctx, rec.ID, revision)
-		if err != nil {
-			return err
-		}
-		for _, a := range accepted {
-			if !a.Valid.Contains(q.ValidAt) {
-				continue
-			}
-			v, err := tx.Version(ctx, rec.ID, a.VersionID)
-			if err != nil {
-				return err
-			}
-			p, err := tx.Policy(ctx, q.Key.Scope, v.PolicyID)
-			if err != nil {
-				return err
-			}
-			as, err := tx.Attestations(ctx, v.ID)
-			if err != nil {
-				return err
-			}
-			if _, err := prerequisites(p, v, as, time.Now()); err != nil {
-				result.State = "ineligible"
-				return nil
-			}
-			selected = v
-			result.State = "resolved"
-			if v.Proposal.Value.Kind == model.Unknown {
-				result.State = "unknown"
-			}
-			result.VersionID = v.ID
-			value := v.Proposal.Value
-			result.Value = &value
-			return nil
-		}
-		return nil
-	})
-	if err != nil {
-		return result, err
-	}
-	if selected.ID != "" {
-		ids := []string{}
-		for _, span := range selected.Proposal.Sources {
-			ids = append(ids, span.EvidenceID)
-		}
-		if _, err := s.loadEvidence(ctx, c, q.Key.Scope, ids); err != nil {
-			result.State = "ineligible"
-			result.Value = nil
-		}
-	}
-	return result, nil
 }

@@ -73,3 +73,36 @@ var (
 	ErrPrecondition = model.ErrPrecondition
 	ErrUnavailable  = model.ErrUnavailable
 )
+
+func (e *Engine) SupersedeFact(ctx context.Context, c Caller, r Supersession) (CommitResult, error) {
+	return e.service.SupersedeFact(ctx, c, r)
+}
+func (e *Engine) RejectFact(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.RejectFact(ctx, c, r)
+}
+func (e *Engine) DisputeFact(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.DisputeFact(ctx, c, r)
+}
+func (e *Engine) ResolveDispute(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.ResolveDispute(ctx, c, r)
+}
+func (e *Engine) RetractFact(ctx context.Context, c Caller, r LifecycleChange) (CommitResult, error) {
+	return e.service.RetractFact(ctx, c, r)
+}
+func (e *Engine) GetFactHistory(ctx context.Context, c Caller, r HistoryQuery) (HistoryResult, error) {
+	return e.service.GetFactHistory(ctx, c, r)
+}
+func (e *Engine) CreateFactSnapshot(ctx context.Context, c Caller, r FactSnapshotRequest) (FactSnapshot, error) {
+	return e.service.CreateFactSnapshot(ctx, c, r)
+}
+func (e *Engine) GetFactSnapshot(ctx context.Context, c Caller, r SnapshotQuery) (FactSnapshot, error) {
+	return e.service.GetFactSnapshot(ctx, c, r)
+}
+
+type Supersession = model.Supersession
+type LifecycleChange = model.LifecycleChange
+type HistoryQuery = model.HistoryQuery
+type HistoryResult = model.HistoryResult
+type FactSnapshotRequest = model.FactSnapshotRequest
+type FactSnapshot = model.FactSnapshot
+type SnapshotQuery = model.SnapshotQuery

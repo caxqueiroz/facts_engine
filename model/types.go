@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+	"unicode/utf8"
 )
 
 var (
@@ -47,6 +48,12 @@ type Interval struct {
 }
 
 func (i Interval) Validate() error {
+	// PostgreSQL ranges have microsecond precision. Reject lossy boundaries.
+	for _, at := range []*time.Time{i.From, i.To} {
+		if at != nil && (at.IsZero() || at.Nanosecond()%1000 != 0) {
+			return ErrInvalid
+		}
+	}
 	if i.From != nil && i.To != nil && !i.From.Before(*i.To) {
 		return ErrInvalid
 	}
@@ -107,7 +114,7 @@ func (v Value) Validate() error {
 	}
 	switch v.Kind {
 	case Text:
-		if v.Text != nil && len(*v.Text) <= 65536 {
+		if v.Text != nil && utf8.ValidString(*v.Text) && len(*v.Text) <= 65536 {
 			return nil
 		}
 	case Boolean:
@@ -228,6 +235,7 @@ type Withdrawal struct {
 	Scope, AttestationID string
 }
 type Acceptance struct {
+	State          string
 	VersionID      string
 	Valid          Interval
 	PolicyID       string
@@ -246,6 +254,9 @@ type FactResult struct {
 	LedgerRevision, StreamRevision int64
 }
 type Event struct {
+	EntityID, Reason                     string
+	Affected                             *Interval
+	ReplacedVersionIDs                   []string
 	ID, Type, Scope, RecordID, VersionID string
 	StreamRevision, LedgerRevision       int64
 	Caller                               Caller

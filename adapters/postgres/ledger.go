@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.active_predicates') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.fact_snapshots') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,9 +40,15 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
-	tx     pgx.Tx
-	tenant string
-	cipher Cipher
+	pendingAttestation *model.Attestation
+	pendingWithdrawal  string
+	pendingRecord      string
+	pendingTimeline    []model.Acceptance
+	pendingRejection   string
+	pendingSnapshot    *model.FactSnapshot
+	tx                 pgx.Tx
+	tenant             string
+	cipher             Cipher
 }
 
 func (l *Ledger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
@@ -71,7 +77,7 @@ func (l *Ledger) transact(ctx context.Context, tenant string, fn func(model.Tx) 
 	if err = ledgerdb.New(tx).BindTenant(ctx, tenant); err != nil {
 		return translate(err)
 	}
-	if err = fn(&transaction{tx, tenant, l.cipher}); err != nil {
+	if err = fn(&transaction{tx: tx, tenant: tenant, cipher: l.cipher}); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -264,13 +270,9 @@ func (t *transaction) Attestations(ctx context.Context, version string) ([]model
 	}
 	return out, rows.Err()
 }
-func (t *transaction) InsertAttestation(ctx context.Context, a model.Attestation) error {
-	b, err := t.encode(a)
-	if err != nil {
-		return err
-	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO attestations VALUES($1,$2,$3,$4,$5,$6,$7)`, t.tenant, a.ID, a.Scope, a.RecordID, a.VersionID, a.EvidenceID, b)
-	return err
+func (t *transaction) InsertAttestation(_ context.Context, a model.Attestation) error {
+	t.pendingAttestation = &a
+	return nil
 }
 func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string, c model.Caller) (model.CommitResult, error) {
 	out := model.CommitResult{}
@@ -289,44 +291,31 @@ func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string,
 	if err != nil {
 		return out, err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO attestation_events VALUES($1,$2,$3,clock_timestamp())`, t.tenant, id, c.Principal)
-	if err != nil {
-		return out, err
-	}
+	t.pendingWithdrawal = id
 	out = model.CommitResult{ID: id, RecordID: a.RecordID, VersionID: a.VersionID, StreamRevision: rec.Revision + 1}
 	return out, t.SetRevision(ctx, rec.ID, out.StreamRevision)
 }
-func (t *transaction) Acceptances(ctx context.Context, record string, rev int64) ([]model.Acceptance, error) {
-	rows, err := t.tx.Query(ctx, `SELECT payload,ledger_revision FROM accepted_intervals WHERE tenant_id=$1 AND record_id=$2 AND ($3::bigint=0 OR ledger_revision<=$3) ORDER BY valid_from`, t.tenant, record, rev)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []model.Acceptance{}
-	for rows.Next() {
-		var b []byte
-		var revision *int64
-		if err := rows.Scan(&b, &revision); err != nil {
-			return nil, err
-		}
-		var a model.Acceptance
-		if err := t.decode(b, &a); err != nil {
-			return nil, err
-		}
-		if revision != nil {
-			a.LedgerRevision = *revision
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
-}
 func (t *transaction) InsertAcceptance(ctx context.Context, record string, a model.Acceptance) error {
-	b, err := t.encode(a)
+	all, err := t.Acceptances(ctx, record, 0)
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.Exec(ctx, `INSERT INTO accepted_intervals VALUES($1,$2,$3,$4,$5,NULL,$6)`, t.tenant, record, a.VersionID, a.Valid.From, a.Valid.To, b)
-	return err
+	next := []model.Acceptance{}
+	for _, existing := range all {
+		if existing.State != "retracted" {
+			next = append(next, existing)
+			continue
+		}
+		for _, part := range model.Subtract(existing.Valid, a.Valid) {
+			piece := existing
+			piece.Valid = part
+			next = append(next, piece)
+		}
+	}
+	a.State = "accepted"
+	next = append(next, a)
+	model.SortTimeline(next)
+	return t.StageTimeline(ctx, record, next)
 }
 func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, error) {
 	err := ledgerdb.New(t.tx).EnsureTenant(ctx, t.tenant)
@@ -351,7 +340,7 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 			return e, err
 		}
 	}
-	_, err = t.tx.Exec(ctx, `UPDATE accepted_intervals SET ledger_revision=$2 WHERE tenant_id=$1 AND ledger_revision IS NULL`, t.tenant, e.LedgerRevision)
+	err = t.flushTemporal(ctx, e)
 	if err != nil {
 		return e, err
 	}
