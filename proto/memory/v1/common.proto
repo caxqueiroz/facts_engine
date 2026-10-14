@@ -114,3 +114,63 @@ message RevisionConflict {
   int64 expected_revision = 2;
   int64 current_revision = 3;
 }
+
+// Identity retained on committed results; requests never supply an actor.
+message Caller {
+  string tenant = 1;
+  string principal = 2;
+  string initiator = 3;
+  bool service = 4;
+}
+message AuthorizationRequest {
+  Caller caller = 1;
+  string scope = 2;
+  string permission = 3;
+  string purpose = 4;
+  string correlation_id = 5;
+}
+message AuthorizationDecision {
+  bool allowed = 1;
+  string model_id = 2;
+  string context_digest = 3;
+  string consistency = 4;
+  google.protobuf.Timestamp checked_at = 5;
+  AuthorizationRequest request = 6;
+}
+message SnapshotItem {
+  FactKey selector = 1;
+  FactResult resolution = 2;
+  string schema_version = 3;
+  string policy_id = 4;
+  Interval valid = 5;
+  repeated string source_classes = 6;
+  repeated string evidence_ids = 7;
+  repeated string attestation_ids = 8;
+}
+message RefreshSweep {
+  string stream = 1;
+  string profile_id = 2;
+  string profile_digest = 3;
+  google.protobuf.Timestamp scheduled_for = 4;
+  int64 interval_nanoseconds = 5;
+}
+message Event {
+  string id = 1;
+  string type = 2;
+  string scope = 3;
+  string record_id = 4;
+  string version_id = 5;
+  string record_kind = 6;
+  int64 stream_revision = 7;
+  int64 ledger_revision = 8;
+  Caller caller = 9;
+  Command command = 10;
+  AuthorizationDecision authorization = 11;
+  google.protobuf.Timestamp recorded_at = 12;
+  string entity_id = 13;
+  string reason = 14;
+  Interval affected = 15;
+  repeated string replaced_version_ids = 16;
+  string definition_predicate = 17;
+  RefreshSweep refresh_sweep = 18;
+}

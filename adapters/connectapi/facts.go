@@ -8,6 +8,8 @@ import (
 
 // FactEngine is satisfied by the public Engine; handlers contain no acceptance policy.
 type FactEngine interface {
+	ListFacts(context.Context, model.Caller, model.FactsQuery) (model.FactsPage, error)
+	ListFactHistory(context.Context, model.Caller, model.HistoryPageQuery) (model.HistoryPage, error)
 	GetFact(context.Context, model.Caller, model.FactQuery) (model.FactResult, error)
 	ProposeFact(context.Context, model.Caller, model.FactProposal) (model.CommitResult, error)
 	ApproveFact(context.Context, model.Caller, model.Approval) (model.CommitResult, error)
@@ -26,14 +28,9 @@ func (s *factService) GetFact(ctx context.Context, r *v1.GetFactRequest) (*v1.Ge
 	if err != nil {
 		return nil, err
 	}
-	result := &v1.FactResult{State: out.State, RecordId: out.RecordID, VersionId: out.VersionID, LedgerRevision: out.LedgerRevision, StreamRevision: out.StreamRevision}
-	if out.Value != nil {
-		result.Value, err = valueToProto(*out.Value)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &v1.GetFactResponse{Result: result}, nil
+	converter := responseConverter{}
+	result := converter.factResult(out)
+	return &v1.GetFactResponse{Result: result}, converter.err
 }
 func (s *factService) ProposeFact(ctx context.Context, r *v1.ProposeFactRequest) (*v1.ProposeFactResponse, error) {
 	value, err := valueFromProto(r.Value)

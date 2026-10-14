@@ -10,6 +10,8 @@ option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 
 // Identity comes from the authenticated transport, never from request actor fields.
 service FactService {
+  rpc ListFacts(ListFactsRequest) returns (ListFactsResponse);
+  rpc GetFactHistory(GetFactHistoryRequest) returns (GetFactHistoryResponse);
   rpc GetFact(GetFactRequest) returns (GetFactResponse);
   rpc ProposeFact(ProposeFactRequest) returns (ProposeFactResponse);
   rpc ApproveFact(ApproveFactRequest) returns (ApproveFactResponse);
@@ -158,4 +160,55 @@ message SupersedeFactRequest {
 }
 message SupersedeFactResponse {
   CommitResult result = 1;
+}
+
+// Tokens are opaque and bound by the engine to identity, filters and revision.
+message ListFactsRequest {
+  option (buf.validate.message).cel = {
+    id: "list_facts.knowledge_boundary"
+    message: "known_at and knowledge_revision cannot both be specified"
+    expression: "!has(this.known_at) || this.knowledge_revision == 0"
+  };
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string subject = 3 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string predicate = 4 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string purpose = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  google.protobuf.Timestamp valid_at = 6 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 7 [(buf.validate.field).int64.gte = 0];
+  google.protobuf.Timestamp known_at = 8;
+  int32 limit = 9 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  string page_token = 10 [(buf.validate.field).string.max_bytes = 4096];
+}
+message ListFactsResponse {
+  repeated SnapshotItem items = 1;
+  int64 ledger_revision = 2;
+  google.protobuf.Timestamp evaluated_at = 3;
+  string next_page_token = 4;
+}
+message GetFactHistoryRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  int32 limit = 5 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  string page_token = 6 [(buf.validate.field).string.max_bytes = 4096];
+}
+message GetFactHistoryResponse {
+  repeated Event events = 1;
+  int64 ledger_revision = 2;
+  int64 stream_revision = 3;
+  string next_page_token = 4;
 }

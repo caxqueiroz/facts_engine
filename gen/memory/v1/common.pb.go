@@ -777,6 +777,591 @@ func (x *RevisionConflict) GetCurrentRevision() int64 {
 	return 0
 }
 
+// Identity retained on committed results; requests never supply an actor.
+type Caller struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Principal     string                 `protobuf:"bytes,2,opt,name=principal,proto3" json:"principal,omitempty"`
+	Initiator     string                 `protobuf:"bytes,3,opt,name=initiator,proto3" json:"initiator,omitempty"`
+	Service       bool                   `protobuf:"varint,4,opt,name=service,proto3" json:"service,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Caller) Reset() {
+	*x = Caller{}
+	mi := &file_memory_v1_common_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Caller) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Caller) ProtoMessage() {}
+
+func (x *Caller) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Caller.ProtoReflect.Descriptor instead.
+func (*Caller) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Caller) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *Caller) GetPrincipal() string {
+	if x != nil {
+		return x.Principal
+	}
+	return ""
+}
+
+func (x *Caller) GetInitiator() string {
+	if x != nil {
+		return x.Initiator
+	}
+	return ""
+}
+
+func (x *Caller) GetService() bool {
+	if x != nil {
+		return x.Service
+	}
+	return false
+}
+
+type AuthorizationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Caller        *Caller                `protobuf:"bytes,1,opt,name=caller,proto3" json:"caller,omitempty"`
+	Scope         string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	Permission    string                 `protobuf:"bytes,3,opt,name=permission,proto3" json:"permission,omitempty"`
+	Purpose       string                 `protobuf:"bytes,4,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	CorrelationId string                 `protobuf:"bytes,5,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthorizationRequest) Reset() {
+	*x = AuthorizationRequest{}
+	mi := &file_memory_v1_common_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizationRequest) ProtoMessage() {}
+
+func (x *AuthorizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizationRequest.ProtoReflect.Descriptor instead.
+func (*AuthorizationRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AuthorizationRequest) GetCaller() *Caller {
+	if x != nil {
+		return x.Caller
+	}
+	return nil
+}
+
+func (x *AuthorizationRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *AuthorizationRequest) GetPermission() string {
+	if x != nil {
+		return x.Permission
+	}
+	return ""
+}
+
+func (x *AuthorizationRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *AuthorizationRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+type AuthorizationDecision struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	ModelId       string                 `protobuf:"bytes,2,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	ContextDigest string                 `protobuf:"bytes,3,opt,name=context_digest,json=contextDigest,proto3" json:"context_digest,omitempty"`
+	Consistency   string                 `protobuf:"bytes,4,opt,name=consistency,proto3" json:"consistency,omitempty"`
+	CheckedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	Request       *AuthorizationRequest  `protobuf:"bytes,6,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthorizationDecision) Reset() {
+	*x = AuthorizationDecision{}
+	mi := &file_memory_v1_common_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizationDecision) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizationDecision) ProtoMessage() {}
+
+func (x *AuthorizationDecision) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizationDecision.ProtoReflect.Descriptor instead.
+func (*AuthorizationDecision) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AuthorizationDecision) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *AuthorizationDecision) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *AuthorizationDecision) GetContextDigest() string {
+	if x != nil {
+		return x.ContextDigest
+	}
+	return ""
+}
+
+func (x *AuthorizationDecision) GetConsistency() string {
+	if x != nil {
+		return x.Consistency
+	}
+	return ""
+}
+
+func (x *AuthorizationDecision) GetCheckedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CheckedAt
+	}
+	return nil
+}
+
+func (x *AuthorizationDecision) GetRequest() *AuthorizationRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+type SnapshotItem struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Selector       *FactKey               `protobuf:"bytes,1,opt,name=selector,proto3" json:"selector,omitempty"`
+	Resolution     *FactResult            `protobuf:"bytes,2,opt,name=resolution,proto3" json:"resolution,omitempty"`
+	SchemaVersion  string                 `protobuf:"bytes,3,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	PolicyId       string                 `protobuf:"bytes,4,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Valid          *Interval              `protobuf:"bytes,5,opt,name=valid,proto3" json:"valid,omitempty"`
+	SourceClasses  []string               `protobuf:"bytes,6,rep,name=source_classes,json=sourceClasses,proto3" json:"source_classes,omitempty"`
+	EvidenceIds    []string               `protobuf:"bytes,7,rep,name=evidence_ids,json=evidenceIds,proto3" json:"evidence_ids,omitempty"`
+	AttestationIds []string               `protobuf:"bytes,8,rep,name=attestation_ids,json=attestationIds,proto3" json:"attestation_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SnapshotItem) Reset() {
+	*x = SnapshotItem{}
+	mi := &file_memory_v1_common_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SnapshotItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SnapshotItem) ProtoMessage() {}
+
+func (x *SnapshotItem) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SnapshotItem.ProtoReflect.Descriptor instead.
+func (*SnapshotItem) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SnapshotItem) GetSelector() *FactKey {
+	if x != nil {
+		return x.Selector
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetResolution() *FactResult {
+	if x != nil {
+		return x.Resolution
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *SnapshotItem) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *SnapshotItem) GetValid() *Interval {
+	if x != nil {
+		return x.Valid
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetSourceClasses() []string {
+	if x != nil {
+		return x.SourceClasses
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetEvidenceIds() []string {
+	if x != nil {
+		return x.EvidenceIds
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetAttestationIds() []string {
+	if x != nil {
+		return x.AttestationIds
+	}
+	return nil
+}
+
+type RefreshSweep struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Stream              string                 `protobuf:"bytes,1,opt,name=stream,proto3" json:"stream,omitempty"`
+	ProfileId           string                 `protobuf:"bytes,2,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ProfileDigest       string                 `protobuf:"bytes,3,opt,name=profile_digest,json=profileDigest,proto3" json:"profile_digest,omitempty"`
+	ScheduledFor        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	IntervalNanoseconds int64                  `protobuf:"varint,5,opt,name=interval_nanoseconds,json=intervalNanoseconds,proto3" json:"interval_nanoseconds,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RefreshSweep) Reset() {
+	*x = RefreshSweep{}
+	mi := &file_memory_v1_common_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshSweep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshSweep) ProtoMessage() {}
+
+func (x *RefreshSweep) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshSweep.ProtoReflect.Descriptor instead.
+func (*RefreshSweep) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RefreshSweep) GetStream() string {
+	if x != nil {
+		return x.Stream
+	}
+	return ""
+}
+
+func (x *RefreshSweep) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *RefreshSweep) GetProfileDigest() string {
+	if x != nil {
+		return x.ProfileDigest
+	}
+	return ""
+}
+
+func (x *RefreshSweep) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *RefreshSweep) GetIntervalNanoseconds() int64 {
+	if x != nil {
+		return x.IntervalNanoseconds
+	}
+	return 0
+}
+
+type Event struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type                string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Scope               string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	RecordId            string                 `protobuf:"bytes,4,opt,name=record_id,json=recordId,proto3" json:"record_id,omitempty"`
+	VersionId           string                 `protobuf:"bytes,5,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	RecordKind          string                 `protobuf:"bytes,6,opt,name=record_kind,json=recordKind,proto3" json:"record_kind,omitempty"`
+	StreamRevision      int64                  `protobuf:"varint,7,opt,name=stream_revision,json=streamRevision,proto3" json:"stream_revision,omitempty"`
+	LedgerRevision      int64                  `protobuf:"varint,8,opt,name=ledger_revision,json=ledgerRevision,proto3" json:"ledger_revision,omitempty"`
+	Caller              *Caller                `protobuf:"bytes,9,opt,name=caller,proto3" json:"caller,omitempty"`
+	Command             *Command               `protobuf:"bytes,10,opt,name=command,proto3" json:"command,omitempty"`
+	Authorization       *AuthorizationDecision `protobuf:"bytes,11,opt,name=authorization,proto3" json:"authorization,omitempty"`
+	RecordedAt          *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=recorded_at,json=recordedAt,proto3" json:"recorded_at,omitempty"`
+	EntityId            string                 `protobuf:"bytes,13,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	Reason              string                 `protobuf:"bytes,14,opt,name=reason,proto3" json:"reason,omitempty"`
+	Affected            *Interval              `protobuf:"bytes,15,opt,name=affected,proto3" json:"affected,omitempty"`
+	ReplacedVersionIds  []string               `protobuf:"bytes,16,rep,name=replaced_version_ids,json=replacedVersionIds,proto3" json:"replaced_version_ids,omitempty"`
+	DefinitionPredicate string                 `protobuf:"bytes,17,opt,name=definition_predicate,json=definitionPredicate,proto3" json:"definition_predicate,omitempty"`
+	RefreshSweep        *RefreshSweep          `protobuf:"bytes,18,opt,name=refresh_sweep,json=refreshSweep,proto3" json:"refresh_sweep,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *Event) Reset() {
+	*x = Event{}
+	mi := &file_memory_v1_common_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Event) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Event) ProtoMessage() {}
+
+func (x *Event) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_common_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Event.ProtoReflect.Descriptor instead.
+func (*Event) Descriptor() ([]byte, []int) {
+	return file_memory_v1_common_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *Event) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Event) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Event) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *Event) GetRecordId() string {
+	if x != nil {
+		return x.RecordId
+	}
+	return ""
+}
+
+func (x *Event) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *Event) GetRecordKind() string {
+	if x != nil {
+		return x.RecordKind
+	}
+	return ""
+}
+
+func (x *Event) GetStreamRevision() int64 {
+	if x != nil {
+		return x.StreamRevision
+	}
+	return 0
+}
+
+func (x *Event) GetLedgerRevision() int64 {
+	if x != nil {
+		return x.LedgerRevision
+	}
+	return 0
+}
+
+func (x *Event) GetCaller() *Caller {
+	if x != nil {
+		return x.Caller
+	}
+	return nil
+}
+
+func (x *Event) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *Event) GetAuthorization() *AuthorizationDecision {
+	if x != nil {
+		return x.Authorization
+	}
+	return nil
+}
+
+func (x *Event) GetRecordedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RecordedAt
+	}
+	return nil
+}
+
+func (x *Event) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+func (x *Event) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Event) GetAffected() *Interval {
+	if x != nil {
+		return x.Affected
+	}
+	return nil
+}
+
+func (x *Event) GetReplacedVersionIds() []string {
+	if x != nil {
+		return x.ReplacedVersionIds
+	}
+	return nil
+}
+
+func (x *Event) GetDefinitionPredicate() string {
+	if x != nil {
+		return x.DefinitionPredicate
+	}
+	return ""
+}
+
+func (x *Event) GetRefreshSweep() *RefreshSweep {
+	if x != nil {
+		return x.RefreshSweep
+	}
+	return nil
+}
+
 var File_memory_v1_common_proto protoreflect.FileDescriptor
 
 const file_memory_v1_common_proto_rawDesc = "" +
@@ -844,7 +1429,69 @@ const file_memory_v1_common_proto_rawDesc = "" +
 	"\x10RevisionConflict\x12\x1b\n" +
 	"\trecord_id\x18\x01 \x01(\tR\brecordId\x12+\n" +
 	"\x11expected_revision\x18\x02 \x01(\x03R\x10expectedRevision\x12)\n" +
-	"\x10current_revision\x18\x03 \x01(\x03R\x0fcurrentRevisionB;Z9github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1b\x06proto3"
+	"\x10current_revision\x18\x03 \x01(\x03R\x0fcurrentRevision\"v\n" +
+	"\x06Caller\x12\x16\n" +
+	"\x06tenant\x18\x01 \x01(\tR\x06tenant\x12\x1c\n" +
+	"\tprincipal\x18\x02 \x01(\tR\tprincipal\x12\x1c\n" +
+	"\tinitiator\x18\x03 \x01(\tR\tinitiator\x12\x18\n" +
+	"\aservice\x18\x04 \x01(\bR\aservice\"\xb8\x01\n" +
+	"\x14AuthorizationRequest\x12)\n" +
+	"\x06caller\x18\x01 \x01(\v2\x11.memory.v1.CallerR\x06caller\x12\x14\n" +
+	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1e\n" +
+	"\n" +
+	"permission\x18\x03 \x01(\tR\n" +
+	"permission\x12\x18\n" +
+	"\apurpose\x18\x04 \x01(\tR\apurpose\x12%\n" +
+	"\x0ecorrelation_id\x18\x05 \x01(\tR\rcorrelationId\"\x8b\x02\n" +
+	"\x15AuthorizationDecision\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x19\n" +
+	"\bmodel_id\x18\x02 \x01(\tR\amodelId\x12%\n" +
+	"\x0econtext_digest\x18\x03 \x01(\tR\rcontextDigest\x12 \n" +
+	"\vconsistency\x18\x04 \x01(\tR\vconsistency\x129\n" +
+	"\n" +
+	"checked_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x129\n" +
+	"\arequest\x18\x06 \x01(\v2\x1f.memory.v1.AuthorizationRequestR\arequest\"\xd7\x02\n" +
+	"\fSnapshotItem\x12.\n" +
+	"\bselector\x18\x01 \x01(\v2\x12.memory.v1.FactKeyR\bselector\x125\n" +
+	"\n" +
+	"resolution\x18\x02 \x01(\v2\x15.memory.v1.FactResultR\n" +
+	"resolution\x12%\n" +
+	"\x0eschema_version\x18\x03 \x01(\tR\rschemaVersion\x12\x1b\n" +
+	"\tpolicy_id\x18\x04 \x01(\tR\bpolicyId\x12)\n" +
+	"\x05valid\x18\x05 \x01(\v2\x13.memory.v1.IntervalR\x05valid\x12%\n" +
+	"\x0esource_classes\x18\x06 \x03(\tR\rsourceClasses\x12!\n" +
+	"\fevidence_ids\x18\a \x03(\tR\vevidenceIds\x12'\n" +
+	"\x0fattestation_ids\x18\b \x03(\tR\x0eattestationIds\"\xe0\x01\n" +
+	"\fRefreshSweep\x12\x16\n" +
+	"\x06stream\x18\x01 \x01(\tR\x06stream\x12\x1d\n" +
+	"\n" +
+	"profile_id\x18\x02 \x01(\tR\tprofileId\x12%\n" +
+	"\x0eprofile_digest\x18\x03 \x01(\tR\rprofileDigest\x12?\n" +
+	"\rscheduled_for\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\fscheduledFor\x121\n" +
+	"\x14interval_nanoseconds\x18\x05 \x01(\x03R\x13intervalNanoseconds\"\xd7\x05\n" +
+	"\x05Event\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
+	"\x05scope\x18\x03 \x01(\tR\x05scope\x12\x1b\n" +
+	"\trecord_id\x18\x04 \x01(\tR\brecordId\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x05 \x01(\tR\tversionId\x12\x1f\n" +
+	"\vrecord_kind\x18\x06 \x01(\tR\n" +
+	"recordKind\x12'\n" +
+	"\x0fstream_revision\x18\a \x01(\x03R\x0estreamRevision\x12'\n" +
+	"\x0fledger_revision\x18\b \x01(\x03R\x0eledgerRevision\x12)\n" +
+	"\x06caller\x18\t \x01(\v2\x11.memory.v1.CallerR\x06caller\x12,\n" +
+	"\acommand\x18\n" +
+	" \x01(\v2\x12.memory.v1.CommandR\acommand\x12F\n" +
+	"\rauthorization\x18\v \x01(\v2 .memory.v1.AuthorizationDecisionR\rauthorization\x12;\n" +
+	"\vrecorded_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"recordedAt\x12\x1b\n" +
+	"\tentity_id\x18\r \x01(\tR\bentityId\x12\x16\n" +
+	"\x06reason\x18\x0e \x01(\tR\x06reason\x12/\n" +
+	"\baffected\x18\x0f \x01(\v2\x13.memory.v1.IntervalR\baffected\x120\n" +
+	"\x14replaced_version_ids\x18\x10 \x03(\tR\x12replacedVersionIds\x121\n" +
+	"\x14definition_predicate\x18\x11 \x01(\tR\x13definitionPredicate\x12<\n" +
+	"\rrefresh_sweep\x18\x12 \x01(\v2\x17.memory.v1.RefreshSweepR\frefreshSweepB;Z9github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1b\x06proto3"
 
 var (
 	file_memory_v1_common_proto_rawDescOnce sync.Once
@@ -858,7 +1505,7 @@ func file_memory_v1_common_proto_rawDescGZIP() []byte {
 	return file_memory_v1_common_proto_rawDescData
 }
 
-var file_memory_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_memory_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_memory_v1_common_proto_goTypes = []any{
 	(*Command)(nil),               // 0: memory.v1.Command
 	(*FactKey)(nil),               // 1: memory.v1.FactKey
@@ -870,20 +1517,39 @@ var file_memory_v1_common_proto_goTypes = []any{
 	(*CommitResult)(nil),          // 7: memory.v1.CommitResult
 	(*FactResult)(nil),            // 8: memory.v1.FactResult
 	(*RevisionConflict)(nil),      // 9: memory.v1.RevisionConflict
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*Caller)(nil),                // 10: memory.v1.Caller
+	(*AuthorizationRequest)(nil),  // 11: memory.v1.AuthorizationRequest
+	(*AuthorizationDecision)(nil), // 12: memory.v1.AuthorizationDecision
+	(*SnapshotItem)(nil),          // 13: memory.v1.SnapshotItem
+	(*RefreshSweep)(nil),          // 14: memory.v1.RefreshSweep
+	(*Event)(nil),                 // 15: memory.v1.Event
+	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
 }
 var file_memory_v1_common_proto_depIdxs = []int32{
-	10, // 0: memory.v1.Interval.from:type_name -> google.protobuf.Timestamp
-	10, // 1: memory.v1.Interval.to:type_name -> google.protobuf.Timestamp
+	16, // 0: memory.v1.Interval.from:type_name -> google.protobuf.Timestamp
+	16, // 1: memory.v1.Interval.to:type_name -> google.protobuf.Timestamp
 	3,  // 2: memory.v1.Value.decimal:type_name -> memory.v1.DecimalValue
-	10, // 3: memory.v1.Value.instant:type_name -> google.protobuf.Timestamp
+	16, // 3: memory.v1.Value.instant:type_name -> google.protobuf.Timestamp
 	4,  // 4: memory.v1.Value.unknown:type_name -> memory.v1.UnknownValue
 	5,  // 5: memory.v1.FactResult.value:type_name -> memory.v1.Value
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	10, // 6: memory.v1.AuthorizationRequest.caller:type_name -> memory.v1.Caller
+	16, // 7: memory.v1.AuthorizationDecision.checked_at:type_name -> google.protobuf.Timestamp
+	11, // 8: memory.v1.AuthorizationDecision.request:type_name -> memory.v1.AuthorizationRequest
+	1,  // 9: memory.v1.SnapshotItem.selector:type_name -> memory.v1.FactKey
+	8,  // 10: memory.v1.SnapshotItem.resolution:type_name -> memory.v1.FactResult
+	2,  // 11: memory.v1.SnapshotItem.valid:type_name -> memory.v1.Interval
+	16, // 12: memory.v1.RefreshSweep.scheduled_for:type_name -> google.protobuf.Timestamp
+	10, // 13: memory.v1.Event.caller:type_name -> memory.v1.Caller
+	0,  // 14: memory.v1.Event.command:type_name -> memory.v1.Command
+	12, // 15: memory.v1.Event.authorization:type_name -> memory.v1.AuthorizationDecision
+	16, // 16: memory.v1.Event.recorded_at:type_name -> google.protobuf.Timestamp
+	2,  // 17: memory.v1.Event.affected:type_name -> memory.v1.Interval
+	14, // 18: memory.v1.Event.refresh_sweep:type_name -> memory.v1.RefreshSweep
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_common_proto_init() }
@@ -907,7 +1573,7 @@ func file_memory_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_common_proto_rawDesc), len(file_memory_v1_common_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

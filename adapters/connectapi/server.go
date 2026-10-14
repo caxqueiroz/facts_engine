@@ -34,14 +34,16 @@ type Limits struct {
 	MaxResponseBytes int
 }
 
-// NewHandler registers the fact service without opening sockets or starting
+// NewHandler registers the fact and snapshot services without opening sockets or starting
 // goroutines. HTTP/2 is required for gRPC. The host must set HTTP server read,
 // write and idle deadlines in addition to the per-RPC timeout.
-func NewHandler(engine FactEngine, verify IdentityVerifier, limits Limits) (http.Handler, error) {
+func NewHandler(engine Engine, verify IdentityVerifier, limits Limits) (http.Handler, error) {
 	if engine == nil || verify == nil || limits.Timeout <= 0 || limits.MaxConcurrent <= 0 || limits.MaxRequestBytes <= 0 || limits.MaxResponseBytes <= 0 {
 		return nil, model.ErrInvalid
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
+		&v1.ListFactsRequest{}, &v1.GetFactHistoryRequest{},
+		&v1.CreateFactSnapshotRequest{}, &v1.GetFactSnapshotRequest{},
 		&v1.GetFactRequest{}, &v1.ProposeFactRequest{}, &v1.ApproveFactRequest{},
 		&v1.AcceptFactRequest{}, &v1.RejectFactRequest{}, &v1.RetractFactRequest{},
 		&v1.DisputeFactRequest{}, &v1.ResolveDisputeRequest{}, &v1.SupersedeFactRequest{},
@@ -75,6 +77,7 @@ func NewHandler(engine FactEngine, verify IdentityVerifier, limits Limits) (http
 		}
 	})
 	memoryv1connect.RegisterFactServiceHandler(server, &factService{engine: engine})
+	memoryv1connect.RegisterSnapshotServiceHandler(server, &snapshotService{engine: engine})
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(limits.MaxRequestBytes), connecthttp.WithSendMaxBytes(limits.MaxResponseBytes))
 	return mux, nil

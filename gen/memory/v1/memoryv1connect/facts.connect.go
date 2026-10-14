@@ -24,6 +24,10 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// FactServiceListFactsProcedure is the procedure name of the FactService's ListFacts RPC.
+	FactServiceListFactsProcedure = "/memory.v1.FactService/ListFacts"
+	// FactServiceGetFactHistoryProcedure is the procedure name of the FactService's GetFactHistory RPC.
+	FactServiceGetFactHistoryProcedure = "/memory.v1.FactService/GetFactHistory"
 	// FactServiceGetFactProcedure is the procedure name of the FactService's GetFact RPC.
 	FactServiceGetFactProcedure = "/memory.v1.FactService/GetFact"
 	// FactServiceProposeFactProcedure is the procedure name of the FactService's ProposeFact RPC.
@@ -45,6 +49,20 @@ const (
 )
 
 var (
+	factServiceListFactsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_facts_proto.Services().ByName("FactService").Methods().ByName("ListFacts"),
+			Procedure:  FactServiceListFactsProcedure,
+		}
+	})
+	factServiceGetFactHistorySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_facts_proto.Services().ByName("FactService").Methods().ByName("GetFactHistory"),
+			Procedure:  FactServiceGetFactHistoryProcedure,
+		}
+	})
 	factServiceGetFactSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -112,6 +130,8 @@ var (
 
 // FactServiceClient is a client for the memory.v1.FactService service.
 type FactServiceClient interface {
+	ListFacts(context.Context, *v1.ListFactsRequest) (*v1.ListFactsResponse, error)
+	GetFactHistory(context.Context, *v1.GetFactHistoryRequest) (*v1.GetFactHistoryResponse, error)
 	GetFact(context.Context, *v1.GetFactRequest) (*v1.GetFactResponse, error)
 	ProposeFact(context.Context, *v1.ProposeFactRequest) (*v1.ProposeFactResponse, error)
 	ApproveFact(context.Context, *v1.ApproveFactRequest) (*v1.ApproveFactResponse, error)
@@ -131,6 +151,8 @@ func NewFactServiceClient(client *connect.Client) FactServiceClient {
 
 // FactServiceHandler is an implementation of the memory.v1.FactService service.
 type FactServiceHandler interface {
+	ListFacts(context.Context, *v1.ListFactsRequest) (*v1.ListFactsResponse, error)
+	GetFactHistory(context.Context, *v1.GetFactHistoryRequest) (*v1.GetFactHistoryResponse, error)
 	GetFact(context.Context, *v1.GetFactRequest) (*v1.GetFactResponse, error)
 	ProposeFact(context.Context, *v1.ProposeFactRequest) (*v1.ProposeFactResponse, error)
 	ApproveFact(context.Context, *v1.ApproveFactRequest) (*v1.ApproveFactResponse, error)
@@ -146,6 +168,8 @@ type FactServiceHandler interface {
 func RegisterFactServiceHandler(server *connect.Server, svc FactServiceHandler) {
 	adapter := factServiceHandler{svc: svc}
 	server.Register(
+		connect.Method{Spec: factServiceListFactsSpec(), Handler: adapter.listFacts},
+		connect.Method{Spec: factServiceGetFactHistorySpec(), Handler: adapter.getFactHistory},
 		connect.Method{Spec: factServiceGetFactSpec(), Handler: adapter.getFact},
 		connect.Method{Spec: factServiceProposeFactSpec(), Handler: adapter.proposeFact},
 		connect.Method{Spec: factServiceApproveFactSpec(), Handler: adapter.approveFact},
@@ -160,6 +184,14 @@ func RegisterFactServiceHandler(server *connect.Server, svc FactServiceHandler) 
 
 // UnimplementedFactServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedFactServiceHandler struct{}
+
+func (UnimplementedFactServiceHandler) ListFacts(context.Context, *v1.ListFactsRequest) (*v1.ListFactsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.FactService.ListFacts is not implemented")
+}
+
+func (UnimplementedFactServiceHandler) GetFactHistory(context.Context, *v1.GetFactHistoryRequest) (*v1.GetFactHistoryResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.FactService.GetFactHistory is not implemented")
+}
 
 func (UnimplementedFactServiceHandler) GetFact(context.Context, *v1.GetFactRequest) (*v1.GetFactResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.FactService.GetFact is not implemented")
@@ -199,6 +231,22 @@ func (UnimplementedFactServiceHandler) SupersedeFact(context.Context, *v1.Supers
 
 type factServiceClient struct {
 	client *connect.Client
+}
+
+func (c *factServiceClient) ListFacts(ctx context.Context, req *v1.ListFactsRequest) (*v1.ListFactsResponse, error) {
+	var res v1.ListFactsResponse
+	if err := c.client.CallUnary(ctx, factServiceListFactsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *factServiceClient) GetFactHistory(ctx context.Context, req *v1.GetFactHistoryRequest) (*v1.GetFactHistoryResponse, error) {
+	var res v1.GetFactHistoryResponse
+	if err := c.client.CallUnary(ctx, factServiceGetFactHistorySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func (c *factServiceClient) GetFact(ctx context.Context, req *v1.GetFactRequest) (*v1.GetFactResponse, error) {
@@ -274,6 +322,30 @@ func (c *factServiceClient) SupersedeFact(ctx context.Context, req *v1.Supersede
 }
 
 type factServiceHandler struct{ svc FactServiceHandler }
+
+func (h factServiceHandler) listFacts(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListFactsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListFacts(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h factServiceHandler) getFactHistory(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetFactHistoryRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetFactHistory(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
 
 func (h factServiceHandler) getFact(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.GetFactRequest

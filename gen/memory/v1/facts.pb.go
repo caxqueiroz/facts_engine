@@ -1279,6 +1279,343 @@ func (x *SupersedeFactResponse) GetResult() *CommitResult {
 	return nil
 }
 
+// Tokens are opaque and bound by the engine to identity, filters and revision.
+type ListFactsRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Tenant            string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Scope             string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	Subject           string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	Predicate         string                 `protobuf:"bytes,4,opt,name=predicate,proto3" json:"predicate,omitempty"`
+	Purpose           string                 `protobuf:"bytes,5,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	ValidAt           *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=valid_at,json=validAt,proto3" json:"valid_at,omitempty"`
+	KnowledgeRevision int64                  `protobuf:"varint,7,opt,name=knowledge_revision,json=knowledgeRevision,proto3" json:"knowledge_revision,omitempty"`
+	KnownAt           *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=known_at,json=knownAt,proto3" json:"known_at,omitempty"`
+	Limit             int32                  `protobuf:"varint,9,opt,name=limit,proto3" json:"limit,omitempty"`
+	PageToken         string                 `protobuf:"bytes,10,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListFactsRequest) Reset() {
+	*x = ListFactsRequest{}
+	mi := &file_memory_v1_facts_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFactsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFactsRequest) ProtoMessage() {}
+
+func (x *ListFactsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_facts_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFactsRequest.ProtoReflect.Descriptor instead.
+func (*ListFactsRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_facts_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListFactsRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *ListFactsRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *ListFactsRequest) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *ListFactsRequest) GetPredicate() string {
+	if x != nil {
+		return x.Predicate
+	}
+	return ""
+}
+
+func (x *ListFactsRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *ListFactsRequest) GetValidAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ValidAt
+	}
+	return nil
+}
+
+func (x *ListFactsRequest) GetKnowledgeRevision() int64 {
+	if x != nil {
+		return x.KnowledgeRevision
+	}
+	return 0
+}
+
+func (x *ListFactsRequest) GetKnownAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.KnownAt
+	}
+	return nil
+}
+
+func (x *ListFactsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListFactsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListFactsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Items          []*SnapshotItem        `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	LedgerRevision int64                  `protobuf:"varint,2,opt,name=ledger_revision,json=ledgerRevision,proto3" json:"ledger_revision,omitempty"`
+	EvaluatedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=evaluated_at,json=evaluatedAt,proto3" json:"evaluated_at,omitempty"`
+	NextPageToken  string                 `protobuf:"bytes,4,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListFactsResponse) Reset() {
+	*x = ListFactsResponse{}
+	mi := &file_memory_v1_facts_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFactsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFactsResponse) ProtoMessage() {}
+
+func (x *ListFactsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_facts_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFactsResponse.ProtoReflect.Descriptor instead.
+func (*ListFactsResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_facts_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListFactsResponse) GetItems() []*SnapshotItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListFactsResponse) GetLedgerRevision() int64 {
+	if x != nil {
+		return x.LedgerRevision
+	}
+	return 0
+}
+
+func (x *ListFactsResponse) GetEvaluatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EvaluatedAt
+	}
+	return nil
+}
+
+func (x *ListFactsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type GetFactHistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Scope         string                 `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	RecordId      string                 `protobuf:"bytes,3,opt,name=record_id,json=recordId,proto3" json:"record_id,omitempty"`
+	Purpose       string                 `protobuf:"bytes,4,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	PageToken     string                 `protobuf:"bytes,6,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFactHistoryRequest) Reset() {
+	*x = GetFactHistoryRequest{}
+	mi := &file_memory_v1_facts_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFactHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFactHistoryRequest) ProtoMessage() {}
+
+func (x *GetFactHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_facts_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFactHistoryRequest.ProtoReflect.Descriptor instead.
+func (*GetFactHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_facts_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetFactHistoryRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *GetFactHistoryRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *GetFactHistoryRequest) GetRecordId() string {
+	if x != nil {
+		return x.RecordId
+	}
+	return ""
+}
+
+func (x *GetFactHistoryRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *GetFactHistoryRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetFactHistoryRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type GetFactHistoryResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Events         []*Event               `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	LedgerRevision int64                  `protobuf:"varint,2,opt,name=ledger_revision,json=ledgerRevision,proto3" json:"ledger_revision,omitempty"`
+	StreamRevision int64                  `protobuf:"varint,3,opt,name=stream_revision,json=streamRevision,proto3" json:"stream_revision,omitempty"`
+	NextPageToken  string                 `protobuf:"bytes,4,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetFactHistoryResponse) Reset() {
+	*x = GetFactHistoryResponse{}
+	mi := &file_memory_v1_facts_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFactHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFactHistoryResponse) ProtoMessage() {}
+
+func (x *GetFactHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_facts_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFactHistoryResponse.ProtoReflect.Descriptor instead.
+func (*GetFactHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_facts_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetFactHistoryResponse) GetEvents() []*Event {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *GetFactHistoryResponse) GetLedgerRevision() int64 {
+	if x != nil {
+		return x.LedgerRevision
+	}
+	return 0
+}
+
+func (x *GetFactHistoryResponse) GetStreamRevision() int64 {
+	if x != nil {
+		return x.StreamRevision
+	}
+	return 0
+}
+
+func (x *GetFactHistoryResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_memory_v1_facts_proto protoreflect.FileDescriptor
 
 const file_memory_v1_facts_proto_rawDesc = "" +
@@ -1388,8 +1725,44 @@ const file_memory_v1_facts_proto_rawDesc = "" +
 	"\tautomated\x18\n" +
 	" \x01(\bR\tautomated\"H\n" +
 	"\x15SupersedeFactResponse\x12/\n" +
-	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result2\xc8\x05\n" +
-	"\vFactService\x12@\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xe0\x05\n" +
+	"\x10ListFactsRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x12?\n" +
+	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12F\n" +
+	"\asubject\x18\x03 \x01(\tB,\xbaH)r'2%^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$R\asubject\x12J\n" +
+	"\tpredicate\x18\x04 \x01(\tB,\xbaH)r'2%^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$R\tpredicate\x12$\n" +
+	"\apurpose\x18\x05 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\x02R\apurpose\x12=\n" +
+	"\bvalid_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\avalidAt\x126\n" +
+	"\x12knowledge_revision\x18\a \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x11knowledgeRevision\x125\n" +
+	"\bknown_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\aknownAt\x12\x1f\n" +
+	"\x05limit\x18\t \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12'\n" +
+	"\n" +
+	"page_token\x18\n" +
+	" \x01(\tB\b\xbaH\x05r\x03(\x80 R\tpageToken:\x95\x01\xbaH\x91\x01\x1a\x8e\x01\n" +
+	"\x1dlist_facts.knowledge_boundary\x128known_at and knowledge_revision cannot both be specified\x1a3!has(this.known_at) || this.knowledge_revision == 0\"\xd2\x01\n" +
+	"\x11ListFactsResponse\x12-\n" +
+	"\x05items\x18\x01 \x03(\v2\x17.memory.v1.SnapshotItemR\x05items\x12'\n" +
+	"\x0fledger_revision\x18\x02 \x01(\x03R\x0eledgerRevision\x12=\n" +
+	"\fevaluated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vevaluatedAt\x12&\n" +
+	"\x0fnext_page_token\x18\x04 \x01(\tR\rnextPageToken\"\xd3\x02\n" +
+	"\x15GetFactHistoryRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x12?\n" +
+	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12F\n" +
+	"\trecord_id\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\brecordId\x12$\n" +
+	"\apurpose\x18\x04 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\x02R\apurpose\x12\x1f\n" +
+	"\x05limit\x18\x05 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12'\n" +
+	"\n" +
+	"page_token\x18\x06 \x01(\tB\b\xbaH\x05r\x03(\x80 R\tpageToken\"\xbc\x01\n" +
+	"\x16GetFactHistoryResponse\x12(\n" +
+	"\x06events\x18\x01 \x03(\v2\x10.memory.v1.EventR\x06events\x12'\n" +
+	"\x0fledger_revision\x18\x02 \x01(\x03R\x0eledgerRevision\x12'\n" +
+	"\x0fstream_revision\x18\x03 \x01(\x03R\x0estreamRevision\x12&\n" +
+	"\x0fnext_page_token\x18\x04 \x01(\tR\rnextPageToken2\xe7\x06\n" +
+	"\vFactService\x12F\n" +
+	"\tListFacts\x12\x1b.memory.v1.ListFactsRequest\x1a\x1c.memory.v1.ListFactsResponse\x12U\n" +
+	"\x0eGetFactHistory\x12 .memory.v1.GetFactHistoryRequest\x1a!.memory.v1.GetFactHistoryResponse\x12@\n" +
 	"\aGetFact\x12\x19.memory.v1.GetFactRequest\x1a\x1a.memory.v1.GetFactResponse\x12L\n" +
 	"\vProposeFact\x12\x1d.memory.v1.ProposeFactRequest\x1a\x1e.memory.v1.ProposeFactResponse\x12L\n" +
 	"\vApproveFact\x12\x1d.memory.v1.ApproveFactRequest\x1a\x1e.memory.v1.ApproveFactResponse\x12I\n" +
@@ -1414,7 +1787,7 @@ func file_memory_v1_facts_proto_rawDescGZIP() []byte {
 	return file_memory_v1_facts_proto_rawDescData
 }
 
-var file_memory_v1_facts_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_memory_v1_facts_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_memory_v1_facts_proto_goTypes = []any{
 	(*GetFactRequest)(nil),         // 0: memory.v1.GetFactRequest
 	(*GetFactResponse)(nil),        // 1: memory.v1.GetFactResponse
@@ -1434,67 +1807,82 @@ var file_memory_v1_facts_proto_goTypes = []any{
 	(*ResolveDisputeResponse)(nil), // 15: memory.v1.ResolveDisputeResponse
 	(*SupersedeFactRequest)(nil),   // 16: memory.v1.SupersedeFactRequest
 	(*SupersedeFactResponse)(nil),  // 17: memory.v1.SupersedeFactResponse
-	(*FactKey)(nil),                // 18: memory.v1.FactKey
-	(*timestamppb.Timestamp)(nil),  // 19: google.protobuf.Timestamp
-	(*FactResult)(nil),             // 20: memory.v1.FactResult
-	(*Command)(nil),                // 21: memory.v1.Command
-	(*Value)(nil),                  // 22: memory.v1.Value
-	(*Interval)(nil),               // 23: memory.v1.Interval
-	(*SourceSpan)(nil),             // 24: memory.v1.SourceSpan
-	(*CommitResult)(nil),           // 25: memory.v1.CommitResult
+	(*ListFactsRequest)(nil),       // 18: memory.v1.ListFactsRequest
+	(*ListFactsResponse)(nil),      // 19: memory.v1.ListFactsResponse
+	(*GetFactHistoryRequest)(nil),  // 20: memory.v1.GetFactHistoryRequest
+	(*GetFactHistoryResponse)(nil), // 21: memory.v1.GetFactHistoryResponse
+	(*FactKey)(nil),                // 22: memory.v1.FactKey
+	(*timestamppb.Timestamp)(nil),  // 23: google.protobuf.Timestamp
+	(*FactResult)(nil),             // 24: memory.v1.FactResult
+	(*Command)(nil),                // 25: memory.v1.Command
+	(*Value)(nil),                  // 26: memory.v1.Value
+	(*Interval)(nil),               // 27: memory.v1.Interval
+	(*SourceSpan)(nil),             // 28: memory.v1.SourceSpan
+	(*CommitResult)(nil),           // 29: memory.v1.CommitResult
+	(*SnapshotItem)(nil),           // 30: memory.v1.SnapshotItem
+	(*Event)(nil),                  // 31: memory.v1.Event
 }
 var file_memory_v1_facts_proto_depIdxs = []int32{
-	18, // 0: memory.v1.GetFactRequest.key:type_name -> memory.v1.FactKey
-	19, // 1: memory.v1.GetFactRequest.valid_at:type_name -> google.protobuf.Timestamp
-	19, // 2: memory.v1.GetFactRequest.known_at:type_name -> google.protobuf.Timestamp
-	20, // 3: memory.v1.GetFactResponse.result:type_name -> memory.v1.FactResult
-	21, // 4: memory.v1.ProposeFactRequest.command:type_name -> memory.v1.Command
-	18, // 5: memory.v1.ProposeFactRequest.key:type_name -> memory.v1.FactKey
-	22, // 6: memory.v1.ProposeFactRequest.value:type_name -> memory.v1.Value
-	23, // 7: memory.v1.ProposeFactRequest.valid:type_name -> memory.v1.Interval
-	24, // 8: memory.v1.ProposeFactRequest.sources:type_name -> memory.v1.SourceSpan
-	25, // 9: memory.v1.ProposeFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 10: memory.v1.ApproveFactRequest.command:type_name -> memory.v1.Command
-	25, // 11: memory.v1.ApproveFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 12: memory.v1.AcceptFactRequest.command:type_name -> memory.v1.Command
-	25, // 13: memory.v1.AcceptFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 14: memory.v1.RejectFactRequest.command:type_name -> memory.v1.Command
-	25, // 15: memory.v1.RejectFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 16: memory.v1.RetractFactRequest.command:type_name -> memory.v1.Command
-	23, // 17: memory.v1.RetractFactRequest.valid:type_name -> memory.v1.Interval
-	25, // 18: memory.v1.RetractFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 19: memory.v1.DisputeFactRequest.command:type_name -> memory.v1.Command
-	23, // 20: memory.v1.DisputeFactRequest.valid:type_name -> memory.v1.Interval
-	25, // 21: memory.v1.DisputeFactResponse.result:type_name -> memory.v1.CommitResult
-	21, // 22: memory.v1.ResolveDisputeRequest.command:type_name -> memory.v1.Command
-	23, // 23: memory.v1.ResolveDisputeRequest.valid:type_name -> memory.v1.Interval
-	25, // 24: memory.v1.ResolveDisputeResponse.result:type_name -> memory.v1.CommitResult
-	21, // 25: memory.v1.SupersedeFactRequest.command:type_name -> memory.v1.Command
-	23, // 26: memory.v1.SupersedeFactRequest.valid:type_name -> memory.v1.Interval
-	25, // 27: memory.v1.SupersedeFactResponse.result:type_name -> memory.v1.CommitResult
-	0,  // 28: memory.v1.FactService.GetFact:input_type -> memory.v1.GetFactRequest
-	2,  // 29: memory.v1.FactService.ProposeFact:input_type -> memory.v1.ProposeFactRequest
-	4,  // 30: memory.v1.FactService.ApproveFact:input_type -> memory.v1.ApproveFactRequest
-	6,  // 31: memory.v1.FactService.AcceptFact:input_type -> memory.v1.AcceptFactRequest
-	8,  // 32: memory.v1.FactService.RejectFact:input_type -> memory.v1.RejectFactRequest
-	10, // 33: memory.v1.FactService.RetractFact:input_type -> memory.v1.RetractFactRequest
-	12, // 34: memory.v1.FactService.DisputeFact:input_type -> memory.v1.DisputeFactRequest
-	14, // 35: memory.v1.FactService.ResolveDispute:input_type -> memory.v1.ResolveDisputeRequest
-	16, // 36: memory.v1.FactService.SupersedeFact:input_type -> memory.v1.SupersedeFactRequest
-	1,  // 37: memory.v1.FactService.GetFact:output_type -> memory.v1.GetFactResponse
-	3,  // 38: memory.v1.FactService.ProposeFact:output_type -> memory.v1.ProposeFactResponse
-	5,  // 39: memory.v1.FactService.ApproveFact:output_type -> memory.v1.ApproveFactResponse
-	7,  // 40: memory.v1.FactService.AcceptFact:output_type -> memory.v1.AcceptFactResponse
-	9,  // 41: memory.v1.FactService.RejectFact:output_type -> memory.v1.RejectFactResponse
-	11, // 42: memory.v1.FactService.RetractFact:output_type -> memory.v1.RetractFactResponse
-	13, // 43: memory.v1.FactService.DisputeFact:output_type -> memory.v1.DisputeFactResponse
-	15, // 44: memory.v1.FactService.ResolveDispute:output_type -> memory.v1.ResolveDisputeResponse
-	17, // 45: memory.v1.FactService.SupersedeFact:output_type -> memory.v1.SupersedeFactResponse
-	37, // [37:46] is the sub-list for method output_type
-	28, // [28:37] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	22, // 0: memory.v1.GetFactRequest.key:type_name -> memory.v1.FactKey
+	23, // 1: memory.v1.GetFactRequest.valid_at:type_name -> google.protobuf.Timestamp
+	23, // 2: memory.v1.GetFactRequest.known_at:type_name -> google.protobuf.Timestamp
+	24, // 3: memory.v1.GetFactResponse.result:type_name -> memory.v1.FactResult
+	25, // 4: memory.v1.ProposeFactRequest.command:type_name -> memory.v1.Command
+	22, // 5: memory.v1.ProposeFactRequest.key:type_name -> memory.v1.FactKey
+	26, // 6: memory.v1.ProposeFactRequest.value:type_name -> memory.v1.Value
+	27, // 7: memory.v1.ProposeFactRequest.valid:type_name -> memory.v1.Interval
+	28, // 8: memory.v1.ProposeFactRequest.sources:type_name -> memory.v1.SourceSpan
+	29, // 9: memory.v1.ProposeFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 10: memory.v1.ApproveFactRequest.command:type_name -> memory.v1.Command
+	29, // 11: memory.v1.ApproveFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 12: memory.v1.AcceptFactRequest.command:type_name -> memory.v1.Command
+	29, // 13: memory.v1.AcceptFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 14: memory.v1.RejectFactRequest.command:type_name -> memory.v1.Command
+	29, // 15: memory.v1.RejectFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 16: memory.v1.RetractFactRequest.command:type_name -> memory.v1.Command
+	27, // 17: memory.v1.RetractFactRequest.valid:type_name -> memory.v1.Interval
+	29, // 18: memory.v1.RetractFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 19: memory.v1.DisputeFactRequest.command:type_name -> memory.v1.Command
+	27, // 20: memory.v1.DisputeFactRequest.valid:type_name -> memory.v1.Interval
+	29, // 21: memory.v1.DisputeFactResponse.result:type_name -> memory.v1.CommitResult
+	25, // 22: memory.v1.ResolveDisputeRequest.command:type_name -> memory.v1.Command
+	27, // 23: memory.v1.ResolveDisputeRequest.valid:type_name -> memory.v1.Interval
+	29, // 24: memory.v1.ResolveDisputeResponse.result:type_name -> memory.v1.CommitResult
+	25, // 25: memory.v1.SupersedeFactRequest.command:type_name -> memory.v1.Command
+	27, // 26: memory.v1.SupersedeFactRequest.valid:type_name -> memory.v1.Interval
+	29, // 27: memory.v1.SupersedeFactResponse.result:type_name -> memory.v1.CommitResult
+	23, // 28: memory.v1.ListFactsRequest.valid_at:type_name -> google.protobuf.Timestamp
+	23, // 29: memory.v1.ListFactsRequest.known_at:type_name -> google.protobuf.Timestamp
+	30, // 30: memory.v1.ListFactsResponse.items:type_name -> memory.v1.SnapshotItem
+	23, // 31: memory.v1.ListFactsResponse.evaluated_at:type_name -> google.protobuf.Timestamp
+	31, // 32: memory.v1.GetFactHistoryResponse.events:type_name -> memory.v1.Event
+	18, // 33: memory.v1.FactService.ListFacts:input_type -> memory.v1.ListFactsRequest
+	20, // 34: memory.v1.FactService.GetFactHistory:input_type -> memory.v1.GetFactHistoryRequest
+	0,  // 35: memory.v1.FactService.GetFact:input_type -> memory.v1.GetFactRequest
+	2,  // 36: memory.v1.FactService.ProposeFact:input_type -> memory.v1.ProposeFactRequest
+	4,  // 37: memory.v1.FactService.ApproveFact:input_type -> memory.v1.ApproveFactRequest
+	6,  // 38: memory.v1.FactService.AcceptFact:input_type -> memory.v1.AcceptFactRequest
+	8,  // 39: memory.v1.FactService.RejectFact:input_type -> memory.v1.RejectFactRequest
+	10, // 40: memory.v1.FactService.RetractFact:input_type -> memory.v1.RetractFactRequest
+	12, // 41: memory.v1.FactService.DisputeFact:input_type -> memory.v1.DisputeFactRequest
+	14, // 42: memory.v1.FactService.ResolveDispute:input_type -> memory.v1.ResolveDisputeRequest
+	16, // 43: memory.v1.FactService.SupersedeFact:input_type -> memory.v1.SupersedeFactRequest
+	19, // 44: memory.v1.FactService.ListFacts:output_type -> memory.v1.ListFactsResponse
+	21, // 45: memory.v1.FactService.GetFactHistory:output_type -> memory.v1.GetFactHistoryResponse
+	1,  // 46: memory.v1.FactService.GetFact:output_type -> memory.v1.GetFactResponse
+	3,  // 47: memory.v1.FactService.ProposeFact:output_type -> memory.v1.ProposeFactResponse
+	5,  // 48: memory.v1.FactService.ApproveFact:output_type -> memory.v1.ApproveFactResponse
+	7,  // 49: memory.v1.FactService.AcceptFact:output_type -> memory.v1.AcceptFactResponse
+	9,  // 50: memory.v1.FactService.RejectFact:output_type -> memory.v1.RejectFactResponse
+	11, // 51: memory.v1.FactService.RetractFact:output_type -> memory.v1.RetractFactResponse
+	13, // 52: memory.v1.FactService.DisputeFact:output_type -> memory.v1.DisputeFactResponse
+	15, // 53: memory.v1.FactService.ResolveDispute:output_type -> memory.v1.ResolveDisputeResponse
+	17, // 54: memory.v1.FactService.SupersedeFact:output_type -> memory.v1.SupersedeFactResponse
+	44, // [44:55] is the sub-list for method output_type
+	33, // [33:44] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_facts_proto_init() }
@@ -1509,7 +1897,7 @@ func file_memory_v1_facts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_facts_proto_rawDesc), len(file_memory_v1_facts_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

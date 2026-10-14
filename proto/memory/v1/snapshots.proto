@@ -1,0 +1,51 @@
+syntax = "proto3";
+package memory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "memory/v1/common.proto";
+
+option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
+
+service SnapshotService {
+  rpc CreateFactSnapshot(CreateFactSnapshotRequest) returns (CreateFactSnapshotResponse);
+  rpc GetFactSnapshot(GetFactSnapshotRequest) returns (GetFactSnapshotResponse);
+}
+message CreateFactSnapshotRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  repeated FactKey selectors = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  google.protobuf.Timestamp valid_at = 4 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 5 [(buf.validate.field).int64.gte = 0];
+}
+message CreateFactSnapshotResponse {
+  FactSnapshot snapshot = 1;
+}
+message GetFactSnapshotRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 3 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+}
+message GetFactSnapshotResponse {
+  FactSnapshot snapshot = 1;
+}
+message FactSnapshot {
+  string id = 1;
+  string tenant = 2;
+  Caller caller = 3;
+  string purpose = 4;
+  google.protobuf.Timestamp valid_at = 5;
+  google.protobuf.Timestamp evaluated_at = 6;
+  int64 selection_revision = 7;
+  int64 creation_revision = 8;
+  repeated SnapshotItem items = 9;
+  string canonical_version = 10;
+  string digest = 11;
+  repeated AuthorizationDecision authorization = 12;
+}

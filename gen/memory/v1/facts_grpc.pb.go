@@ -19,6 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	FactService_ListFacts_FullMethodName      = "/memory.v1.FactService/ListFacts"
+	FactService_GetFactHistory_FullMethodName = "/memory.v1.FactService/GetFactHistory"
 	FactService_GetFact_FullMethodName        = "/memory.v1.FactService/GetFact"
 	FactService_ProposeFact_FullMethodName    = "/memory.v1.FactService/ProposeFact"
 	FactService_ApproveFact_FullMethodName    = "/memory.v1.FactService/ApproveFact"
@@ -36,6 +38,8 @@ const (
 //
 // Identity comes from the authenticated transport, never from request actor fields.
 type FactServiceClient interface {
+	ListFacts(ctx context.Context, in *ListFactsRequest, opts ...grpc.CallOption) (*ListFactsResponse, error)
+	GetFactHistory(ctx context.Context, in *GetFactHistoryRequest, opts ...grpc.CallOption) (*GetFactHistoryResponse, error)
 	GetFact(ctx context.Context, in *GetFactRequest, opts ...grpc.CallOption) (*GetFactResponse, error)
 	ProposeFact(ctx context.Context, in *ProposeFactRequest, opts ...grpc.CallOption) (*ProposeFactResponse, error)
 	ApproveFact(ctx context.Context, in *ApproveFactRequest, opts ...grpc.CallOption) (*ApproveFactResponse, error)
@@ -53,6 +57,26 @@ type factServiceClient struct {
 
 func NewFactServiceClient(cc grpc.ClientConnInterface) FactServiceClient {
 	return &factServiceClient{cc}
+}
+
+func (c *factServiceClient) ListFacts(ctx context.Context, in *ListFactsRequest, opts ...grpc.CallOption) (*ListFactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFactsResponse)
+	err := c.cc.Invoke(ctx, FactService_ListFacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *factServiceClient) GetFactHistory(ctx context.Context, in *GetFactHistoryRequest, opts ...grpc.CallOption) (*GetFactHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFactHistoryResponse)
+	err := c.cc.Invoke(ctx, FactService_GetFactHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *factServiceClient) GetFact(ctx context.Context, in *GetFactRequest, opts ...grpc.CallOption) (*GetFactResponse, error) {
@@ -151,6 +175,8 @@ func (c *factServiceClient) SupersedeFact(ctx context.Context, in *SupersedeFact
 //
 // Identity comes from the authenticated transport, never from request actor fields.
 type FactServiceServer interface {
+	ListFacts(context.Context, *ListFactsRequest) (*ListFactsResponse, error)
+	GetFactHistory(context.Context, *GetFactHistoryRequest) (*GetFactHistoryResponse, error)
 	GetFact(context.Context, *GetFactRequest) (*GetFactResponse, error)
 	ProposeFact(context.Context, *ProposeFactRequest) (*ProposeFactResponse, error)
 	ApproveFact(context.Context, *ApproveFactRequest) (*ApproveFactResponse, error)
@@ -170,6 +196,12 @@ type FactServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedFactServiceServer struct{}
 
+func (UnimplementedFactServiceServer) ListFacts(context.Context, *ListFactsRequest) (*ListFactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFacts not implemented")
+}
+func (UnimplementedFactServiceServer) GetFactHistory(context.Context, *GetFactHistoryRequest) (*GetFactHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFactHistory not implemented")
+}
 func (UnimplementedFactServiceServer) GetFact(context.Context, *GetFactRequest) (*GetFactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFact not implemented")
 }
@@ -216,6 +248,42 @@ func RegisterFactServiceServer(s grpc.ServiceRegistrar, srv FactServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&FactService_ServiceDesc, srv)
+}
+
+func _FactService_ListFacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FactServiceServer).ListFacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FactService_ListFacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FactServiceServer).ListFacts(ctx, req.(*ListFactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _FactService_GetFactHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFactHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FactServiceServer).GetFactHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FactService_GetFactHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FactServiceServer).GetFactHistory(ctx, req.(*GetFactHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _FactService_GetFact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -387,6 +455,14 @@ var FactService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "memory.v1.FactService",
 	HandlerType: (*FactServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListFacts",
+			Handler:    _FactService_ListFacts_Handler,
+		},
+		{
+			MethodName: "GetFactHistory",
+			Handler:    _FactService_GetFactHistory_Handler,
+		},
 		{
 			MethodName: "GetFact",
 			Handler:    _FactService_GetFact_Handler,

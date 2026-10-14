@@ -300,6 +300,13 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(success, conflict)
 		}
 	})
+	t.Run("remote fact reads and snapshots", func(t *testing.T) {
+		paged, err := facts.NewWithReads(ledger, allow{}, store, model.ReadOptions{PaginationKey: bytes.Repeat([]byte{9}, 32)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		testRemoteFactReads(t, ctx, paged, reviewer, q.Key, proposal.RecordID, now)
+	})
 	t.Run("current value", func(t *testing.T) {
 		r, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: q.Key, ValidAt: now})
 		if err != nil || r.State != "resolved" || *r.Value.Text != "tea" {

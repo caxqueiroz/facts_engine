@@ -24,7 +24,7 @@ import (
 )
 
 type testEngine struct {
-	FactEngine
+	Engine
 	calls atomic.Int64
 	get   func(context.Context, model.Caller, model.FactQuery) (model.FactResult, error)
 }
@@ -39,7 +39,7 @@ func testLimits() Limits {
 func validQuery() *v1.GetFactRequest {
 	return &v1.GetFactRequest{Tenant: "tenant", Purpose: "review", Key: &v1.FactKey{Scope: "scope", Subject: "subject", Predicate: "predicate"}, ValidAt: timestamppb.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))}
 }
-func startServer(t *testing.T, e FactEngine, verify IdentityVerifier, limits Limits) (*httptest.Server, memoryv1connect.FactServiceClient) {
+func startServer(t *testing.T, e Engine, verify IdentityVerifier, limits Limits) (*httptest.Server, memoryv1connect.FactServiceClient) {
 	t.Helper()
 	handler, err := NewHandler(e, verify, limits)
 	if err != nil {
@@ -202,5 +202,55 @@ func TestAdmissionAndRequestSize(t *testing.T) {
 	}
 	if engine.calls.Load() != 1 {
 		t.Fatal("rejected request entered engine")
+	}
+}
+
+func TestReadRequestValidation(t *testing.T) {
+	engine := &testEngine{}
+	server, client := startServer(t, engine, fixedIdentity, testLimits())
+	snapshots := memoryv1connect.NewSnapshotServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	query := validQuery()
+	list := &v1.ListFactsRequest{Tenant: query.Tenant, Scope: query.Key.Scope, Purpose: query.Purpose, ValidAt: query.ValidAt}
+	for _, limit := range []int32{0, -1, 101} {
+		list.Limit = limit
+		if _, err := client.ListFacts(context.Background(), list); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("list limit %d: %v", limit, err)
+		}
+	}
+	list.Limit = 1
+	list.KnowledgeRevision = 2
+	list.KnownAt = query.ValidAt
+	if _, err := client.ListFacts(context.Background(), list); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("list boundary: %v", err)
+	}
+	history := &v1.GetFactHistoryRequest{Tenant: query.Tenant, Scope: query.Key.Scope, RecordId: "record", Purpose: query.Purpose, Limit: 101}
+	if _, err := client.GetFactHistory(context.Background(), history); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("history limit: %v", err)
+	}
+	history.Limit = 1
+	history.PageToken = strings.Repeat("x", 4097)
+	if _, err := client.GetFactHistory(context.Background(), history); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("history token size: %v", err)
+	}
+	snapshot := &v1.CreateFactSnapshotRequest{Tenant: query.Tenant, Command: &v1.Command{Key: "snapshot", Purpose: query.Purpose}, ValidAt: query.ValidAt}
+	if _, err := snapshots.CreateFactSnapshot(context.Background(), snapshot); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("empty selectors: %v", err)
+	}
+	for range 129 {
+		snapshot.Selectors = append(snapshot.Selectors, query.Key)
+	}
+	if _, err := snapshots.CreateFactSnapshot(context.Background(), snapshot); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("selector count: %v", err)
+	}
+	if _, err := snapshots.GetFactSnapshot(context.Background(), &v1.GetFactSnapshotRequest{Tenant: "other", Id: "snapshot", Purpose: query.Purpose}); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("snapshot tenant: %v", err)
+	}
+}
+
+func TestResponseTimestampRange(t *testing.T) {
+	converter := responseConverter{}
+	converter.snapshot(model.FactSnapshot{EvaluatedAt: time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)})
+	if converter.err == nil || connect.CodeOf(rpcError(converter.err)) != connect.CodeInternal {
+		t.Fatalf("invalid output timestamp: %v", converter.err)
 	}
 }
