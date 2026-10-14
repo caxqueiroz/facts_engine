@@ -138,3 +138,10 @@ type AuditExportRequest = model.AuditExportRequest
 type AuditExportResult = model.AuditExportResult
 type AuditExportQuery = model.AuditExportQuery
 type AuditOptions = model.AuditOptions
+
+func (e *Engine) ListChanges(ctx context.Context, c Caller, q model.ChangesQuery) (model.ChangesResult, error) {
+	return e.service.ListChanges(ctx, c, q)
+}
+
+type ChangesQuery = model.ChangesQuery
+type ChangesResult = model.ChangesResult

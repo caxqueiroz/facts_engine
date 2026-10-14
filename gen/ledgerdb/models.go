@@ -103,6 +103,26 @@ type CommandReceipt struct {
 	Payload    []byte
 }
 
+type ConsumerOffset struct {
+	TenantID             string
+	ConsumerID           string
+	AcknowledgedRevision int64
+	State                string
+	Fence                int64
+	Attempts             int32
+	MaxAttempts          int32
+	LeaseUntil           pgtype.Timestamptz
+	AvailableAt          pgtype.Timestamptz
+	LastFailureCode      string
+}
+
+type ConsumerRetryCommand struct {
+	TenantID    string
+	ConsumerID  string
+	FailedFence int64
+	RecordedAt  pgtype.Timestamptz
+}
+
 type Evidence struct {
 	TenantID       string
 	ID             string

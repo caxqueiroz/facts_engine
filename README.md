@@ -1,6 +1,6 @@
 # Facts engine
 
-An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, and signed audit exports**. The complete v0.2 specification and production banking release remain in progress.
+An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, and durable outbox workers**. The complete v0.2 specification and production banking release remain in progress.
 
 The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. Constructors do not run migrations, start workers/listeners, or change global logging. The host owns the PostgreSQL pools, authentication boundary, encryption keys, OpenFGA provisioning, and shutdown.
 
@@ -17,6 +17,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 - External calculation receipts bind an application/run identity to immutable snapshots, executable/configuration digests, normalization version, and verified input/output evidence. Concurrent retries converge; changed run content conflicts. Reads recheck snapshot and artifact permissions.
 - Durable, leased audit exports with fenced completion, revision-bound scope contents, signed entry manifests, explicit coverage gaps, and trusted-key verification.
 - Bounded authorized record event history, including actor/check receipts, correction intervals, reason codes, and replaced versions. Histories exceeding 1,000 events fail explicitly pending paginated history support.
+- Explicit outbox workers with lease renewal, fencing, bounded retries, jittered backoff, visible failure state, independent contiguous consumer offsets, and scope-authorized change replay.
 - Transactional tenant ordering, stream revisions, bounded transaction retries, command receipts, encrypted ledger events, and atomic outbox insertion. Identical authorized retries return the committed result; changed commands conflict.
 - Tenant-qualified foreign keys, forced row-level security, transaction-local tenant context, and a runtime role without mutation privileges on immutable tables.
 - OpenFGA HTTP adapter with pinned store/model, bounded requests, fresh checks, tenant-qualified identities, and retained authorization receipts.
@@ -99,13 +100,31 @@ Verify a retrieved bundle using `adapters/audit.Verify(bundle, trustedKeys)`, wh
 
 Integration tests cover external-run races and conflicts, preserved snapshot lineage, current authorization, tenant isolation, cross-scope exclusion, signature/content tampering, metadata redaction, live-lease exclusion, stale completion rollback, and expired-lease recovery.
 
+## Outbox delivery and workers
+
+Apply migration `00006_outbox_consumers.sql` and reapply `scripts/runtime-role.sql`. Provision a separate login with membership in `facts_worker` for delivery; it can read events and maintain consumer progress but cannot append or mutate business events. The pool and cipher are host-owned. The worker port is a trusted administrative interface: tenant/consumer configuration and retry commands must never come directly from an unchecked request. The host must authorize operator retries and retain operator identity in its operational audit log.
+
+Every business event has an outbox row committed in the same transaction. Register a stable `(tenant, consumer)` identity with `ledger.RegisterConsumer(ctx, key, maxAttempts)`. Registration is idempotent with the same retry limit; changed configuration conflicts. New consumers start at revision one, including existing history. Use distinct identities for projection, archive, and application notifications.
+
+Compose `workers.NewOutbox(ledger, key, handler, options)` and explicitly call `Run(ctx)` or `ProcessOne(ctx)`. `handler` implements `Handle(context.Context, model.Delivery) error`. Options require a 3-second to 5-minute lease, a polling interval, and minimum/maximum retry backoff. `Run` renews the lease every third of its duration while the handler runs outside database transactions. Handlers must honor cancellation. Cancel and wait for workers before closing their pools. No constructor starts background work, and no service or worker binary is installed by this slice.
+
+Each tenant/consumer has one event in flight. Acknowledgement advances the contiguous offset by exactly one revision, so later events cannot hide an earlier failure. Parallel workers may process different tenant/consumer pairs; simultaneous claims for the same pair use `SKIP LOCKED`. This deliberately favors straightforward ordering over parallelism within a stream. A missing outbox row below the committed tenant revision is an explicit precondition failure.
+
+Delivery is **at least once**. Consumers must atomically deduplicate external effects using `(tenant, event ID)` or use an idempotent destination operation. A lease only fences queue updates; it cannot undo an external write by a worker that lost its lease. Crashes after an external effect but before acknowledgement cause redelivery of that same immutable event.
+
+Handler errors persist a generic failure code and exponential backoff with jitter; sensitive error text is not stored. Claims, including crash recoveries, count toward the configured attempt limit. Exhausted events enter `failed` and block that consumer. Inspect `ConsumerStatus`, then explicitly call `RetryConsumer(ctx, key, failedFence)` after resolving the cause. The retry resets the attempt budget without advancing the offset, increments the fence, and records an immutable retry receipt. Repeating the same retry after response loss is safe. Failed consumers remain idle until retried; database and lease errors return to the host supervisor. Projection progress and archive progress are separate offsets, not proof that an archive destination meets its retention guarantees.
+
+`Engine.ListChanges` provides current-authorized scope replay with `AfterRevision` and a limit of 1–1,000 events. Continue from `NextRevision`; `ThroughRevision` is the tenant boundary observed for that page. Each page checks `can_read_history` and uses one database view. This feed never changes worker offsets. Its revision cursor carries no authorization grant, and separate pages may observe newer commits. Change events retain version IDs, replaced IDs, affected intervals, reasons, and actor metadata where applicable. No external calculation is automatically rerun.
+
+Recovery tests cover competing claimants, expired leases, duplicates after external effects, stale renewal/acknowledgement/failure, retry exhaustion and recovery, missing-event gaps, independent consumers, tenant isolation, restricted worker privileges, scope replay, heartbeat failure, and cancellation.
+
 ## Remaining delivery work
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
 1. Finish foundation contracts: scope/subject administration, complete schema constraints and migration rules, confirmation presentation/response artifacts and delegated identity flows, evidence access endpoints, configurable quotas, richer policy controls, structured revision-conflict details, and full sqlc query coverage.
 2. Extend the temporal slice with the distinct memory lifecycle, derived-memory eligibility, integrity-protected pagination, and known-at timestamp convenience queries. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
-3. Implement leased/fenced workers, outbox delivery/offsets, the pinned CortexDB adapter, per-tenant databases, projection status, rebuilds, and retrieval revalidation. The outbox is persisted but has no consumer yet.
+3. Connect the durable outbox workers to the pinned CortexDB adapter and independent archive storage. Add per-tenant CortexDB databases, projection generation/status, rebuilds, retrieval revalidation, and other job types. The generic delivery machinery is implemented; concrete projection and archive consumers remain.
 4. Add conversation ingestion, extraction adapters, retained provider artifacts, and bank-approved extraction evaluations.
 5. Add context manifests, decision receipts, retention/legal holds, independent archive coverage, and recovery drills. Calculation receipts and signed PostgreSQL audit bundles are implemented.
 6. Add Protobuf/Buf/protovalidate, Connect/gRPC service and worker binaries, gateway identity integration, transport parity tests, injected telemetry, readiness endpoints, CI, and operational packaging.

@@ -12,3 +12,9 @@ GRANT DELETE ON accepted_intervals TO facts_runtime;
 GRANT USAGE ON SEQUENCE accepted_intervals_segment_id_seq TO facts_runtime;
 GRANT SELECT,INSERT ON calculation_receipts,calculation_snapshots,calculation_artifacts,audit_export_requests,audit_export_jobs,audit_exports TO facts_runtime;
 GRANT UPDATE ON audit_export_jobs TO facts_runtime;
+-- Dedicated worker credentials cannot append business events or change facts.
+DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_worker') THEN CREATE ROLE facts_worker NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
+GRANT USAGE ON SCHEMA public TO facts_worker;
+GRANT SELECT ON ledger_events,outbox,tenant_revisions TO facts_worker;
+GRANT SELECT,INSERT,UPDATE ON consumer_offsets TO facts_worker;
+GRANT SELECT,INSERT ON consumer_retry_commands TO facts_worker;
