@@ -393,7 +393,10 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			gaps = append(gaps, model.AuditGap{Kind: "evidence_content", ID: id, Reason: "not_requested"})
 			continue
 		}
-		b, err := s.verify(ctx, c.Tenant, e)
+		b, mismatch, err := s.verifyEvidenceIntegrity(ctx, c.Tenant, e)
+		if mismatch {
+			s.telemetry.ExportIntegrityFailure(ctx, "evidence_content")
+		}
 		if err != nil {
 			gaps = append(gaps, model.AuditGap{Kind: "evidence_content", ID: id, Reason: "unavailable_or_integrity_failure"})
 			continue

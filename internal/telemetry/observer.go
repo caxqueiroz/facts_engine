@@ -18,6 +18,7 @@ import (
 )
 
 type Observer struct {
+	exportIntegrityFailures                                                      metric.Int64Counter
 	recallFiltered                                                               metric.Int64Counter
 	extractionResults, extractionProposals, extractionIssues, extractionRejected metric.Int64Counter
 	tracer                                                                       trace.Tracer
@@ -65,7 +66,11 @@ func New(o model.TelemetryOptions) (*Observer, error) {
 	if err != nil {
 		return nil, model.ErrInvalid
 	}
-	return &Observer{recallFiltered: filtered, tracer: o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count: count, duration: duration, logger: o.Logger, extractionResults: results, extractionProposals: proposals, extractionIssues: issues, extractionRejected: rejected}, nil
+	integrity, err := meter.Int64Counter("facts.export.integrity_failures", metric.WithDescription("Failed export integrity checks"))
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	return &Observer{exportIntegrityFailures: integrity, recallFiltered: filtered, tracer: o.TracerProvider.Tracer("github.com/caxqueiroz/facts_engine"), count: count, duration: duration, logger: o.Logger, extractionResults: results, extractionProposals: proposals, extractionIssues: issues, extractionRejected: rejected}, nil
 }
 
 type Operation struct {

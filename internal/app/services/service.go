@@ -181,14 +181,20 @@ func (s *Service) RegisterPredicateVersion(ctx context.Context, c model.Caller, 
 	})
 }
 func (s *Service) verify(ctx context.Context, tenant string, e model.Evidence) ([]byte, error) {
+	b, _, err := s.verifyEvidenceIntegrity(ctx, tenant, e)
+	return b, err
+}
+
+// The boolean distinguishes a confirmed mismatch from a failed storage read.
+func (s *Service) verifyEvidenceIntegrity(ctx context.Context, tenant string, e model.Evidence) ([]byte, bool, error) {
 	b, err := s.evidence.Read(ctx, tenant, e.Object)
 	if err != nil {
-		return nil, model.ErrPrecondition
+		return nil, false, model.ErrPrecondition
 	}
 	if int64(len(b)) != e.Object.Size || model.BytesDigest(b) != e.Object.Digest {
-		return nil, model.ErrPrecondition
+		return nil, true, model.ErrPrecondition
 	}
-	return b, nil
+	return b, false, nil
 }
 func (s *Service) RegisterEvidence(ctx context.Context, c model.Caller, r model.EvidenceRequest) (model.CommitResult, error) {
 	e := r.Evidence
