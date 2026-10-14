@@ -35,6 +35,7 @@ type scope
     define can_approve: approver and tenant_member
     define can_attest: attestor and tenant_member
     define can_accept: acceptor and tenant_member
+    define can_manage_identities: administrator and tenant_member
     define can_manage_definitions: administrator and tenant_member
     define can_read_history: auditor and tenant_member
     define can_read_evidence_metadata: reader and tenant_member

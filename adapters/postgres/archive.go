@@ -149,6 +149,8 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		queries := []struct{ kind, sql string }{
+			{"scope_identity", `SELECT scope_id||'/'||revision::text,payload FROM scope_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
+			{"subject_identity", `SELECT subject_id||'/'||revision::text,payload FROM subject_versions WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"memory_timeline", `SELECT record_id||'/'||ordinal::text,payload FROM memory_timeline_history WHERE tenant_id=$1 AND ledger_revision=$2 ORDER BY record_id,ordinal`},
 			{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND ledger_revision=$2`},
 			{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND ledger_revision=$2`},

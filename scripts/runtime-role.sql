@@ -83,3 +83,8 @@ GRANT SELECT ON extraction_refresh_triggers TO facts_archiver;
 
 GRANT SELECT,INSERT ON extraction_memory_targets,extraction_memory_dependencies TO facts_runtime;
 GRANT SELECT ON extraction_memory_targets,extraction_memory_dependencies TO facts_archiver;
+
+GRANT SELECT,INSERT ON scopes,subjects,scope_versions,subject_versions TO facts_runtime;
+GRANT UPDATE(current_revision) ON scopes,subjects TO facts_runtime;
+GRANT SELECT,INSERT,DELETE ON subject_lookup TO facts_runtime;
+GRANT SELECT ON scopes,subjects,scope_versions,subject_versions,subject_lookup TO facts_archiver;

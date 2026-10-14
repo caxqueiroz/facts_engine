@@ -30,7 +30,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT to_regclass('public.command_receipts') IS NOT NULL AND to_regclass('public.audit_exports') IS NOT NULL AND to_regclass('public.consumer_offsets') IS NOT NULL AND to_regclass('public.active_projections') IS NOT NULL AND to_regclass('public.decision_receipts') IS NOT NULL AND to_regclass('public.retention_events') IS NOT NULL AND to_regclass('public.conversations') IS NOT NULL AND to_regclass('public.extraction_jobs') IS NOT NULL AND to_regclass('public.extraction_attempts') IS NOT NULL AND to_regclass('public.predicate_migrations') IS NOT NULL AND to_regclass('public.memory_versions') IS NOT NULL AND to_regclass('public.memory_timeline_history') IS NOT NULL AND to_regclass('public.memory_attestations') IS NOT NULL AND to_regclass('public.context_memory_items') IS NOT NULL AND to_regclass('public.decision_memory_items') IS NOT NULL AND to_regclass('public.extraction_memory_proposals') IS NOT NULL AND to_regclass('public.extraction_refresh_triggers') IS NOT NULL AND to_regclass('public.extraction_memory_targets') IS NOT NULL AND to_regclass('public.extraction_memory_dependencies') IS NOT NULL AND to_regclass('public.subject_lookup') IS NOT NULL AND to_regclass('public.scope_versions') IS NOT NULL AND to_regclass('public.subject_versions') IS NOT NULL`).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
@@ -40,6 +40,8 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error
 }
 
 type transaction struct {
+	pendingScope             *model.ScopeVersion
+	pendingSubject           *model.SubjectVersion
 	pendingMemoryAttestation *model.Attestation
 	pendingMemoryWithdrawal  string
 	pendingMemoryRecord      string
@@ -397,6 +399,9 @@ func (t *transaction) Append(ctx context.Context, e model.Event) (model.Event, e
 	}
 	err = t.tx.QueryRow(ctx, `INSERT INTO ledger_events(tenant_id,id,ledger_revision,event_type,scope_id,payload) VALUES($1,$2,$3,$4,$5,$6) RETURNING recorded_at`, t.tenant, e.ID, e.LedgerRevision, e.Type, e.Scope, b).Scan(&e.RecordedAt)
 	if err != nil {
+		return e, err
+	}
+	if err = t.flushIdentities(ctx, e); err != nil {
 		return e, err
 	}
 	if err = t.flushMemoryLifecycle(ctx, e); err != nil {

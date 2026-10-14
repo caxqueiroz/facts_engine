@@ -27,6 +27,8 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 		return nil
 	}
 	queries := []struct{ kind, query string }{
+		{"scope_identity", `SELECT scope_id||'/'||revision::text,payload FROM scope_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY revision`},
+		{"subject_identity", `SELECT subject_id||'/'||revision::text,payload FROM subject_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
 		{"memory_timeline", `SELECT h.record_id||'/'||h.ledger_revision::text||'/'||h.ordinal::text,h.payload FROM memory_timeline_history h JOIN records r ON r.tenant_id=h.tenant_id AND r.id=h.record_id WHERE h.tenant_id=$1 AND r.scope_id=$2 ORDER BY h.ledger_revision,h.record_id,h.ordinal`},
 		{"memory_type", `SELECT subtype||'/'||version,payload FROM memory_types WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},
 		{"memory_version", `SELECT id,payload FROM memory_versions WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision`},

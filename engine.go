@@ -344,3 +344,20 @@ func (e *Engine) ScanMemoryRefresh(ctx context.Context, c Caller, q model.Memory
 func (e *Engine) StartMemoryRefreshSweep(ctx context.Context, c Caller, r model.MemoryRefreshSweepRequest) (model.CommitResult, error) {
 	return e.service.StartMemoryRefreshSweep(ctx, c, r)
 }
+
+// PutScope creates or revises governed scope metadata. OpenFGA provisioning is host-owned.
+func (e *Engine) PutScope(ctx context.Context, c Caller, r model.ScopeRequest) (CommitResult, error) {
+	return e.service.PutScope(ctx, c, r)
+}
+func (e *Engine) PutSubject(ctx context.Context, c Caller, r model.SubjectRequest) (CommitResult, error) {
+	return e.service.PutSubject(ctx, c, r)
+}
+func (e *Engine) GetScope(ctx context.Context, c Caller, q model.IdentityQuery) (model.ScopeVersion, error) {
+	return e.service.GetScope(ctx, c, q)
+}
+func (e *Engine) GetSubject(ctx context.Context, c Caller, q model.IdentityQuery) (model.SubjectVersion, error) {
+	return e.service.GetSubject(ctx, c, q)
+}
+func (e *Engine) LookupSubject(ctx context.Context, c Caller, q model.SubjectLookupQuery) (model.SubjectVersion, error) {
+	return e.service.LookupSubject(ctx, c, q)
+}

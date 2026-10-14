@@ -6,6 +6,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 
 ## Implemented
 
+- Governed scope/subject metadata with immutable revision history, exact qualified subject lookup, administrator authorization and audit/archive coverage. Registry enforcement across existing fact/ingestion write paths remains unfinished.
 - Typed text, boolean, integer, canonical decimal, date, instant, entity-reference, and explicit unknown values.
 - Immutable policy and predicate versions; administrative publication activates a predicate version. New proposals and approvals cannot choose an obsolete schema to bypass the active policy. Existing acceptances retain their recorded policy.
 - Encrypted development evidence objects with immutable revisions, digest verification, tenant isolation, source-revision integrity conflicts, and exact UTF-8 byte-span validation.
@@ -170,7 +171,7 @@ Retain the archive head object reference and expected revision independently, th
 
 Follow the slices in [spec.md](spec.md). The current API is intentionally incomplete and may change before v1:
 
-1. Finish foundation contracts: scope/subject administration, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
+1. Finish foundation contracts: scope/subject registry enforcement and migration of existing identities, confirmation presentation/response artifacts and delegated identity flows, configurable quotas, richer policy controls, and full sqlc query coverage. Fact mutations now return structured revision-conflict details, and registered predicates enforce typed value constraints, temporal precision and explicit migration rules.
 2. Complete extraction input chunking and redaction policies. Conversation memory candidate extraction is implemented. Durable refresh jobs, automatic scheduling from fact-change events and periodic expiry sweeps are implemented. Ledger-revalidated memory recall, mixed contexts and memory decision references are implemented. Paginated memory lifecycle history is implemented. Version-bound memory attestations and withdrawal are implemented. Memory acceptance, temporal lifecycle and synchronous dependency eligibility are implemented. Distinct memory identities, subtype definitions, immutable proposals, dependency provenance and authorized version reads are implemented. Fact listing now has integrity-protected pagination and known-at timestamp convenience reads. Fact lifecycle, revision-bound reads, and immutable fact snapshots are implemented.
 3. Add scalable/paginated rebuild verification, workload tuning, and other job types. Deadline-bounded projection waits and generation-bound recall are implemented. Managed rebuilds with exhaustive canonical-content verification and controlled cutover, CortexDB projection, ledger-validated recall, coverage reporting, and signed event archive consumers are implemented.
 4. Integrate an approved production extraction provider and bank-approved evaluations. Durable fact and memory extraction jobs, retained model artifacts and immutable conversation ingestion are implemented. Extraction delivery uses an explicit outbox handler; process supervision remains host-owned.
@@ -622,3 +623,41 @@ Valid candidates atomically create immutable **unaccepted** memory proposals lin
 The requester and worker need the usual extraction/proposal/evidence permissions, plus current read/history/evidence access across the memory and dependency scopes. Retained artifacts preserve those content scopes for later reads, scoped audit filtering and archive authorization. Fact and memory jobs share the existing durable queue, profile pinning, byte/candidate/token budgets, retries, leases and fencing. Use the same extraction worker and inspection APIs; the job kind is `memory_extraction`. Input chunk planning, configurable redaction and approved production model evaluations remain unfinished.
 
 Tests cover source and identity rejection, immutable dependency binding, two proposals committed in one run, duplicate and overlap links, proposals remaining unaccepted, separation of proposer/approver, schema changes, retained-input verification, dependency permissions and cross-scope artifact redaction.
+
+
+## Scope and subject administration
+
+Apply forward-only migration `00021_identities.sql`, refresh [runtime/archive grants](scripts/runtime-role.sql), and publish/pin the updated OpenFGA model. `PutScope` and `PutSubject` require `can_manage_identities` (scope administrator plus parent-tenant membership). Provision those OpenFGA relations before registering the scope; the engine does not create authorization tuples.
+
+```go
+scopeResult, err := engine.PutScope(ctx, administrator, model.ScopeRequest{
+    Command: model.Command{Key: "register-case", Purpose: "case_setup"},
+    Definition: model.ScopeDefinition{ID: scope, Label: "Customer case"},
+    Reason: "Open case",
+})
+if err != nil { return err }
+_ = scopeResult // StreamRevision is the metadata revision, initially 1.
+
+subjectResult, err := engine.PutSubject(ctx, administrator, model.SubjectRequest{
+    Command: model.Command{Key: "register-subject", Purpose: "case_setup"},
+    Definition: model.SubjectDefinition{
+        Scope: scope, ID: subjectID, Kind: "customer", Label: "Case customer",
+        Lookup: map[string]string{"crm": externalOpaqueID},
+    },
+    Reason: "Bind verified CRM identity",
+})
+if err != nil { return err }
+_ = subjectResult
+```
+
+IDs are issued by the application. Labels are display metadata and never resolve identities. Subject kind is immutable, and a subject requires a registered parent scope. Each subject can hold up to 16 qualified lookup identifiers. Namespaces and values use the engine's opaque-ID format (1–128 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit). Labels are nonempty UTF-8 up to 256 bytes; an administrative reason is required and bounded to 2,048 bytes.
+
+Use `ExpectedRevision: 0` to create metadata and the returned `StreamRevision` for updates, with a new command key. Retrying an identical command returns its receipt; changing it conflicts. Each update replaces the complete metadata, including the lookup map. Removed lookup identifiers cease resolving; historical versions retain their original values. A qualified lookup value belongs to at most one subject per tenant and scope, including under concurrent claims. A collision returns `ErrConflict` without disclosing the other identity. No automatic identity merge or reassignment is performed.
+
+`GetScope` and `GetSubject` take `model.IdentityQuery{Scope: scope, ID: subjectID, Purpose: "case_review"}`; omit `ID` for `GetScope`. Revision zero returns current metadata; a positive `Revision` selects an exact immutable metadata revision, not a tenant ledger revision. Current reads and `LookupSubject` require `can_read`; historical reads additionally require `can_read_history`. Lookup takes `model.SubjectLookupQuery{Scope: scope, Namespace: "crm", Value: externalOpaqueID, Purpose: "case_review"}` and uses exact matching. Missing identities return `ErrNotFound` after authorization.
+
+Metadata history is encrypted and linked to its governed ledger event, authorization receipt and atomic outbox notification. Subject lookup uses tenant/scope-qualified digests in its searchable projection; those digests are not anonymization. Normal runtime roles can advance current revisions and lookup projections but cannot modify immutable history. Scoped audit exports and event archives include the retained metadata revisions.
+
+**Migration boundary:** this migration creates the registry without inventing metadata for existing records. Fact proposals, conversations and extraction still use their existing identity-validation paths; registration is not yet a mandatory gate across those paths. Backfill and strict registry enforcement are the next foundation step. This administration API alone does not establish verified real-world ownership of an identity.
+
+Integration coverage includes authorized creation/update, exact retry, changed-command and stale-revision conflicts, immutable kind, lookup replacement, concurrent duplicate claims, historical reads, tenant isolation, permission denial, rollback of rejected registrations, and audit/archive retention.

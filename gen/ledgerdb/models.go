@@ -620,6 +620,45 @@ type RetentionScope struct {
 	Epoch    int64
 }
 
+type Scope struct {
+	TenantID        string
+	ID              string
+	CurrentRevision int64
+}
+
+type ScopeVersion struct {
+	TenantID       string
+	ScopeID        string
+	Revision       int64
+	LedgerRevision int64
+	Payload        []byte
+}
+
+type Subject struct {
+	TenantID        string
+	ScopeID         string
+	ID              string
+	Kind            string
+	CurrentRevision int64
+}
+
+type SubjectLookup struct {
+	TenantID    string
+	ScopeID     string
+	Namespace   string
+	ValueDigest string
+	SubjectID   string
+}
+
+type SubjectVersion struct {
+	TenantID       string
+	ScopeID        string
+	SubjectID      string
+	Revision       int64
+	LedgerRevision int64
+	Payload        []byte
+}
+
 type TenantRevision struct {
 	TenantID string
 	Revision int64

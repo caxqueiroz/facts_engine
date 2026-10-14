@@ -254,6 +254,22 @@
             ]
           }
         },
+        "can_manage_identities": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "administrator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
         "can_manage_definitions": {
           "intersection": {
             "child": [
