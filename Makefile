@@ -1,4 +1,7 @@
-.PHONY: test integration ci-integration check vet lint vuln generate migrate tools
+.PHONY: build test integration ci-integration check vet lint vuln generate migrate tools
+
+build:
+	go build -trimpath -o bin/memoryd ./cmd/memoryd
 
 test:
 	go test -race ./...

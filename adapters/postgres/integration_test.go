@@ -67,6 +67,7 @@ func TestPostgresLedger(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.ConnConfig.RuntimeParams["role"] = "facts_runtime"
+	t.Run("standalone memoryd", func(t *testing.T) { testMemoryd(t, ctx, cfg.ConnString()) })
 	runtime, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)

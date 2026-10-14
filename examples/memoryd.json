@@ -1,0 +1,20 @@
+{
+  "listen": "127.0.0.1:8443",
+  "tls_certificate": "secrets/server.pem",
+  "tls_key": "secrets/server-key.pem",
+  "client_ca": "secrets/client-ca.pem",
+  "identities": [
+    {"URI": "spiffe://example.test/facts-client", "Tenant": "bank1", "Principal": "facts-client"}
+  ],
+  "openfga_url": "http://127.0.0.1:8080",
+  "openfga_store": "replace-with-store-id",
+  "openfga_model": "replace-with-model-id",
+  "readiness_scope": "operations",
+  "audit_key_id": "",
+  "max_connections": 16,
+  "max_concurrent": 32,
+  "max_request_bytes": 20971520,
+  "max_response_bytes": 134217728,
+  "rpc_timeout_seconds": 30,
+  "shutdown_seconds": 35
+}

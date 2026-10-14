@@ -4,3 +4,6 @@
 coverage.out
 bin/
 .DS_Store
+
+# Local TLS and service secret files used by examples/memoryd.json.
+/secrets/
