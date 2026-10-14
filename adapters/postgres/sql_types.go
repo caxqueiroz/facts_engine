@@ -19,3 +19,5 @@ func nullableText(value *string) pgtype.Text {
 	}
 	return pgtype.Text{String: *value, Valid: true}
 }
+
+func nullableID(id string) pgtype.Text { return pgtype.Text{String: id, Valid: id != ""} }
