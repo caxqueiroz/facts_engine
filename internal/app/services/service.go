@@ -1,0 +1,493 @@
+package services
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"github.com/caxqueiroz/facts_engine/model"
+	"slices"
+	"time"
+	"unicode/utf8"
+)
+
+type Service struct {
+	ledger   model.Ledger
+	auth     model.Authorizer
+	evidence model.EvidenceStore
+}
+
+func New(l model.Ledger, a model.Authorizer, e model.EvidenceStore) (*Service, error) {
+	if l == nil || a == nil || e == nil {
+		return nil, model.ErrInvalid
+	}
+	return &Service{l, a, e}, nil
+}
+func id() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", b)
+}
+func (s *Service) authorize(ctx context.Context, c model.Caller, scope, permission string, cmd model.Command) (model.AuthorizationDecision, error) {
+	if !model.ValidID(c.Tenant) || !model.ValidID(c.Principal) || !model.ValidID(scope) || cmd.Purpose == "" || len(cmd.Purpose) > 256 || (c.Initiator != "" && (!c.Service || !model.ValidID(c.Initiator))) {
+		return model.AuthorizationDecision{}, model.ErrInvalid
+	}
+	req := model.AuthorizationRequest{Caller: c, Scope: scope, Permission: permission, Purpose: cmd.Purpose, CorrelationID: cmd.CorrelationID}
+	d, err := s.auth.Check(ctx, req)
+	if err != nil {
+		return d, fmt.Errorf("authorization: %w", model.ErrUnavailable)
+	}
+	if !d.Allowed {
+		return d, model.ErrDenied
+	}
+	if d.ModelID == "" || d.Consistency != "HIGHER_CONSISTENCY" || time.Since(d.CheckedAt) > 30*time.Second || d.CheckedAt.After(time.Now().Add(time.Second)) {
+		return d, model.ErrUnavailable
+	}
+	d.Request = req
+	d.ContextDigest = model.Digest(req)
+	return d, nil
+}
+func (s *Service) mutate(ctx context.Context, c model.Caller, scope, op, permission string, cmd model.Command, input any, fn func(model.Tx, *model.CommitResult) error) (model.CommitResult, error) {
+	var result model.CommitResult
+	if !model.ValidID(cmd.Key) {
+		return result, model.ErrInvalid
+	}
+	auth, err := s.authorize(ctx, c, scope, permission, cmd)
+	if err != nil {
+		return result, err
+	}
+	digest := model.Digest(struct {
+		Caller model.Caller
+		Input  any
+	}{c, input})
+	err = s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		previous, err := tx.Receipt(ctx, c, op, cmd.Key, digest)
+		if err != nil {
+			return err
+		}
+		if previous != nil {
+			result = *previous
+			return nil
+		}
+		if err := fn(tx, &result); err != nil {
+			return err
+		}
+		if time.Since(auth.CheckedAt) > 30*time.Second {
+			return model.ErrUnavailable
+		}
+		event, err := tx.Append(ctx, model.Event{ID: id(), Type: op, Scope: scope, RecordID: result.RecordID, VersionID: result.VersionID, StreamRevision: result.StreamRevision, Caller: c, Command: cmd, Authorization: auth})
+		if err != nil {
+			return err
+		}
+		result.LedgerRevision = event.LedgerRevision
+		if result.ID == "" {
+			result.ID = event.ID
+		}
+		return tx.SaveReceipt(ctx, c, op, cmd.Key, digest, result)
+	})
+	return result, err
+}
+func (s *Service) RegisterAcceptancePolicy(ctx context.Context, c model.Caller, r model.PolicyRequest) (model.CommitResult, error) {
+	p := r.Policy
+	if !model.ValidID(p.ID) || (p.Mode != "manual" && p.Mode != "automated") || len(p.SourceClasses) == 0 || (p.Mode == "automated" && len(p.AcceptingServices) == 0) {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	for _, v := range p.AcceptingServices {
+		if !model.ValidID(v) {
+			return model.CommitResult{}, model.ErrInvalid
+		}
+	}
+	kinds := map[string]bool{}
+	for _, req := range p.Required {
+		if !validKind(req.Kind) || len(req.Principals) == 0 || kinds[req.Kind] {
+			return model.CommitResult{}, model.ErrInvalid
+		}
+		kinds[req.Kind] = true
+		for _, v := range req.Principals {
+			if !model.ValidID(v) {
+				return model.CommitResult{}, model.ErrInvalid
+			}
+		}
+	}
+	return s.mutate(ctx, c, p.Scope, "register_policy", "can_manage_definitions", r.Command, r, func(tx model.Tx, out *model.CommitResult) error { out.ID = p.ID; return tx.InsertPolicy(ctx, p) })
+}
+func (s *Service) RegisterPredicateVersion(ctx context.Context, c model.Caller, r model.PredicateRequest) (model.CommitResult, error) {
+	d := r.Definition
+	if !model.ValidID(d.Predicate) || !model.ValidID(d.Version) || !model.ValidID(d.PolicyID) || d.Classification == "" || !slices.Contains([]model.ValueKind{model.Text, model.Boolean, model.Integer, model.Decimal, model.Date, model.Instant, model.Entity}, d.Kind) {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	return s.mutate(ctx, c, d.Scope, "register_predicate", "can_manage_definitions", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		if _, err := tx.Policy(ctx, d.Scope, d.PolicyID); err != nil {
+			return err
+		}
+		out.ID = d.Version
+		return tx.InsertPredicate(ctx, d)
+	})
+}
+func (s *Service) verify(ctx context.Context, tenant string, e model.Evidence) ([]byte, error) {
+	b, err := s.evidence.Read(ctx, tenant, e.Object)
+	if err != nil {
+		return nil, model.ErrPrecondition
+	}
+	if int64(len(b)) != e.Object.Size || model.BytesDigest(b) != e.Object.Digest {
+		return nil, model.ErrPrecondition
+	}
+	return b, nil
+}
+func (s *Service) RegisterEvidence(ctx context.Context, c model.Caller, r model.EvidenceRequest) (model.CommitResult, error) {
+	e := r.Evidence
+	if !model.ValidID(e.ID) || e.SourceSystem == "" || e.SourceObject == "" || e.SourceRevision == "" || e.Speaker == "" || e.SourceClass == "" || e.MediaType == "" || e.Classification == "" || e.RetentionPolicy == "" || e.SourceTime.IsZero() || e.Object.Locator == "" || e.Object.Version == "" || e.Object.Size < 0 || e.Object.Size > 16<<20 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, e.Scope, "can_propose", r.Command); err != nil {
+		return model.CommitResult{}, err
+	}
+	if _, err := s.verify(ctx, c.Tenant, e); err != nil {
+		return model.CommitResult{}, err
+	}
+	return s.mutate(ctx, c, e.Scope, "register_evidence", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		eid, err := tx.InsertEvidence(ctx, e)
+		out.ID = eid
+		return err
+	})
+}
+func (s *Service) loadEvidence(ctx context.Context, c model.Caller, scope string, ids []string) (map[string][]byte, error) {
+	evidence := make([]model.Evidence, 0, len(ids))
+	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		for _, id := range ids {
+			e, err := tx.Evidence(ctx, id)
+			if err != nil {
+				return err
+			}
+			if e.Scope != scope {
+				return model.ErrDenied
+			}
+			evidence = append(evidence, e)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	data := map[string][]byte{}
+	for _, e := range evidence {
+		b, err := s.verify(ctx, c.Tenant, e)
+		if err != nil {
+			return nil, err
+		}
+		data[e.ID] = b
+	}
+	return data, nil
+}
+func (s *Service) ProposeFact(ctx context.Context, c model.Caller, r model.FactProposal) (model.CommitResult, error) {
+	if !model.ValidID(r.Key.Subject) || !model.ValidID(r.Key.Predicate) || !model.ValidID(r.SchemaVersion) || (r.Key.Discriminator != "" && !model.ValidID(r.Key.Discriminator)) || r.ExpectedRevision < 0 || r.Value.Validate() != nil || r.Valid.Validate() != nil || len(r.Sources) == 0 || len(r.Sources) > 64 {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, r.Key.Scope, "can_propose", r.Command); err != nil {
+		return model.CommitResult{}, err
+	}
+	ids := []string{}
+	for _, span := range r.Sources {
+		ids = append(ids, span.EvidenceID)
+	}
+	data, err := s.loadEvidence(ctx, c, r.Key.Scope, ids)
+	if err != nil {
+		return model.CommitResult{}, err
+	}
+	for _, span := range r.Sources {
+		b := data[span.EvidenceID]
+		if span.Start < 0 || span.End <= span.Start || span.End > len(b) || !utf8.Valid(b[span.Start:span.End]) || string(b[span.Start:span.End]) != span.Quote {
+			return model.CommitResult{}, model.ErrInvalid
+		}
+	}
+	return s.mutate(ctx, c, r.Key.Scope, "propose_fact", "can_propose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		active, err := tx.ActivePredicate(ctx, r.Key.Scope, r.Key.Predicate)
+		if err != nil {
+			return err
+		}
+		if active != r.SchemaVersion {
+			return model.ErrPrecondition
+		}
+		d, err := tx.Predicate(ctx, r.Key.Scope, r.Key.Predicate, r.SchemaVersion)
+		if err != nil {
+			return err
+		}
+		if r.Value.Kind != model.Unknown && r.Value.Kind != d.Kind {
+			return model.ErrInvalid
+		}
+		rec, err := tx.LockRecord(ctx, r.Key)
+		if err != nil {
+			return err
+		}
+		if rec.Revision != r.ExpectedRevision {
+			return model.ErrRevision
+		}
+		v := model.Version{ID: id(), RecordID: rec.ID, Proposal: r, Proposer: c, PolicyID: d.PolicyID}
+		v.Digest = model.Digest(struct {
+			Key     model.FactKey
+			Value   model.Value
+			Valid   model.Interval
+			Schema  string
+			Sources []model.SourceSpan
+		}{r.Key, r.Value, r.Valid, r.SchemaVersion, r.Sources})
+		if err := tx.InsertVersion(ctx, v); err != nil {
+			return err
+		}
+		out.ID = v.ID
+		out.ContentDigest = v.Digest
+		out.RecordID = rec.ID
+		out.VersionID = v.ID
+		out.StreamRevision = rec.Revision + 1
+		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
+	})
+}
+func validKind(k string) bool {
+	return slices.Contains([]string{"client_confirmation", "source_verification", "application_validation"}, k)
+}
+func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest) (model.CommitResult, error) {
+	a := r.Attestation
+	// The trusted caller is the attestor in this first slice. Delegated identity flows are not inferred.
+	if !validKind(a.Kind) || !model.ValidID(a.ID) || a.Attestor != c || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+		return model.CommitResult{}, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, a.Scope, "can_attest", r.Command); err != nil {
+		return model.CommitResult{}, err
+	}
+	if _, err := s.loadEvidence(ctx, c, a.Scope, []string{a.EvidenceID}); err != nil {
+		return model.CommitResult{}, err
+	}
+	return s.mutate(ctx, c, a.Scope, "record_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		v, err := tx.Version(ctx, a.RecordID, a.VersionID)
+		if err != nil {
+			return err
+		}
+		if v.Proposal.Key.Scope != a.Scope || v.Digest != a.ContentDigest {
+			return model.ErrPrecondition
+		}
+		p, err := tx.Policy(ctx, a.Scope, v.PolicyID)
+		if err != nil {
+			return err
+		}
+		allowed := false
+		for _, req := range p.Required {
+			if req.Kind == a.Kind && slices.Contains(req.Principals, c.Principal) {
+				allowed = true
+			}
+		}
+		if !allowed {
+			return model.ErrDenied
+		}
+		out.ID = a.ID
+		return tx.InsertAttestation(ctx, a)
+	})
+}
+func (s *Service) WithdrawAttestation(ctx context.Context, c model.Caller, r model.Withdrawal) (model.CommitResult, error) {
+	return s.mutate(ctx, c, r.Scope, "withdraw_attestation", "can_attest", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		result, err := tx.WithdrawAttestation(ctx, r.AttestationID, r.Scope, c)
+		*out = result
+		return err
+	})
+}
+func prerequisites(p model.AcceptancePolicy, v model.Version, as []model.Attestation, now time.Time) ([]string, error) {
+	ids := []string{}
+	for _, req := range p.Required {
+		found := false
+		for _, a := range as {
+			if a.Kind == req.Kind && a.VersionID == v.ID && a.ContentDigest == v.Digest && slices.Contains(req.Principals, a.Attestor.Principal) && (a.ExpiresAt == nil || a.ExpiresAt.After(now)) {
+				ids = append(ids, a.ID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, model.ErrPrecondition
+		}
+	}
+	return ids, nil
+}
+func (s *Service) ApproveFact(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+	return s.accept(ctx, c, r, false)
+}
+func (s *Service) AcceptFact(ctx context.Context, c model.Caller, r model.Approval) (model.CommitResult, error) {
+	return s.accept(ctx, c, r, true)
+}
+func (s *Service) accept(ctx context.Context, c model.Caller, r model.Approval, automatic bool) (model.CommitResult, error) {
+	op, permission := "approve_fact", "can_approve"
+	if automatic {
+		op, permission = "accept_fact", "can_accept"
+	}
+	if _, err := s.authorize(ctx, c, r.Scope, permission, r.Command); err != nil {
+		return model.CommitResult{}, err
+	}
+	var preliminary model.Version
+	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		v, err := tx.Version(ctx, r.RecordID, r.VersionID)
+		preliminary = v
+		return err
+	})
+	if err != nil {
+		return model.CommitResult{}, err
+	}
+	if preliminary.Proposal.Key.Scope != r.Scope {
+		return model.CommitResult{}, model.ErrDenied
+	}
+	ids := []string{}
+	for _, span := range preliminary.Proposal.Sources {
+		ids = append(ids, span.EvidenceID)
+	}
+	if _, err := s.loadEvidence(ctx, c, r.Scope, ids); err != nil {
+		return model.CommitResult{}, err
+	}
+	return s.mutate(ctx, c, r.Scope, op, permission, r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
+		rec, err := tx.LockRecord(ctx, preliminary.Proposal.Key)
+		if err != nil {
+			return err
+		}
+		if rec.ID != r.RecordID {
+			return model.ErrNotFound
+		}
+		if rec.Revision != r.ExpectedRevision {
+			return model.ErrRevision
+		}
+		v, err := tx.Version(ctx, r.RecordID, r.VersionID)
+		if err != nil {
+			return err
+		}
+		active, err := tx.ActivePredicate(ctx, r.Scope, v.Proposal.Key.Predicate)
+		if err != nil {
+			return err
+		}
+		if active != v.Proposal.SchemaVersion {
+			return model.ErrPrecondition
+		}
+		p, err := tx.Policy(ctx, r.Scope, v.PolicyID)
+		if err != nil {
+			return err
+		}
+		if automatic {
+			if p.Mode != "automated" || !c.Service || !slices.Contains(p.AcceptingServices, c.Principal) {
+				return model.ErrPrecondition
+			}
+		} else {
+			if p.Mode != "manual" || c.Principal == v.Proposer.Principal || c.Human() == v.Proposer.Human() {
+				return model.ErrPrecondition
+			}
+		}
+		if v.Proposal.Valid.From == nil {
+			return model.ErrPrecondition
+		}
+		for _, span := range v.Proposal.Sources {
+			e, err := tx.Evidence(ctx, span.EvidenceID)
+			if err != nil {
+				return err
+			}
+			if e.SourceClass == "assistant" || !slices.Contains(p.SourceClasses, e.SourceClass) {
+				return model.ErrPrecondition
+			}
+		}
+		as, err := tx.Attestations(ctx, v.ID)
+		if err != nil {
+			return err
+		}
+		attIDs, err := prerequisites(p, v, as, time.Now())
+		if err != nil {
+			return err
+		}
+		accepted, err := tx.Acceptances(ctx, rec.ID, 0)
+		if err != nil {
+			return err
+		}
+		for _, a := range accepted {
+			if a.Valid.Overlaps(v.Proposal.Valid) {
+				return model.ErrPrecondition
+			}
+		}
+		if err := tx.InsertAcceptance(ctx, rec.ID, model.Acceptance{VersionID: v.ID, Valid: v.Proposal.Valid, PolicyID: p.ID, AttestationIDs: attIDs}); err != nil {
+			return err
+		}
+		out.ID = v.ID
+		out.ContentDigest = v.Digest
+		out.RecordID = rec.ID
+		out.VersionID = v.ID
+		out.StreamRevision = rec.Revision + 1
+		return tx.SetRevision(ctx, rec.ID, out.StreamRevision)
+	})
+}
+func (s *Service) GetFact(ctx context.Context, c model.Caller, q model.FactQuery) (model.FactResult, error) {
+	result := model.FactResult{State: "missing"}
+	if q.ValidAt.IsZero() || q.KnowledgeRevision != 0 {
+		return result, model.ErrInvalid
+	} // Historical eligibility is implemented in the temporal slice.
+	if _, err := s.authorize(ctx, c, q.Key.Scope, "can_read", model.Command{Purpose: "fact_read"}); err != nil {
+		return result, err
+	}
+	var selected model.Version
+	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		revision, err := tx.Revision(ctx)
+		if err != nil {
+			return err
+		}
+		result.LedgerRevision = revision
+		// Read without creating a record; natural key lookup uses its deterministic identity.
+		rec, err := tx.Record(ctx, model.Digest(q.Key))
+		if errors.Is(err, model.ErrNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		result.RecordID = rec.ID
+		result.StreamRevision = rec.Revision
+		accepted, err := tx.Acceptances(ctx, rec.ID, revision)
+		if err != nil {
+			return err
+		}
+		for _, a := range accepted {
+			if !a.Valid.Contains(q.ValidAt) {
+				continue
+			}
+			v, err := tx.Version(ctx, rec.ID, a.VersionID)
+			if err != nil {
+				return err
+			}
+			p, err := tx.Policy(ctx, q.Key.Scope, v.PolicyID)
+			if err != nil {
+				return err
+			}
+			as, err := tx.Attestations(ctx, v.ID)
+			if err != nil {
+				return err
+			}
+			if _, err := prerequisites(p, v, as, time.Now()); err != nil {
+				result.State = "ineligible"
+				return nil
+			}
+			selected = v
+			result.State = "resolved"
+			if v.Proposal.Value.Kind == model.Unknown {
+				result.State = "unknown"
+			}
+			result.VersionID = v.ID
+			value := v.Proposal.Value
+			result.Value = &value
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return result, err
+	}
+	if selected.ID != "" {
+		ids := []string{}
+		for _, span := range selected.Proposal.Sources {
+			ids = append(ids, span.EvidenceID)
+		}
+		if _, err := s.loadEvidence(ctx, c, q.Key.Scope, ids); err != nil {
+			result.State = "ineligible"
+			result.Value = nil
+		}
+	}
+	return result, nil
+}

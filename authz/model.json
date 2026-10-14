@@ -1,0 +1,403 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {
+      "type": "user"
+    },
+    {
+      "type": "service"
+    },
+    {
+      "type": "tenant",
+      "relations": {
+        "member": {
+          "this": {}
+        }
+      },
+      "metadata": {
+        "relations": {
+          "member": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "scope",
+      "relations": {
+        "tenant": {
+          "this": {}
+        },
+        "tenant_member": {
+          "tupleToUserset": {
+            "tupleset": {
+              "relation": "tenant"
+            },
+            "computedUserset": {
+              "relation": "member"
+            }
+          }
+        },
+        "reader": {
+          "this": {}
+        },
+        "proposer": {
+          "this": {}
+        },
+        "approver": {
+          "this": {}
+        },
+        "attestor": {
+          "this": {}
+        },
+        "acceptor": {
+          "this": {}
+        },
+        "administrator": {
+          "this": {}
+        },
+        "auditor": {
+          "this": {}
+        },
+        "operator": {
+          "this": {}
+        },
+        "can_read": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "reader"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_propose": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_approve": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "approver"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_attest": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "attestor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_accept": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "acceptor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_manage_definitions": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "administrator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_read_history": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "auditor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_read_evidence": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "auditor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_dispute": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_resolve": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "approver"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_snapshot": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "reader"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_record_calculation": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_record_decision": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "proposer"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_export_audit": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "auditor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        },
+        "can_operate": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "operator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "tenant_member"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "tenant": {
+            "directly_related_user_types": [
+              {
+                "type": "tenant"
+              }
+            ]
+          },
+          "reader": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "proposer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "approver": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "attestor": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "acceptor": {
+            "directly_related_user_types": [
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "administrator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "auditor": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          },
+          "operator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              },
+              {
+                "type": "service"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

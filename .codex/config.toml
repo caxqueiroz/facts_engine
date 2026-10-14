@@ -1,0 +1,4 @@
+# Project-scoped automatic approval review (Approve for me).
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "workspace-write"
