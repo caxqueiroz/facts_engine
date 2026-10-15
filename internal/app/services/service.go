@@ -321,13 +321,7 @@ func (s *Service) stageFactProposal(ctx context.Context, tx model.Tx, c model.Ca
 		return &model.RevisionConflict{RecordID: rec.ID, ExpectedRevision: r.ExpectedRevision, CurrentRevision: rec.Revision}
 	}
 	v := model.Version{ExtractionAttemptID: attemptID, ID: id(), RecordID: rec.ID, Proposal: r, Proposer: c, PolicyID: d.PolicyID}
-	v.Digest = model.Digest(struct {
-		Key     model.FactKey
-		Value   model.Value
-		Valid   model.Interval
-		Schema  string
-		Sources []model.SourceSpan
-	}{r.Key, r.Value, r.Valid, r.SchemaVersion, r.Sources})
+	v.Digest = model.FactDigest(r)
 	if err := tx.InsertVersion(ctx, v); err != nil {
 		return err
 	}

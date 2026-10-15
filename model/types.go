@@ -220,6 +220,7 @@ type FactProposal struct {
 	ExpectedRevision int64
 }
 type Version struct {
+	PayloadDisposed      bool   `json:",omitempty"`
 	ExtractionAttemptID  string `json:",omitempty"`
 	ID, RecordID, Digest string
 	Proposal             FactProposal

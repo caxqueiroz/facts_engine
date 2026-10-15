@@ -70,6 +70,9 @@ func (t *transaction) MemoryVersion(ctx context.Context, record, version string)
 		return v, model.ErrPrecondition
 	}
 	err = t.decode(payload, &v)
+	if err == nil && v.PayloadDisposed {
+		return model.MemoryVersion{}, model.ErrPrecondition
+	}
 	return v, err
 }
 func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
@@ -149,6 +152,9 @@ func (t *transaction) MemoryVersions(ctx context.Context, record string, revisio
 		var version model.MemoryVersion
 		if err = t.decode(payload, &version); err != nil {
 			return nil, err
+		}
+		if version.PayloadDisposed {
+			return nil, model.ErrPrecondition
 		}
 		out = append(out, version)
 	}

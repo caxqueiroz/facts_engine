@@ -144,28 +144,64 @@ func testVersionPayloadMigration(t *testing.T, ctx context.Context, admin, runti
 			if _, err := admin.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE tenant_id='legacy' AND version_id=$1", fixture.table), fixture.id); err != nil {
 				t.Fatal(err)
 			}
-			for _, history := range []bool{false, true} {
-				err := ledger.Transact(ctx, "legacy", func(tx model.Tx) error {
+			// Both missing bytes and explicitly disposed metadata must fail closed,
+			// even if a flagged envelope still contains the original sensitive fields.
+			for _, state := range []string{"missing", "tombstone", "flagged-content"} {
+				if state != "missing" {
+					var content any
 					if fixture.table == "fact_version_payloads" {
-						if history {
-							_, err := tx.(model.TemporalTx).Versions(ctx, want.factVersion.RecordID, 3)
+						v := want.factVersion
+						v.PayloadDisposed = true
+						if state == "tombstone" {
+							v = model.VersionTombstone(v)
+						}
+						content = v
+					} else {
+						v := want.memoryVersion
+						v.PayloadDisposed = true
+						if state == "tombstone" {
+							v = model.MemoryVersionTombstone(v)
+						}
+						content = v
+					}
+					raw, err := json.Marshal(content)
+					if err != nil {
+						t.Fatal(err)
+					}
+					sealed, err := cipher.Seal("legacy", raw)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := admin.Exec(ctx, fmt.Sprintf("INSERT INTO %s(tenant_id,version_id,payload) VALUES('legacy',$1,$2) ON CONFLICT(tenant_id,version_id) DO UPDATE SET payload=EXCLUDED.payload", fixture.table), fixture.id, sealed); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, history := range []bool{false, true} {
+					err := ledger.Transact(ctx, "legacy", func(tx model.Tx) error {
+						if fixture.table == "fact_version_payloads" {
+							if history {
+								_, err := tx.(model.TemporalTx).Versions(ctx, want.factVersion.RecordID, 3)
+								return err
+							}
+							_, err := tx.Version(ctx, want.factVersion.RecordID, fixture.id)
 							return err
 						}
-						_, err := tx.Version(ctx, want.factVersion.RecordID, fixture.id)
+						if history {
+							_, err := tx.(interface {
+								MemoryVersions(context.Context, string, int64) ([]model.MemoryVersion, error)
+							}).MemoryVersions(ctx, want.memoryVersion.RecordID, 3)
+							return err
+						}
+						_, err := tx.(model.MemoryTx).MemoryVersion(ctx, want.memoryVersion.RecordID, fixture.id)
 						return err
+					})
+					if !errors.Is(err, model.ErrPrecondition) {
+						t.Fatal("unavailable content not reported", state, history, err)
 					}
-					if history {
-						_, err := tx.(interface {
-							MemoryVersions(context.Context, string, int64) ([]model.MemoryVersion, error)
-						}).MemoryVersions(ctx, want.memoryVersion.RecordID, 3)
-						return err
-					}
-					_, err := tx.(model.MemoryTx).MemoryVersion(ctx, want.memoryVersion.RecordID, fixture.id)
-					return err
-				})
-				if !errors.Is(err, model.ErrPrecondition) {
-					t.Fatal("missing content not reported", history, err)
 				}
+			}
+			if _, err := admin.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE tenant_id='legacy' AND version_id=$1", fixture.table), fixture.id); err != nil {
+				t.Fatal(err)
 			}
 			rows, err := admin.Query(ctx, fixture.query, "legacy", fixture.arg)
 			if err != nil {

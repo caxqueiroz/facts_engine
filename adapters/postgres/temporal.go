@@ -167,6 +167,9 @@ func (t *transaction) Versions(ctx context.Context, record string, revision int6
 		if err := t.decode(b, &v); err != nil {
 			return nil, err
 		}
+		if v.PayloadDisposed {
+			return nil, model.ErrPrecondition
+		}
 		out = append(out, v)
 	}
 	return out, rows.Err()

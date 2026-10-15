@@ -309,6 +309,9 @@ func (t *transaction) Version(ctx context.Context, record, id string) (model.Ver
 		return v, model.ErrPrecondition
 	}
 	err = t.decode(b, &v)
+	if err == nil && v.PayloadDisposed {
+		return model.Version{}, model.ErrPrecondition
+	}
 	return v, err
 }
 func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error {

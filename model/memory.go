@@ -30,6 +30,7 @@ type MemoryProposal struct {
 	ExpectedRevision             int64
 }
 type MemoryVersion struct {
+	PayloadDisposed                bool `json:",omitempty"`
 	Authorization                  []AuthorizationDecision
 	ID, RecordID, Digest, PolicyID string
 	Proposal                       MemoryProposal

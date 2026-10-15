@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// archiveRetentionReplay permits only a full snapshot or context transition to
+// archiveRetentionReplay permits only a full version, snapshot or context transition to
 // its exact metadata-only tombstone. All other entries, event fields, scopes
 // and coverage gaps must still match the previously signed payload.
 func archiveRetentionReplay(retained []byte, current model.ArchivePayload) bool {
@@ -31,6 +31,14 @@ func archiveRetentionReplay(retained []byte, current model.ArchivePayload) bool 
 			return false
 		}
 		switch entry.Kind {
+		case "version":
+			if !versionRetentionTransition(old, entry, current.Event) {
+				return false
+			}
+		case "memory_version":
+			if !memoryVersionRetentionTransition(old, entry, current.Event) {
+				return false
+			}
 		case "snapshot":
 			if !snapshotRetentionTransition(old, entry, current.Event) {
 				return false
@@ -68,6 +76,28 @@ func archiveRetentionReplay(retained []byte, current model.ArchivePayload) bool 
 		normalized.Gaps = prior.Gaps
 	}
 	return model.Digest(normalized) == model.Digest(prior)
+}
+
+func versionRetentionTransition(old, entry model.AuditEntry, event model.Event) bool {
+	var from, to model.Version
+	if !decodeRetentionPayload(old.Payload, &from) || !decodeRetentionPayload(entry.Payload, &to) {
+		return false
+	}
+	if from.PayloadDisposed || !to.PayloadDisposed || from.ID != entry.ID || from.ID != event.VersionID || from.RecordID != event.RecordID || from.Proposal.Key.Scope != event.Scope || from.Proposer.Tenant != event.Caller.Tenant || event.RecordKind == "memory" || model.FactDigest(from.Proposal) != from.Digest {
+		return false
+	}
+	return model.Digest(model.VersionTombstone(from)) == model.Digest(to)
+}
+
+func memoryVersionRetentionTransition(old, entry model.AuditEntry, event model.Event) bool {
+	var from, to model.MemoryVersion
+	if !decodeRetentionPayload(old.Payload, &from) || !decodeRetentionPayload(entry.Payload, &to) {
+		return false
+	}
+	if from.PayloadDisposed || !to.PayloadDisposed || from.ID != entry.ID || from.ID != event.VersionID || from.RecordID != event.RecordID || from.Proposal.Key.Scope != event.Scope || from.Proposer.Tenant != event.Caller.Tenant || event.RecordKind != "memory" || model.MemoryDigest(from.Proposal) != from.Digest || from.LedgerRevision <= 0 || from.LedgerRevision > event.LedgerRevision {
+		return false
+	}
+	return model.Digest(model.MemoryVersionTombstone(from)) == model.Digest(to)
 }
 
 func snapshotRetentionTransition(old, entry model.AuditEntry, event model.Event) bool {
