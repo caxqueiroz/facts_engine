@@ -17,6 +17,12 @@ import (
 	"time"
 )
 
+type auditCoverageStub struct{}
+
+func (auditCoverageStub) VerifyAuditCoverage(_ context.Context, tenant, scope string, through int64) (model.ArchiveCoverageReceipt, error) {
+	return model.ArchiveCoverageReceipt{Tenant: tenant, Scope: scope, Stream: "archive-test", ThroughRevision: through, HeadDigest: model.BytesDigest([]byte("archive-head")), KeyID: "archive-key", VerifiedAt: time.Now().UTC()}, nil
+}
+
 func recordCalculationFixture(t *testing.T, ctx context.Context, engine *facts.Engine, store *evidence.Postgres, c model.Caller, snapshot model.FactSnapshot) model.CalculationRecord {
 	t.Helper()
 	artifact := func(id, content string) model.ArtifactReference {
@@ -175,6 +181,26 @@ func testAuditExports(t *testing.T, ctx context.Context, ledger *postgres.Ledger
 	}
 	if !oldSnapshot || !calculation || !currentCorrection {
 		t.Fatal("incomplete lineage", oldSnapshot, calculation, currentCorrection)
+	}
+	coveredEngine, err := facts.NewWithAudit(ledger, allow{}, store, model.AuditOptions{Signer: signer, ArchiveCoverage: auditCoverageStub{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coveredRequest := model.AuditExportRequest{Command: model.Command{Key: "covered-audit", Purpose: "audit"}, Scope: "case1"}
+	coveredPending, err := coveredEngine.StartAuditExport(ctx, c, coveredRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	covered, err := coveredEngine.RunAuditExport(ctx, c, model.AuditExportQuery{ID: coveredPending.ID, Scope: "case1", Purpose: "audit"})
+	if err != nil || covered.Bundle == nil || covered.Bundle.Manifest.ArchiveCoverage == nil {
+		t.Fatal("archive coverage missing from signed manifest", covered, err)
+	}
+	receipt := covered.Bundle.Manifest.ArchiveCoverage
+	if receipt.Tenant != c.Tenant || receipt.Scope != "case1" || receipt.ThroughRevision != covered.Bundle.Manifest.ThroughRevision || receipt.Stream != "archive-test" {
+		t.Fatal("archive coverage receipt is not bound to export", receipt, covered.Bundle.Manifest.ThroughRevision)
+	}
+	if err := audits.Verify(*covered.Bundle, keys); err != nil {
+		t.Fatal("archive coverage receipt is not covered by export signature", err)
 	}
 	tampered := *completed.Bundle
 	tampered.Entries = append([]model.AuditEntry(nil), tampered.Entries...)

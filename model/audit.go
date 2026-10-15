@@ -6,6 +6,18 @@ import (
 	"time"
 )
 
+// ArchiveCoverageReceipt records a chain verification anchored to the export's
+// tenant revision. It carries no archived event or other-scope metadata.
+type ArchiveCoverageReceipt struct {
+	Tenant, Scope, Stream, HeadDigest, KeyID string
+	ThroughRevision                          int64
+	VerifiedAt                               time.Time
+}
+
+type ArchiveCoverageVerifier interface {
+	VerifyAuditCoverage(context.Context, string, string, int64) (ArchiveCoverageReceipt, error)
+}
+
 type ArtifactReference struct{ EvidenceID, Digest string }
 
 // CalculationReceipt reports an externally executed run; the engine never executes it.
@@ -55,6 +67,7 @@ type AuditManifest struct {
 	Entries                                          []AuditManifestEntry
 	Gaps                                             []AuditGap
 	Authorization                                    []AuthorizationDecision
+	ArchiveCoverage                                  *ArchiveCoverageReceipt `json:",omitempty"`
 }
 type AuditSignature struct {
 	Algorithm, KeyID string
@@ -74,7 +87,10 @@ type AuditExportResult struct {
 type AuditSigner interface {
 	Sign(context.Context, []byte) (AuditSignature, error)
 }
-type AuditOptions struct{ Signer AuditSigner }
+type AuditOptions struct {
+	Signer          AuditSigner
+	ArchiveCoverage ArchiveCoverageVerifier
+}
 
 // AuditTx keeps business receipts and export completion in the same append transaction.
 type AuditTx interface {

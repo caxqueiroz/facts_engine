@@ -155,7 +155,27 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	// Preserve the gap kind while distinguishing supported unreferenced lineage
 	// disposal from the remaining copies embedded in referenced artifacts.
 	gaps = append(gaps, model.AuditGap{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"})
-	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
+	var archiveCoverage *model.ArchiveCoverageReceipt
+	if s.audit.ArchiveCoverage == nil {
+		gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_configured"})
+	} else {
+		receipt, verifyErr := s.audit.ArchiveCoverage.VerifyAuditCoverage(ctx, c.Tenant, q.Scope, revision)
+		if verifyErr != nil {
+			if interrupted := evidenceDependencyFailure(ctx, verifyErr); interrupted != nil {
+				return model.AuditExportResult{}, interrupted
+			}
+			if errors.Is(verifyErr, model.ErrUnavailable) {
+				gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_pending"})
+			} else {
+				return model.AuditExportResult{}, model.ErrPrecondition
+			}
+		} else {
+			if receipt.Tenant != c.Tenant || receipt.Scope != q.Scope || receipt.ThroughRevision != revision || !model.ValidID(receipt.Stream) || !validDigest(receipt.HeadDigest) || !model.ValidID(receipt.KeyID) || receipt.VerifiedAt.IsZero() || receipt.VerifiedAt.After(time.Now().Add(time.Second)) || time.Since(receipt.VerifiedAt) > 30*time.Second {
+				return model.AuditExportResult{}, model.ErrPrecondition
+			}
+			archiveCoverage = &receipt
+		}
+	}
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Kind == entries[j].Kind {
 			return entries[i].ID < entries[j].ID
@@ -176,7 +196,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	if err != nil {
 		return model.AuditExportResult{}, err
 	}
-	manifest := model.AuditManifest{SchemaVersion: "facts-audit-v1", Encoding: "json-utf8-v1", Tenant: c.Tenant, Scope: q.Scope, ExportID: job.ID, ThroughRevision: revision, EntryCount: len(entries), Gaps: gaps, Authorization: auth}
+	manifest := model.AuditManifest{SchemaVersion: "facts-audit-v1", Encoding: "json-utf8-v1", Tenant: c.Tenant, Scope: q.Scope, ExportID: job.ID, ThroughRevision: revision, EntryCount: len(entries), Gaps: gaps, Authorization: auth, ArchiveCoverage: archiveCoverage}
 	previous := ""
 	size := 0
 	for _, entry := range entries {

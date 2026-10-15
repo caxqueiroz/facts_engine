@@ -136,7 +136,7 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 		t.Fatal(err)
 	}
 	for _, expected := range []model.AuditGap{
-		{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"},
+		{Kind: "independent_archive_chain", Reason: "archive_coverage_not_configured"},
 		{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"},
 	} {
 		if !slices.Contains(manifest.Gaps, expected) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"github.com/caxqueiroz/facts_engine/adapters/archive"
 	"github.com/caxqueiroz/facts_engine/adapters/audit"
@@ -24,6 +25,12 @@ func (source) ArchivePayload(_ context.Context, d model.Delivery) (model.Archive
 }
 
 type auth struct{ denied string }
+
+type archiveProgress struct{ ledger, acknowledged int64 }
+
+func (p archiveProgress) ReadOutboxProgress(context.Context, model.ConsumerKey) (model.OutboxProgress, error) {
+	return model.OutboxProgress{LedgerRevision: p.ledger, AcknowledgedRevision: p.acknowledged, State: "active"}, nil
+}
 
 func (a auth) Check(_ context.Context, r model.AuthorizationRequest) (model.AuthorizationDecision, error) {
 	return model.AuthorizationDecision{Allowed: r.Scope != a.denied, ModelID: "model", Consistency: "HIGHER_CONSISTENCY", CheckedAt: time.Now()}, nil
@@ -77,6 +84,25 @@ func TestArchiveChainRecovery(t *testing.T) {
 	}
 	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, keys); err != nil {
 		t.Fatal(err)
+	}
+	coverage, err := archive.NewCoverageVerifier(store, archiveProgress{ledger: 2, acknowledged: 2}, "stream1", 2, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := coverage.VerifyAuditCoverage(ctx, "bank", "scope1", 2)
+	if err != nil || receipt.Tenant != "bank" || receipt.Scope != "scope1" || receipt.Stream != "stream1" || receipt.ThroughRevision != 2 || receipt.HeadDigest != head.Digest || receipt.KeyID != "key1" || receipt.VerifiedAt.IsZero() {
+		t.Fatal("archive coverage receipt", receipt, err)
+	}
+	encoded, err := json.Marshal(receipt)
+	if err != nil || bytes.Contains(encoded, []byte("scope2")) {
+		t.Fatal("archive coverage disclosed another scope", string(encoded), err)
+	}
+	lagging, err := archive.NewCoverageVerifier(store, archiveProgress{ledger: 2, acknowledged: 1}, "stream1", 2, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lagging.VerifyAuditCoverage(ctx, "bank", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("archive lag claimed complete coverage", err)
 	}
 	testObservedArchiveVerification(t, store, head, keys)
 	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 3, 3, keys); err == nil {
