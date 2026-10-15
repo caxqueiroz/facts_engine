@@ -1,6 +1,6 @@
 # Facts engine setup manual
 
-This manual describes the consumer contract for `v0.2.0-rc.1`. It covers an embedded Go integration and the optional Connect/gRPC service. The release is a pre-1.0 release candidate: pin the exact version, and expect the Go and protobuf APIs to change before v1.
+This manual describes the consumer contract for `v0.2.0-rc.2`. It covers an embedded Go integration and the optional Connect/gRPC service. The release is a pre-1.0 release candidate: pin the exact version, and expect the Go and protobuf APIs to change before v1.
 
 ## What the consuming application owns
 
@@ -18,13 +18,15 @@ Engine constructors do not migrate databases, start workers/listeners, create au
 - Go 1.26 or later; the repository has been verified with Go 1.27.2.
 - PostgreSQL 17 is used by the checked-in integration environment. Use a currently supported PostgreSQL version and test the migration plan for your deployment.
 - OpenFGA with the repository's generated model, a PostgreSQL-backed CortexDB database if vector/lexical retrieval is enabled, and an evidence store appropriate to the data policy.
-- For the RC, pin the module instead of tracking `master`:
+- This GitHub repository is private. The consuming developer/CI identity needs read access, and Go must bypass the public module proxy/checksum database for this module. For local use with GitHub CLI:
 
 ```sh
-go get github.com/caxqueiroz/facts_engine@v0.2.0-rc.1
+export GOPRIVATE=github.com/caxqueiroz/facts_engine
+gh auth setup-git
+go get github.com/caxqueiroz/facts_engine@v0.2.0-rc.2
 ```
 
-The package import path is `github.com/caxqueiroz/facts_engine`. Generated Connect and gRPC contracts are under `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
+In CI, configure an approved GitHub credential with read access to this repository and set the same `GOPRIVATE` pattern; do not put a token in the module URL or commit it. The package import path is `github.com/caxqueiroz/facts_engine`. Generated Connect and gRPC contracts are under `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
 
 ## Choose an integration mode
 

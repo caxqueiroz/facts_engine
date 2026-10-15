@@ -1,14 +1,15 @@
-# v0.2.0-rc.1
+# v0.2.0-rc.2
 
 **Release date:** 2026-10-15  
 **Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
 
-This is the first tagged release of `github.com/caxqueiroz/facts_engine`. It gives consumers a pin-able Go module and protobuf contract for the v0.2 specification. It is not a production banking approval or a v1 compatibility promise.
+This release candidate updates the consumer setup instructions for the private GitHub repository. It gives consumers a pin-able Go module and protobuf contract for the v0.2 specification. It is not a production banking approval or a v1 compatibility promise.
 
 ## Consumer contract
 
 - Minimum Go version: Go 1.26.0. The repository was verified with Go 1.27.2.
 - Go module: `github.com/caxqueiroz/facts_engine`.
+- Repository access: private GitHub read access is required. Set `GOPRIVATE=github.com/caxqueiroz/facts_engine` and configure an authenticated Git credential before fetching the module.
 - Remote API: generated Connect and gRPC contracts in `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
 - Persistence: PostgreSQL is authoritative. The release includes forward-only migrations through `00052_conversation_disposal_storage.sql`; run migrations with a privileged deployment identity and use restricted runtime roles.
 - Authorization: OpenFGA model and adapter are included. The host publishes and pins a store/model and provisions tenant/scope tuples.
