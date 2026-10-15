@@ -222,39 +222,44 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			if err != nil {
 				return err
 			}
+			type archiveRow struct {
+				id      string
+				payload []byte
+			}
+			items := []archiveRow{}
 			for rows.Next() {
-				var id string
-				var b []byte
-				if err = rows.Scan(&id, &b); err != nil {
+				var item archiveRow
+				if err = rows.Scan(&item.id, &item.payload); err != nil {
 					rows.Close()
 					return err
 				}
-				if q.kind == "conversation" {
-					if err = ledgerdb.New(t.tx).LockConversationGuard(ctx, ledgerdb.LockConversationGuardParams{TenantID: t.tenant, ConversationID: id}); err != nil {
-						rows.Close()
-						return err
-					}
-				}
-				if len(b) == 0 {
-					rows.Close()
-					return model.ErrPrecondition
-				}
-				plain, err := t.cipher.Open(d.Key.Tenant, b)
-				if err != nil {
-					rows.Close()
-					return err
-				}
-				total += len(plain)
-				if total > 60<<20 || len(p.Entries) > 10000 {
-					rows.Close()
-					return model.ErrPrecondition
-				}
-				p.Entries = append(p.Entries, model.AuditEntry{Kind: q.kind, ID: id, Payload: plain})
+				items = append(items, item)
 			}
 			err = rows.Err()
 			rows.Close()
 			if err != nil {
 				return err
+			}
+			if q.kind == "conversation" {
+				for _, item := range items {
+					if err = ledgerdb.New(t.tx).LockConversationGuard(ctx, ledgerdb.LockConversationGuardParams{TenantID: t.tenant, ConversationID: item.id}); err != nil {
+						return err
+					}
+				}
+			}
+			for _, item := range items {
+				if len(item.payload) == 0 {
+					return model.ErrPrecondition
+				}
+				plain, err := t.cipher.Open(d.Key.Tenant, item.payload)
+				if err != nil {
+					return err
+				}
+				total += len(plain)
+				if total > 60<<20 || len(p.Entries) > 10000 {
+					return model.ErrPrecondition
+				}
+				p.Entries = append(p.Entries, model.AuditEntry{Kind: q.kind, ID: item.id, Payload: plain})
 			}
 		}
 		// Snapshots can span scopes. Resolve every referenced scope before the

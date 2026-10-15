@@ -94,6 +94,9 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err := projector.RegisterConsumer(ctx, key, 3); err != nil {
 		t.Fatal(err)
 	}
+	if err := projector.RegisterProjectionDestination(ctx, model.GenerationKey{Tenant: c.Tenant, Generation: "g1"}); err != nil {
+		t.Fatal(err)
+	}
 	options := workers.Options{Lease: time.Minute, PollInterval: time.Millisecond, MinBackoff: time.Second, MaxBackoff: time.Minute}
 	worker, err := workers.NewOutbox(projector, key, handler, options)
 	if err != nil {
@@ -164,6 +167,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		}
 	}
 	assertLagMetric(initialProgress.LedgerRevision - initialProgress.AcknowledgedRevision)
+	var archiveHandlerErr error
 	drain := func(w *workers.Worker, ledger *postgres.Ledger, key model.ConsumerKey) {
 		t.Helper()
 		for i := 0; i < 1000; i++ {
@@ -174,7 +178,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 			if !worked {
 				s, err := ledger.ConsumerStatus(ctx, key)
 				if err != nil || s.State != "pending" || s.LastFailureCode != "" {
-					t.Fatal("consumer did not converge", s, err)
+					t.Fatal("consumer did not converge", s, err, archiveHandlerErr)
 				}
 				snapshot, err := ledger.ReadOutboxProgress(ctx, key)
 				if err != nil || snapshot.LedgerRevision != snapshot.AcknowledgedRevision || snapshot.OldestRecordedAt != nil {
@@ -407,7 +411,11 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if _, err := admin.Exec(ctx, `UPDATE consumer_offsets SET lease_until=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND consumer_id=$2`, archiveKey.Tenant, archiveKey.Consumer); err != nil {
 		t.Fatal(err)
 	}
-	archiveWorker, err := workers.NewOutbox(archiver, archiveKey, archiveHandler, options)
+	observedArchiveHandler := workers.HandlerFunc(func(ctx context.Context, delivery model.Delivery) error {
+		archiveHandlerErr = archiveHandler.Handle(ctx, delivery)
+		return archiveHandlerErr
+	})
+	archiveWorker, err := workers.NewOutbox(archiver, archiveKey, observedArchiveHandler, options)
 	if err != nil {
 		t.Fatal(err)
 	}

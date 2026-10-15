@@ -123,8 +123,23 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("legacy identity adoption", func(t *testing.T) { testIdentityAdoption(t, ctx, ledger, store, admin) })
-	t.Run("attestation disposal", func(t *testing.T) { testAttestationDisposal(t, ctx, admin, store, legacyAttestations) })
+	run := func(name string, test func(*testing.T)) {
+		t.Run(name, func(t *testing.T) {
+			adminBefore := admin.Stat().AcquiredConns()
+			runtimeBefore := runtime.Stat().AcquiredConns()
+			t.Cleanup(func() {
+				if got := admin.Stat().AcquiredConns(); got != adminBefore {
+					t.Errorf("admin PostgreSQL connections leaked by subtest: before=%d after=%d", adminBefore, got)
+				}
+				if got := runtime.Stat().AcquiredConns(); got != runtimeBefore {
+					t.Errorf("runtime PostgreSQL connections leaked by subtest: before=%d after=%d", runtimeBefore, got)
+				}
+			})
+			test(t)
+		})
+	}
+	run("legacy identity adoption", func(t *testing.T) { testIdentityAdoption(t, ctx, ledger, store, admin) })
+	run("attestation disposal", func(t *testing.T) { testAttestationDisposal(t, ctx, admin, store, legacyAttestations) })
 	for _, fixture := range []struct {
 		tenant, scope string
 		subjects      []string
@@ -140,27 +155,27 @@ func TestPostgresLedger(t *testing.T) {
 	} {
 		registerTestIdentities(t, ctx, engine, fixture.tenant, fixture.scope, fixture.subjects)
 	}
-	t.Run("identity administration", func(t *testing.T) { testIdentities(t, ctx, ledger, store) })
-	t.Run("conversation payload disposal", func(t *testing.T) { testConversationDisposal(t, ctx, admin, ledger, store) })
-	t.Run("redacted extraction", func(t *testing.T) { testExtractionRedaction(t, ctx, ledger, store) })
-	t.Run("redacted evidence", func(t *testing.T) { testEvidenceDerivation(t, ctx, ledger, store) })
-	t.Run("extraction cost budget", func(t *testing.T) { testExtractionCost(t, ctx, ledger, store, admin) })
-	t.Run("remote extraction", func(t *testing.T) { testRemoteExtraction(t, ctx, ledger, store) })
-	t.Run("remote memories", func(t *testing.T) { testRemoteMemories(t, ctx, ledger, store) })
-	t.Run("remote governance", func(t *testing.T) { testRemoteGovernance(t, ctx, ledger, store) })
-	t.Run("gRPC memory governance", func(t *testing.T) { testGRPCMemoryGovernance(t, ctx, ledger, store) })
-	t.Run("gRPC fact lifecycle", func(t *testing.T) { testGRPCFactLifecycle(t, ctx, ledger, store) })
-	t.Run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })
-	t.Run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
-	t.Run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })
-	t.Run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
-	t.Run("projection destination inventory", func(t *testing.T) { testProjectionDestinations(t, ctx, admin, runtime) })
-	t.Run("context disposal", func(t *testing.T) { testContextDisposal(t, ctx, engine, store, admin) })
-	t.Run("version disposal", func(t *testing.T) { testVersionDisposal(t, ctx, engine, store, admin, runtime) })
-	t.Run("version disposal storage", func(t *testing.T) { testVersionDisposalStorage(t, ctx, engine, store, admin, runtime) })
-	t.Run("snapshot disposal", func(t *testing.T) { testSnapshotDisposal(t, ctx, engine, store, admin) })
-	t.Run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })
-	t.Run("outbox delivery recovery", func(t *testing.T) { testOutbox(t, ctx, ledger, admin) })
+	run("identity administration", func(t *testing.T) { testIdentities(t, ctx, ledger, store) })
+	run("conversation payload disposal", func(t *testing.T) { testConversationDisposal(t, ctx, admin, ledger, store) })
+	run("redacted extraction", func(t *testing.T) { testExtractionRedaction(t, ctx, ledger, store) })
+	run("redacted evidence", func(t *testing.T) { testEvidenceDerivation(t, ctx, ledger, store) })
+	run("extraction cost budget", func(t *testing.T) { testExtractionCost(t, ctx, ledger, store, admin) })
+	run("remote extraction", func(t *testing.T) { testRemoteExtraction(t, ctx, ledger, store) })
+	run("remote memories", func(t *testing.T) { testRemoteMemories(t, ctx, ledger, store) })
+	run("remote governance", func(t *testing.T) { testRemoteGovernance(t, ctx, ledger, store) })
+	run("gRPC memory governance", func(t *testing.T) { testGRPCMemoryGovernance(t, ctx, ledger, store) })
+	run("gRPC fact lifecycle", func(t *testing.T) { testGRPCFactLifecycle(t, ctx, ledger, store) })
+	run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })
+	run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
+	run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })
+	run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
+	run("projection destination inventory", func(t *testing.T) { testProjectionDestinations(t, ctx, admin, runtime) })
+	run("context disposal", func(t *testing.T) { testContextDisposal(t, ctx, engine, store, admin) })
+	run("version disposal", func(t *testing.T) { testVersionDisposal(t, ctx, engine, store, admin, runtime) })
+	run("version disposal storage", func(t *testing.T) { testVersionDisposalStorage(t, ctx, engine, store, admin, runtime) })
+	run("snapshot disposal", func(t *testing.T) { testSnapshotDisposal(t, ctx, engine, store, admin) })
+	run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })
+	run("outbox delivery recovery", func(t *testing.T) { testOutbox(t, ctx, ledger, admin) })
 	caller := model.Caller{Tenant: "bank1", Principal: "proposer"}
 	reviewer := model.Caller{Tenant: "bank1", Principal: "reviewer"}
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "integration"} }
@@ -185,7 +200,7 @@ func TestPostgresLedger(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	value := "tea"
 	q := model.FactProposal{Command: cmd("proposal"), Key: model.FactKey{Scope: "case1", Subject: "subject1", Predicate: "preference"}, SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &now}, Sources: []model.SourceSpan{{EvidenceID: "ev1", Start: 9, End: 12, Quote: "tea"}}}
-	t.Run("unregistered fact subject", func(t *testing.T) {
+	run("unregistered fact subject", func(t *testing.T) {
 		missing := q
 		missing.Command = cmd("unknown-subject-proposal")
 		missing.Key.Subject = "not-registered"
@@ -193,7 +208,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal("unregistered subject accepted", err)
 		}
 	})
-	t.Run("predicate value constraints", func(t *testing.T) {
+	run("predicate value constraints", func(t *testing.T) {
 		maximum := 3
 		restricted := def
 		restricted.Command = cmd("restricted-schema")
@@ -266,8 +281,8 @@ func TestPostgresLedger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("remote fact parity", func(t *testing.T) { testRemoteFactParity(t, ctx, engine, caller, q, proposal) })
-	t.Run("idempotent response loss", func(t *testing.T) {
+	run("remote fact parity", func(t *testing.T) { testRemoteFactParity(t, ctx, engine, caller, q, proposal) })
+	run("idempotent response loss", func(t *testing.T) {
 		retry, err := engine.ProposeFact(ctx, caller, q)
 		if err != nil || retry != proposal {
 			t.Fatal(retry, err)
@@ -279,7 +294,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 	approval := model.Approval{Command: cmd("approval"), Scope: "case1", RecordID: proposal.RecordID, VersionID: proposal.VersionID, ExpectedRevision: 1}
-	t.Run("concurrent duplicate commands", func(t *testing.T) {
+	run("concurrent duplicate commands", func(t *testing.T) {
 		request := q
 		request.Command = cmd("duplicate-race")
 		request.Key.Subject = "subject-race"
@@ -312,7 +327,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("separation", func(t *testing.T) {
+	run("separation", func(t *testing.T) {
 		if _, err := engine.ApproveFact(ctx, caller, approval); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal(err)
 		}
@@ -321,7 +336,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("concurrent approvals", func(t *testing.T) {
+	run("concurrent approvals", func(t *testing.T) {
 		var wg sync.WaitGroup
 		errs := make(chan error, 2)
 		for _, key := range []string{"approval-a", "approval-b"} {
@@ -354,21 +369,21 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(success, conflict)
 		}
 	})
-	t.Run("remote fact reads and snapshots", func(t *testing.T) {
+	run("remote fact reads and snapshots", func(t *testing.T) {
 		paged, err := facts.NewWithReads(ledger, allow{}, store, model.ReadOptions{PaginationKey: bytes.Repeat([]byte{9}, 32)})
 		if err != nil {
 			t.Fatal(err)
 		}
 		testRemoteFactReads(t, ctx, paged, reviewer, q.Key, proposal.RecordID, now)
 	})
-	t.Run("evidence interruption", func(t *testing.T) { testEvidenceInterruption(t, ctx, ledger, store, reviewer, q.Key, now) })
-	t.Run("current value", func(t *testing.T) {
+	run("evidence interruption", func(t *testing.T) { testEvidenceInterruption(t, ctx, ledger, store, reviewer, q.Key, now) })
+	run("current value", func(t *testing.T) {
 		r, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: q.Key, ValidAt: now})
 		if err != nil || r.State != "resolved" || *r.Value.Text != "tea" {
 			t.Fatal(r, err)
 		}
 	})
-	t.Run("cross tenant", func(t *testing.T) {
+	run("cross tenant", func(t *testing.T) {
 		other := reviewer
 		other.Tenant = "bank2"
 		r, err := engine.GetFact(ctx, other, model.FactQuery{Key: q.Key, ValidAt: now})
@@ -382,7 +397,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("RLS and privileges", func(t *testing.T) {
+	run("RLS and privileges", func(t *testing.T) {
 		conn, err := runtime.Acquire(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -399,7 +414,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal("truncate allowed")
 		}
 	})
-	t.Run("database cross-tenant foreign keys", func(t *testing.T) {
+	run("database cross-tenant foreign keys", func(t *testing.T) {
 		conn, err := runtime.Acquire(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -418,7 +433,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid span", func(t *testing.T) {
+	run("invalid span", func(t *testing.T) {
 		bad := q
 		bad.Key = model.FactKey{Scope: "case1", Subject: "subject2", Predicate: "preference"}
 		bad.Command = cmd("badspan")
@@ -427,7 +442,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("changed source revision", func(t *testing.T) {
+	run("changed source revision", func(t *testing.T) {
 		newRef, err := store.Put(ctx, caller.Tenant, "message2", []byte("changed"))
 		if err != nil {
 			t.Fatal(err)
@@ -440,7 +455,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("no overlap", func(t *testing.T) {
+	run("no overlap", func(t *testing.T) {
 		next := q
 		next.Command = cmd("proposal2")
 		next.ExpectedRevision = 2
@@ -456,7 +471,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("automated attestations and withdrawal", func(t *testing.T) {
+	run("automated attestations and withdrawal", func(t *testing.T) {
 		auto := model.Caller{Tenant: "bank1", Principal: "acceptor", Service: true}
 		policy := model.PolicyRequest{Command: cmd("auto-policy"), Policy: model.AcceptancePolicy{Scope: "case1", ID: "auto1", Mode: "automated", SourceClasses: []string{"customer"}, AcceptingServices: []string{"acceptor"}, Required: []model.AttestationRequirement{{Kind: "client_confirmation", Principals: []string{"proposer"}}}}}
 		if _, err := engine.RegisterAcceptancePolicy(ctx, caller, policy); err != nil {
@@ -526,7 +541,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("inactive schema cannot weaken policy", func(t *testing.T) {
+	run("inactive schema cannot weaken policy", func(t *testing.T) {
 		newer := def
 		newer.Command = cmd("schema-v2")
 		newer.Definition.Version = "v2"
@@ -580,7 +595,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("temporal lifecycle and immutable snapshots", func(t *testing.T) {
+	run("temporal lifecycle and immutable snapshots", func(t *testing.T) {
 		definition := def
 		definition.Command = cmd("timeline-schema")
 		definition.Definition.Predicate = "timeline"
@@ -741,7 +756,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("snapshot uses one database view", func(t *testing.T) {
+	run("snapshot uses one database view", func(t *testing.T) {
 		gate := &pauseLedger{Ledger: ledger, read: make(chan struct{}), proceed: make(chan struct{})}
 		observer, err := facts.New(gate, allow{}, store)
 		if err != nil {
@@ -796,7 +811,7 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(current, err)
 		}
 	})
-	t.Run("unauthorized snapshot selector fails", func(t *testing.T) {
+	run("unauthorized snapshot selector fails", func(t *testing.T) {
 		restricted, err := facts.New(ledger, denyScope{scope: "forbidden"}, store)
 		if err != nil {
 			t.Fatal(err)
@@ -808,7 +823,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("upgrade retains earlier timeline generations", func(t *testing.T) {
+	run("upgrade retains earlier timeline generations", func(t *testing.T) {
 		var generations, entries int
 		if err := admin.QueryRow(ctx, `SELECT count(*) FROM timeline_generations WHERE tenant_id='legacy'`).Scan(&generations); err != nil {
 			t.Fatal(err)
@@ -828,17 +843,17 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("immutable memory proposals", func(t *testing.T) { testMemoryProposals(t, ctx, ledger, store, caller, q, proposal) })
-	t.Run("signed audit export and recovery", func(t *testing.T) { testAuditExports(t, ctx, ledger, store, reviewer, admin) })
+	run("immutable memory proposals", func(t *testing.T) { testMemoryProposals(t, ctx, ledger, store, caller, q, proposal) })
+	run("signed audit export and recovery", func(t *testing.T) { testAuditExports(t, ctx, ledger, store, reviewer, admin) })
 
-	t.Run("projection and archive consumers", func(t *testing.T) { testPipeline(t, ctx, ledger, store, admin) })
-	t.Run("extraction input inventories", func(t *testing.T) { testExtractionInputInventories(t, ctx, admin, runtime) })
-	t.Run("extraction inventory sealing", func(t *testing.T) { testExtractionInventorySealing(t, ctx, admin, runtime) })
-	t.Run("extraction inventory backfill", func(t *testing.T) { testExtractionInventoryBackfill(t, ctx, admin, runtime) })
-	t.Run("extraction disposal", func(t *testing.T) { testExtractionDisposal(t, ctx, engine, ledger, store, admin) })
-	t.Run("projection cleanup obligations", func(t *testing.T) { testProjectionCleanup(t, ctx, admin, runtime, legacyVersions) })
-	t.Run("extraction disposal storage", func(t *testing.T) { testExtractionDisposalStorage(t, ctx, admin, runtime, store) })
-	t.Run("atomic ordering", func(t *testing.T) {
+	run("projection and archive consumers", func(t *testing.T) { testPipeline(t, ctx, ledger, store, admin) })
+	run("extraction input inventories", func(t *testing.T) { testExtractionInputInventories(t, ctx, admin, runtime) })
+	run("extraction inventory sealing", func(t *testing.T) { testExtractionInventorySealing(t, ctx, admin, runtime) })
+	run("extraction inventory backfill", func(t *testing.T) { testExtractionInventoryBackfill(t, ctx, admin, runtime) })
+	run("extraction disposal", func(t *testing.T) { testExtractionDisposal(t, ctx, engine, ledger, store, admin) })
+	run("projection cleanup obligations", func(t *testing.T) { testProjectionCleanup(t, ctx, admin, runtime, legacyVersions) })
+	run("extraction disposal storage", func(t *testing.T) { testExtractionDisposalStorage(t, ctx, admin, runtime, store) })
+	run("atomic ordering", func(t *testing.T) {
 		var count, maxRev int64
 		if err := admin.QueryRow(ctx, `SELECT count(*),max(ledger_revision) FROM ledger_events WHERE tenant_id='bank1'`).Scan(&count, &maxRev); err != nil || count != maxRev {
 			t.Fatal(count, maxRev, err)
@@ -849,4 +864,10 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal("lost outbox event")
 		}
 	})
+	if acquired := admin.Stat().AcquiredConns(); acquired != 0 {
+		t.Errorf("admin PostgreSQL connections remain acquired before cleanup: %d", acquired)
+	}
+	if acquired := runtime.Stat().AcquiredConns(); acquired != 0 {
+		t.Errorf("runtime PostgreSQL connections remain acquired before cleanup: %d", acquired)
+	}
 }

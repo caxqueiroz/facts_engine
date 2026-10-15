@@ -79,6 +79,7 @@ func testExtractionInputInventories(t *testing.T, ctx context.Context, admin, ru
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 		if _, err := tx.Exec(ctx, "INSERT INTO "+kind+"_version_disposals(tenant_id,version_id,payload) VALUES($1,$2,$3)", tenant, version, []byte{1}); err != nil {
 			t.Fatal(err)
 		}

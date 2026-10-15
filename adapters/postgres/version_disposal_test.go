@@ -275,6 +275,10 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		t.Fatal(err)
 	}
 	if cleanupIndex != nil {
-		testVersionCleanupExecution(t, ctx, ledger, store, admin, c, cleanupIndex, f, m, disposedFact, first)
+		factDisposal := disposedFact
+		if err = admin.QueryRow(ctx, `SELECT id FROM retention_events WHERE tenant_id=$1 AND kind='dispose_fact_payload' AND target_id=$2 ORDER BY ledger_revision DESC LIMIT 1`, c.Tenant, f.VersionID).Scan(&factDisposal.ID); err != nil {
+			t.Fatal("find child version disposal event", err)
+		}
+		testVersionCleanupExecution(t, ctx, ledger, store, admin, c, cleanupIndex, f, m, factDisposal, first)
 	}
 }
