@@ -8,12 +8,13 @@ import "memory/v1/evidence.proto";
 
 option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 // Administrative controls retain engine authorization and database-role checks.
-// Disposal currently covers only unreferenced evidence in the shared database.
+// Disposal covers eligible evidence, orphan uploads, snapshots and contexts.
 service RetentionService {
   rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc DisposeContext(DisposeContextRequest) returns (DisposeContextResponse);
   rpc DisposeSnapshot(DisposeSnapshotRequest) returns (DisposeSnapshotResponse);
   rpc DisposeOrphanEvidence(DisposeOrphanEvidenceRequest) returns (DisposeOrphanEvidenceResponse);
   rpc GetRetentionStatus(GetRetentionStatusRequest) returns (GetRetentionStatusResponse);
@@ -24,7 +25,8 @@ message RetentionPolicy {
   string record_class = 3 [
     (buf.validate.field).string.in = "evidence_bytes",
     (buf.validate.field).string.in = "orphan_evidence_bytes",
-    (buf.validate.field).string.in = "snapshot_payload"
+    (buf.validate.field).string.in = "snapshot_payload",
+    (buf.validate.field).string.in = "context_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -148,5 +150,27 @@ message DisposeSnapshotRequest {
   }];
 }
 message DisposeSnapshotResponse {
+  CommitResult result = 1;
+}
+
+message ContextRetentionBinding {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeContextRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string context_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated ContextRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+message DisposeContextResponse {
   CommitResult result = 1;
 }

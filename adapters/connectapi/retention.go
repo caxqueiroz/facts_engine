@@ -7,6 +7,7 @@ import (
 )
 
 type RetentionEngine interface {
+	DisposeContext(context.Context, model.Caller, model.ContextDisposalRequest) (model.CommitResult, error)
 	DisposeSnapshot(context.Context, model.Caller, model.SnapshotDisposalRequest) (model.CommitResult, error)
 	DisposeOrphanEvidence(context.Context, model.Caller, model.OrphanEvidenceDisposalRequest) (model.CommitResult, error)
 	RegisterRetentionPolicy(context.Context, model.Caller, model.RetentionPolicyRequest) (model.CommitResult, error)
@@ -73,4 +74,16 @@ func (s *retentionService) DisposeSnapshot(ctx context.Context, r *v1.DisposeSna
 		return nil, err
 	}
 	return &v1.DisposeSnapshotResponse{Result: commit(out)}, nil
+}
+
+func (s *retentionService) DisposeContext(ctx context.Context, r *v1.DisposeContextRequest) (*v1.DisposeContextResponse, error) {
+	request := model.ContextDisposalRequest{Command: command(r.Command), ContextID: r.ContextId, Reason: r.Reason}
+	for _, b := range r.Bindings {
+		request.Bindings = append(request.Bindings, model.ContextRetentionBinding{Scope: b.Scope, PolicyID: b.PolicyId, Jurisdiction: b.Jurisdiction})
+	}
+	out, err := s.engine.DisposeContext(ctx, callerFrom(ctx), request)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeContextResponse{Result: commit(out)}, nil
 }

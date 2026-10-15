@@ -18,6 +18,14 @@ import (
 // retries the retained deliveries against the tombstoned ledger view.
 func archiveSnapshotsBeforeDisposal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, cipher postgres.Cipher, signer model.AuditSigner, keys map[string]ed25519.PublicKey, tenant string, snapshots ...model.FactSnapshot) func() {
 	t.Helper()
+	revisions := make([]int64, len(snapshots))
+	for i, s := range snapshots {
+		revisions[i] = s.CreationRevision
+	}
+	return archiveRevisionsBeforeDisposal(t, ctx, admin, cipher, signer, keys, tenant, revisions...)
+}
+func archiveRevisionsBeforeDisposal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, cipher postgres.Cipher, signer model.AuditSigner, keys map[string]ed25519.PublicKey, tenant string, revisions ...int64) func() {
+	t.Helper()
 	cfg := admin.Config().Copy()
 	cfg.ConnConfig.RuntimeParams["role"] = "facts_archiver"
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -63,8 +71,8 @@ func archiveSnapshotsBeforeDisposal(t *testing.T, ctx context.Context, admin *pg
 		if err := ledger.AcknowledgeDelivery(ctx, delivery); err != nil {
 			t.Fatal(err)
 		}
-		for _, snapshot := range snapshots {
-			if snapshot.CreationRevision == revision {
+		for _, retained := range revisions {
+			if retained == revision {
 				deliveries[revision] = delivery
 			}
 		}
@@ -83,8 +91,8 @@ func archiveSnapshotsBeforeDisposal(t *testing.T, ctx context.Context, admin *pg
 	}
 	return func() {
 		t.Helper()
-		if len(deliveries) != len(snapshots) {
-			t.Fatal("snapshot deliveries missing")
+		if len(deliveries) != len(revisions) {
+			t.Fatal("retained deliveries missing")
 		}
 		for revision, delivery := range deliveries {
 			if err := worker.Handle(ctx, delivery); err != nil {

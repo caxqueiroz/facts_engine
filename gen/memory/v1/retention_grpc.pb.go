@@ -23,6 +23,7 @@ const (
 	RetentionService_PlaceLegalHold_FullMethodName          = "/memory.v1.RetentionService/PlaceLegalHold"
 	RetentionService_ReleaseLegalHold_FullMethodName        = "/memory.v1.RetentionService/ReleaseLegalHold"
 	RetentionService_DisposeEvidence_FullMethodName         = "/memory.v1.RetentionService/DisposeEvidence"
+	RetentionService_DisposeContext_FullMethodName          = "/memory.v1.RetentionService/DisposeContext"
 	RetentionService_DisposeSnapshot_FullMethodName         = "/memory.v1.RetentionService/DisposeSnapshot"
 	RetentionService_DisposeOrphanEvidence_FullMethodName   = "/memory.v1.RetentionService/DisposeOrphanEvidence"
 	RetentionService_GetRetentionStatus_FullMethodName      = "/memory.v1.RetentionService/GetRetentionStatus"
@@ -33,12 +34,13 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Administrative controls retain engine authorization and database-role checks.
-// Disposal currently covers only unreferenced evidence in the shared database.
+// Disposal covers eligible evidence, orphan uploads, snapshots and contexts.
 type RetentionServiceClient interface {
 	RegisterRetentionPolicy(ctx context.Context, in *RegisterRetentionPolicyRequest, opts ...grpc.CallOption) (*RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(ctx context.Context, in *PlaceLegalHoldRequest, opts ...grpc.CallOption) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(ctx context.Context, in *ReleaseLegalHoldRequest, opts ...grpc.CallOption) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(ctx context.Context, in *DisposeEvidenceRequest, opts ...grpc.CallOption) (*DisposeEvidenceResponse, error)
+	DisposeContext(ctx context.Context, in *DisposeContextRequest, opts ...grpc.CallOption) (*DisposeContextResponse, error)
 	DisposeSnapshot(ctx context.Context, in *DisposeSnapshotRequest, opts ...grpc.CallOption) (*DisposeSnapshotResponse, error)
 	DisposeOrphanEvidence(ctx context.Context, in *DisposeOrphanEvidenceRequest, opts ...grpc.CallOption) (*DisposeOrphanEvidenceResponse, error)
 	GetRetentionStatus(ctx context.Context, in *GetRetentionStatusRequest, opts ...grpc.CallOption) (*GetRetentionStatusResponse, error)
@@ -92,6 +94,16 @@ func (c *retentionServiceClient) DisposeEvidence(ctx context.Context, in *Dispos
 	return out, nil
 }
 
+func (c *retentionServiceClient) DisposeContext(ctx context.Context, in *DisposeContextRequest, opts ...grpc.CallOption) (*DisposeContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisposeContextResponse)
+	err := c.cc.Invoke(ctx, RetentionService_DisposeContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *retentionServiceClient) DisposeSnapshot(ctx context.Context, in *DisposeSnapshotRequest, opts ...grpc.CallOption) (*DisposeSnapshotResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DisposeSnapshotResponse)
@@ -127,12 +139,13 @@ func (c *retentionServiceClient) GetRetentionStatus(ctx context.Context, in *Get
 // for forward compatibility.
 //
 // Administrative controls retain engine authorization and database-role checks.
-// Disposal currently covers only unreferenced evidence in the shared database.
+// Disposal covers eligible evidence, orphan uploads, snapshots and contexts.
 type RetentionServiceServer interface {
 	RegisterRetentionPolicy(context.Context, *RegisterRetentionPolicyRequest) (*RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(context.Context, *PlaceLegalHoldRequest) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *ReleaseLegalHoldRequest) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error)
+	DisposeContext(context.Context, *DisposeContextRequest) (*DisposeContextResponse, error)
 	DisposeSnapshot(context.Context, *DisposeSnapshotRequest) (*DisposeSnapshotResponse, error)
 	DisposeOrphanEvidence(context.Context, *DisposeOrphanEvidenceRequest) (*DisposeOrphanEvidenceResponse, error)
 	GetRetentionStatus(context.Context, *GetRetentionStatusRequest) (*GetRetentionStatusResponse, error)
@@ -157,6 +170,9 @@ func (UnimplementedRetentionServiceServer) ReleaseLegalHold(context.Context, *Re
 }
 func (UnimplementedRetentionServiceServer) DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisposeEvidence not implemented")
+}
+func (UnimplementedRetentionServiceServer) DisposeContext(context.Context, *DisposeContextRequest) (*DisposeContextResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisposeContext not implemented")
 }
 func (UnimplementedRetentionServiceServer) DisposeSnapshot(context.Context, *DisposeSnapshotRequest) (*DisposeSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisposeSnapshot not implemented")
@@ -260,6 +276,24 @@ func _RetentionService_DisposeEvidence_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RetentionService_DisposeContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisposeContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RetentionServiceServer).DisposeContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RetentionService_DisposeContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RetentionServiceServer).DisposeContext(ctx, req.(*DisposeContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RetentionService_DisposeSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DisposeSnapshotRequest)
 	if err := dec(in); err != nil {
@@ -336,6 +370,10 @@ var RetentionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DisposeEvidence",
 			Handler:    _RetentionService_DisposeEvidence_Handler,
+		},
+		{
+			MethodName: "DisposeContext",
+			Handler:    _RetentionService_DisposeContext_Handler,
 		},
 		{
 			MethodName: "DisposeSnapshot",

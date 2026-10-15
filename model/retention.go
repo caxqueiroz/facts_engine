@@ -7,7 +7,8 @@ import (
 
 // RetentionPolicy is immutable and application-owned. Evidence-byte durations
 // start at registration; orphan-evidence durations start at recorded upload time.
-// Neither uses a caller-supplied historical source timestamp.
+// Snapshot/context durations start at their database creation event time.
+// None uses a caller-supplied historical source timestamp.
 type RetentionPolicy struct {
 	ID, Scope, RecordClass, Purpose, Jurisdiction string
 	MinimumAgeSeconds                             int64
@@ -59,7 +60,20 @@ type SnapshotDisposalRequest struct {
 type SnapshotDisposalTx interface {
 	DisposeSnapshot(context.Context, SnapshotDisposalRequest) error
 }
+type ContextRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }
+type ContextDisposalRequest struct {
+	Command
+	ContextID, Reason string
+	Bindings          []ContextRetentionBinding
+}
+
+// ContextDisposalTx adapters must serialize disposal with new references,
+// scope holds, exports and archive reads, and retain an immutable tombstone.
+type ContextDisposalTx interface {
+	DisposeContext(context.Context, ContextDisposalRequest) error
+}
 type RetentionEvent struct {
+	ContextDisposal         *ContextDisposalRequest  `json:",omitempty"`
 	SnapshotDisposal        *SnapshotDisposalRequest `json:",omitempty"`
 	AdditionalAuthorization []AuthorizationDecision  `json:",omitempty"`
 

@@ -166,6 +166,19 @@ type ConsumerRetryCommand struct {
 	RecordedAt  pgtype.Timestamptz
 }
 
+type ContextDisposal struct {
+	TenantID   string
+	ContextID  string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
+type ContextGuard struct {
+	TenantID  string
+	ContextID string
+	Epoch     int64
+}
+
 type ContextItem struct {
 	TenantID  string
 	ContextID string

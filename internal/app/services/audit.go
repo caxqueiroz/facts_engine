@@ -328,6 +328,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 					include = include && b.Scope == r.Scope
 				}
 			}
+			if event.ContextDisposal != nil {
+				for _, b := range event.ContextDisposal.Bindings {
+					include = include && b.Scope == r.Scope
+				}
+			}
 			if event.Kind == "dispose_evidence" {
 				ids := []string{event.TargetID}
 				if event.Disposal != nil {
@@ -345,12 +350,15 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &m); err != nil {
 				return nil, nil, err
 			}
-			if len(m.Memories) > 0 && !r.IncludeEvidence {
+			if len(m.Memories) > 0 && !m.PayloadDisposed && !r.IncludeEvidence {
 				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "memory_context_payload_withheld"})
 				continue
 			}
 			for _, scope := range model.ContextScopes(m) {
 				include = include && scope == r.Scope
+			}
+			if include && m.PayloadDisposed {
+				gaps = append(gaps, model.AuditGap{Kind: "context_content", ID: m.ID, Reason: "disposed_under_retention_policy"})
 			}
 		case "decision":
 			var d model.DecisionRecord

@@ -23,6 +23,7 @@ type rollbackRetentionTx struct {
 	model.EvidenceLineageDisposalTx
 	model.OrphanEvidenceDisposalTx
 	model.SnapshotDisposalTx
+	model.ContextDisposalTx
 }
 
 func (t rollbackRetentionTx) Append(context.Context, model.Event) (model.Event, error) {
@@ -30,7 +31,7 @@ func (t rollbackRetentionTx) Append(context.Context, model.Event) (model.Event, 
 }
 func (l rollbackRetentionLedger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
 	return l.Ledger.Transact(ctx, tenant, func(tx model.Tx) error {
-		return fn(rollbackRetentionTx{tx.(model.RetentionTx), tx.(model.EvidenceLineageDisposalTx), tx.(model.OrphanEvidenceDisposalTx), tx.(model.SnapshotDisposalTx)})
+		return fn(rollbackRetentionTx{tx.(model.RetentionTx), tx.(model.EvidenceLineageDisposalTx), tx.(model.OrphanEvidenceDisposalTx), tx.(model.SnapshotDisposalTx), tx.(model.ContextDisposalTx)})
 	})
 }
 func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, store *evidence.Postgres, admin *pgxpool.Pool) {

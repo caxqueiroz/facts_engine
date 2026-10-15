@@ -144,9 +144,10 @@ func (q *Queries) ListArchiveCalculation(ctx context.Context, arg ListArchiveCal
 }
 
 const ListArchiveContext = `-- name: ListArchiveContext :many
-SELECT c.id,p.payload
+SELECT c.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM context_manifests c
 LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND c.ledger_revision=$2
 `
 
@@ -844,9 +845,10 @@ func (q *Queries) ListAuditCalculation(ctx context.Context, arg ListAuditCalcula
 }
 
 const ListAuditContext = `-- name: ListAuditContext :many
-SELECT c.id,p.payload
+SELECT c.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM context_manifests c
 LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND EXISTS(SELECT 1
 FROM context_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001

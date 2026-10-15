@@ -246,6 +246,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 						scopes[b.Scope] = true
 					}
 				}
+				if event.ContextDisposal != nil {
+					for _, b := range event.ContextDisposal.Bindings {
+						scopes[b.Scope] = true
+					}
+				}
 				if event.Disposal != nil {
 					ids := append([]string{event.Disposal.EvidenceID}, event.Disposal.DerivativeEvidenceIDs...)
 					for _, id := range ids {
@@ -313,6 +318,12 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				var m model.ContextManifest
 				if err := json.Unmarshal(entry.Payload, &m); err != nil {
 					return err
+				}
+				if err := ledgerdb.New(t.tx).LockContextGuard(ctx, ledgerdb.LockContextGuardParams{TenantID: t.tenant, ContextID: m.ID}); err != nil {
+					return err
+				}
+				if m.PayloadDisposed {
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "context_content", ID: m.ID, Reason: "disposed_under_retention_policy"})
 				}
 				for _, scope := range model.ContextScopes(m) {
 					scopes[scope] = true

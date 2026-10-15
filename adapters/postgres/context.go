@@ -50,6 +50,11 @@ func (t *transaction) DecisionRun(ctx context.Context, application, run string) 
 	return r, err
 }
 func (t *transaction) StageDecision(ctx context.Context, r model.DecisionRecord, scopes map[model.VersionReference]string) error {
+	if r.Receipt.ContextID != "" {
+		if err := t.guardContextContent(ctx, r.Receipt.ContextID); err != nil {
+			return err
+		}
+	}
 	if r.Receipt.SnapshotID != "" {
 		if err := t.guardSnapshotContent(ctx, r.Receipt.SnapshotID); err != nil {
 			return err

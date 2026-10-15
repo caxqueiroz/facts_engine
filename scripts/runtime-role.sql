@@ -112,3 +112,9 @@ GRANT SELECT,INSERT ON evidence_derivations TO facts_runtime;
 GRANT SELECT ON evidence_derivations TO facts_archiver;
 GRANT SELECT,INSERT ON extraction_redactions TO facts_runtime;
 GRANT SELECT ON extraction_redactions TO facts_archiver;
+
+GRANT SELECT ON context_disposals TO facts_runtime,facts_archiver;
+GRANT SELECT,INSERT ON context_guards TO facts_runtime,facts_archiver;
+GRANT UPDATE(epoch) ON context_guards TO facts_runtime,facts_archiver;
+GRANT INSERT ON context_disposals TO facts_retention;
+GRANT DELETE ON context_payloads TO facts_retention;

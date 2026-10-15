@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -44,6 +45,31 @@ func TestDisposedContextReadAuthorization(t *testing.T) {
 			if !errors.Is(err, want) || !reflect.DeepEqual(got, model.ContextManifest{}) {
 				t.Fatalf("scope %q: got %v, %v", denied, got, err)
 			}
+		}
+	}
+}
+
+func TestDisposedContextAuditBoundaries(t *testing.T) {
+	m := model.ContextTombstone(model.ContextManifest{ID: "manifest", Request: model.ContextRequest{Query: model.RecallRequest{Scopes: []string{"scope"}}}, Memories: []model.MemoryRecallItem{{Key: model.MemoryKey{Scope: "scope"}, Memory: model.MemoryResult{Body: "private", Dependencies: []model.MemoryDependency{{Scope: "scope", Label: "assertion"}}}}}, Rendered: []byte("private")})
+	s := &Service{}
+	for _, crossScope := range []bool{false, true} {
+		if crossScope {
+			m.Memories[0].Memory.Dependencies[0].Scope = "other"
+		}
+		raw, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries, gaps, err := s.prepareAuditEntries(context.Background(), model.Caller{Tenant: "bank", Principal: "reader"}, model.AuditExportRequest{Scope: "scope", IncludeEvidence: false}, []model.AuditEntry{{Kind: "context", ID: m.ID, Payload: raw}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if crossScope {
+			if len(entries) != 0 || len(gaps) != 1 || gaps[0].Reason != "outside_export_scope" {
+				t.Fatal("cross-scope metadata disclosed", entries, gaps)
+			}
+		} else if len(entries) != 1 || len(gaps) != 1 || gaps[0].Kind != "context_content" || gaps[0].Reason != "disposed_under_retention_policy" {
+			t.Fatal("disposed context coverage missing", entries, gaps)
 		}
 	}
 }

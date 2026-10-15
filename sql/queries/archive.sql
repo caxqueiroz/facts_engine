@@ -54,9 +54,10 @@ FROM retention_events
 WHERE tenant_id=$1 AND ledger_revision=$2;
 
 -- name: ListArchiveContext :many
-SELECT c.id,p.payload
+SELECT c.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM context_manifests c
 LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND c.ledger_revision=$2;
 
 -- name: ListArchiveDecision :many
@@ -130,9 +131,10 @@ FROM memory_versions
 WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001;
 
 -- name: ListAuditContext :many
-SELECT c.id,p.payload
+SELECT c.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM context_manifests c
 LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND EXISTS(SELECT 1
 FROM context_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001;

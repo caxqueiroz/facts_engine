@@ -1107,15 +1107,195 @@ func (x *DisposeSnapshotResponse) GetResult() *CommitResult {
 	return nil
 }
 
+type ContextRetentionBinding struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	PolicyId      string                 `protobuf:"bytes,2,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Jurisdiction  string                 `protobuf:"bytes,3,opt,name=jurisdiction,proto3" json:"jurisdiction,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContextRetentionBinding) Reset() {
+	*x = ContextRetentionBinding{}
+	mi := &file_memory_v1_retention_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextRetentionBinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextRetentionBinding) ProtoMessage() {}
+
+func (x *ContextRetentionBinding) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextRetentionBinding.ProtoReflect.Descriptor instead.
+func (*ContextRetentionBinding) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ContextRetentionBinding) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *ContextRetentionBinding) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *ContextRetentionBinding) GetJurisdiction() string {
+	if x != nil {
+		return x.Jurisdiction
+	}
+	return ""
+}
+
+type DisposeContextRequest struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Tenant        string                     `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command       *Command                   `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	ContextId     string                     `protobuf:"bytes,3,opt,name=context_id,json=contextId,proto3" json:"context_id,omitempty"`
+	Reason        string                     `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Bindings      []*ContextRetentionBinding `protobuf:"bytes,5,rep,name=bindings,proto3" json:"bindings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisposeContextRequest) Reset() {
+	*x = DisposeContextRequest{}
+	mi := &file_memory_v1_retention_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisposeContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisposeContextRequest) ProtoMessage() {}
+
+func (x *DisposeContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisposeContextRequest.ProtoReflect.Descriptor instead.
+func (*DisposeContextRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DisposeContextRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *DisposeContextRequest) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *DisposeContextRequest) GetContextId() string {
+	if x != nil {
+		return x.ContextId
+	}
+	return ""
+}
+
+func (x *DisposeContextRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *DisposeContextRequest) GetBindings() []*ContextRetentionBinding {
+	if x != nil {
+		return x.Bindings
+	}
+	return nil
+}
+
+type DisposeContextResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *CommitResult          `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisposeContextResponse) Reset() {
+	*x = DisposeContextResponse{}
+	mi := &file_memory_v1_retention_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisposeContextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisposeContextResponse) ProtoMessage() {}
+
+func (x *DisposeContextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisposeContextResponse.ProtoReflect.Descriptor instead.
+func (*DisposeContextResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DisposeContextResponse) GetResult() *CommitResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_memory_v1_retention_proto protoreflect.FileDescriptor
 
 const file_memory_v1_retention_proto_rawDesc = "" +
 	"\n" +
-	"\x19memory/v1/retention.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/evidence.proto\"\xa4\x03\n" +
+	"\x19memory/v1/retention.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/evidence.proto\"\xb5\x03\n" +
 	"\x0fRetentionPolicy\x129\n" +
 	"\x02id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12?\n" +
-	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12a\n" +
-	"\frecord_class\x18\x03 \x01(\tB>\xbaH;r9R\x0eevidence_bytesR\x15orphan_evidence_bytesR\x10snapshot_payloadR\vrecordClass\x12$\n" +
+	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12r\n" +
+	"\frecord_class\x18\x03 \x01(\tBO\xbaHLrJR\x0eevidence_bytesR\x15orphan_evidence_bytesR\x10snapshot_payloadR\x0fcontext_payloadR\vrecordClass\x12$\n" +
 	"\apurpose\x18\x04 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\x02R\apurpose\x12M\n" +
 	"\fjurisdiction\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\fjurisdiction\x12=\n" +
@@ -1199,12 +1379,27 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\x12L\n" +
 	"\bbindings\x18\x05 \x03(\v2#.memory.v1.SnapshotRetentionBindingB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\bbindings\"J\n" +
 	"\x17DisposeSnapshotResponse\x12/\n" +
-	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result2\xbb\x05\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result\"\xf1\x01\n" +
+	"\x17ContextRetentionBinding\x12?\n" +
+	"\x05scope\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12F\n" +
+	"\tpolicy_id\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\bpolicyId\x12M\n" +
+	"\fjurisdiction\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\fjurisdiction\"\xcb\x02\n" +
+	"\x15DisposeContextRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
+	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12H\n" +
+	"\n" +
+	"context_id\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\tcontextId\x12\"\n" +
+	"\x06reason\x18\x04 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\x12K\n" +
+	"\bbindings\x18\x05 \x03(\v2\".memory.v1.ContextRetentionBindingB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\bbindings\"I\n" +
+	"\x16DisposeContextResponse\x12/\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result2\x92\x06\n" +
 	"\x10RetentionService\x12p\n" +
 	"\x17RegisterRetentionPolicy\x12).memory.v1.RegisterRetentionPolicyRequest\x1a*.memory.v1.RegisterRetentionPolicyResponse\x12U\n" +
 	"\x0ePlaceLegalHold\x12 .memory.v1.PlaceLegalHoldRequest\x1a!.memory.v1.PlaceLegalHoldResponse\x12[\n" +
 	"\x10ReleaseLegalHold\x12\".memory.v1.ReleaseLegalHoldRequest\x1a#.memory.v1.ReleaseLegalHoldResponse\x12X\n" +
-	"\x0fDisposeEvidence\x12!.memory.v1.DisposeEvidenceRequest\x1a\".memory.v1.DisposeEvidenceResponse\x12X\n" +
+	"\x0fDisposeEvidence\x12!.memory.v1.DisposeEvidenceRequest\x1a\".memory.v1.DisposeEvidenceResponse\x12U\n" +
+	"\x0eDisposeContext\x12 .memory.v1.DisposeContextRequest\x1a!.memory.v1.DisposeContextResponse\x12X\n" +
 	"\x0fDisposeSnapshot\x12!.memory.v1.DisposeSnapshotRequest\x1a\".memory.v1.DisposeSnapshotResponse\x12j\n" +
 	"\x15DisposeOrphanEvidence\x12'.memory.v1.DisposeOrphanEvidenceRequest\x1a(.memory.v1.DisposeOrphanEvidenceResponse\x12a\n" +
 	"\x12GetRetentionStatus\x12$.memory.v1.GetRetentionStatusRequest\x1a%.memory.v1.GetRetentionStatusResponseB;Z9github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1b\x06proto3"
@@ -1221,7 +1416,7 @@ func file_memory_v1_retention_proto_rawDescGZIP() []byte {
 	return file_memory_v1_retention_proto_rawDescData
 }
 
-var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_memory_v1_retention_proto_goTypes = []any{
 	(*RetentionPolicy)(nil),                 // 0: memory.v1.RetentionPolicy
 	(*RegisterRetentionPolicyRequest)(nil),  // 1: memory.v1.RegisterRetentionPolicyRequest
@@ -1240,48 +1435,56 @@ var file_memory_v1_retention_proto_goTypes = []any{
 	(*SnapshotRetentionBinding)(nil),        // 14: memory.v1.SnapshotRetentionBinding
 	(*DisposeSnapshotRequest)(nil),          // 15: memory.v1.DisposeSnapshotRequest
 	(*DisposeSnapshotResponse)(nil),         // 16: memory.v1.DisposeSnapshotResponse
-	(*Command)(nil),                         // 17: memory.v1.Command
-	(*CommitResult)(nil),                    // 18: memory.v1.CommitResult
-	(*timestamppb.Timestamp)(nil),           // 19: google.protobuf.Timestamp
-	(*ObjectRef)(nil),                       // 20: memory.v1.ObjectRef
+	(*ContextRetentionBinding)(nil),         // 17: memory.v1.ContextRetentionBinding
+	(*DisposeContextRequest)(nil),           // 18: memory.v1.DisposeContextRequest
+	(*DisposeContextResponse)(nil),          // 19: memory.v1.DisposeContextResponse
+	(*Command)(nil),                         // 20: memory.v1.Command
+	(*CommitResult)(nil),                    // 21: memory.v1.CommitResult
+	(*timestamppb.Timestamp)(nil),           // 22: google.protobuf.Timestamp
+	(*ObjectRef)(nil),                       // 23: memory.v1.ObjectRef
 }
 var file_memory_v1_retention_proto_depIdxs = []int32{
-	17, // 0: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
+	20, // 0: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
 	0,  // 1: memory.v1.RegisterRetentionPolicyRequest.policy:type_name -> memory.v1.RetentionPolicy
-	18, // 2: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
-	17, // 3: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
-	18, // 4: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	17, // 5: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
-	18, // 6: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	17, // 7: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
-	18, // 8: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	21, // 2: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
+	20, // 3: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
+	21, // 4: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	20, // 5: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
+	21, // 6: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	20, // 7: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
+	21, // 8: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
 	11, // 9: memory.v1.GetRetentionStatusResponse.status:type_name -> memory.v1.RetentionStatus
-	19, // 10: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
-	17, // 11: memory.v1.DisposeOrphanEvidenceRequest.command:type_name -> memory.v1.Command
-	20, // 12: memory.v1.DisposeOrphanEvidenceRequest.object:type_name -> memory.v1.ObjectRef
-	18, // 13: memory.v1.DisposeOrphanEvidenceResponse.result:type_name -> memory.v1.CommitResult
-	17, // 14: memory.v1.DisposeSnapshotRequest.command:type_name -> memory.v1.Command
+	22, // 10: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
+	20, // 11: memory.v1.DisposeOrphanEvidenceRequest.command:type_name -> memory.v1.Command
+	23, // 12: memory.v1.DisposeOrphanEvidenceRequest.object:type_name -> memory.v1.ObjectRef
+	21, // 13: memory.v1.DisposeOrphanEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	20, // 14: memory.v1.DisposeSnapshotRequest.command:type_name -> memory.v1.Command
 	14, // 15: memory.v1.DisposeSnapshotRequest.bindings:type_name -> memory.v1.SnapshotRetentionBinding
-	18, // 16: memory.v1.DisposeSnapshotResponse.result:type_name -> memory.v1.CommitResult
-	1,  // 17: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
-	3,  // 18: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
-	5,  // 19: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
-	7,  // 20: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
-	15, // 21: memory.v1.RetentionService.DisposeSnapshot:input_type -> memory.v1.DisposeSnapshotRequest
-	12, // 22: memory.v1.RetentionService.DisposeOrphanEvidence:input_type -> memory.v1.DisposeOrphanEvidenceRequest
-	9,  // 23: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
-	2,  // 24: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
-	4,  // 25: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
-	6,  // 26: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
-	8,  // 27: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
-	16, // 28: memory.v1.RetentionService.DisposeSnapshot:output_type -> memory.v1.DisposeSnapshotResponse
-	13, // 29: memory.v1.RetentionService.DisposeOrphanEvidence:output_type -> memory.v1.DisposeOrphanEvidenceResponse
-	10, // 30: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
-	24, // [24:31] is the sub-list for method output_type
-	17, // [17:24] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	21, // 16: memory.v1.DisposeSnapshotResponse.result:type_name -> memory.v1.CommitResult
+	20, // 17: memory.v1.DisposeContextRequest.command:type_name -> memory.v1.Command
+	17, // 18: memory.v1.DisposeContextRequest.bindings:type_name -> memory.v1.ContextRetentionBinding
+	21, // 19: memory.v1.DisposeContextResponse.result:type_name -> memory.v1.CommitResult
+	1,  // 20: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
+	3,  // 21: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
+	5,  // 22: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
+	7,  // 23: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
+	18, // 24: memory.v1.RetentionService.DisposeContext:input_type -> memory.v1.DisposeContextRequest
+	15, // 25: memory.v1.RetentionService.DisposeSnapshot:input_type -> memory.v1.DisposeSnapshotRequest
+	12, // 26: memory.v1.RetentionService.DisposeOrphanEvidence:input_type -> memory.v1.DisposeOrphanEvidenceRequest
+	9,  // 27: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
+	2,  // 28: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
+	4,  // 29: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
+	6,  // 30: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
+	8,  // 31: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
+	19, // 32: memory.v1.RetentionService.DisposeContext:output_type -> memory.v1.DisposeContextResponse
+	16, // 33: memory.v1.RetentionService.DisposeSnapshot:output_type -> memory.v1.DisposeSnapshotResponse
+	13, // 34: memory.v1.RetentionService.DisposeOrphanEvidence:output_type -> memory.v1.DisposeOrphanEvidenceResponse
+	10, // 35: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
+	28, // [28:36] is the sub-list for method output_type
+	20, // [20:28] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_retention_proto_init() }
@@ -1297,7 +1500,7 @@ func file_memory_v1_retention_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_retention_proto_rawDesc), len(file_memory_v1_retention_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -191,3 +191,29 @@ INSERT INTO snapshot_disposals(tenant_id,snapshot_id,payload) VALUES($1,$2,$3);
 
 -- name: SnapshotScopes :many
 SELECT DISTINCT scope_id FROM fact_snapshot_items WHERE tenant_id=$1 AND snapshot_id=$2 ORDER BY scope_id;
+
+-- name: LockContextGuard :exec
+INSERT INTO context_guards(tenant_id,context_id,epoch) VALUES($1,$2,1)
+ON CONFLICT(tenant_id,context_id) DO UPDATE SET epoch=context_guards.epoch+1;
+
+-- name: ContextContentAvailable :one
+SELECT EXISTS(SELECT 1 FROM context_payloads p WHERE p.tenant_id=$1 AND p.context_id=$2)
+AND NOT EXISTS(SELECT 1 FROM context_disposals d WHERE d.tenant_id=$1 AND d.context_id=$2);
+
+-- name: ContextCreationTime :one
+SELECT e.recorded_at FROM context_manifests s JOIN ledger_events e ON e.tenant_id=s.tenant_id AND e.ledger_revision=s.ledger_revision
+WHERE s.tenant_id=$1 AND s.id=$2;
+
+-- name: ContextDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.context_id=$2)
+OR EXISTS(SELECT 1 FROM audit_export_requests a JOIN context_scopes i ON i.tenant_id=a.tenant_id AND i.scope_id=a.scope_id WHERE i.tenant_id=$1 AND i.context_id=$2)
+OR EXISTS(SELECT 1 FROM consumer_offsets co JOIN context_manifests s ON s.tenant_id=co.tenant_id WHERE s.tenant_id=$1 AND s.id=$2 AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<s.ledger_revision);
+
+-- name: DeleteContextPayload :execrows
+DELETE FROM context_payloads WHERE tenant_id=$1 AND context_id=$2;
+
+-- name: InsertContextDisposal :exec
+INSERT INTO context_disposals(tenant_id,context_id,payload) VALUES($1,$2,$3);
+
+-- name: ContextScopes :many
+SELECT DISTINCT scope_id FROM context_scopes WHERE tenant_id=$1 AND context_id=$2 ORDER BY scope_id;

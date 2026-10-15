@@ -11,6 +11,104 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const ContextContentAvailable = `-- name: ContextContentAvailable :one
+SELECT EXISTS(SELECT 1 FROM context_payloads p WHERE p.tenant_id=$1 AND p.context_id=$2)
+AND NOT EXISTS(SELECT 1 FROM context_disposals d WHERE d.tenant_id=$1 AND d.context_id=$2)
+`
+
+type ContextContentAvailableParams struct {
+	TenantID  string
+	ContextID string
+}
+
+func (q *Queries) ContextContentAvailable(ctx context.Context, arg ContextContentAvailableParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, ContextContentAvailable, arg.TenantID, arg.ContextID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const ContextCreationTime = `-- name: ContextCreationTime :one
+SELECT e.recorded_at FROM context_manifests s JOIN ledger_events e ON e.tenant_id=s.tenant_id AND e.ledger_revision=s.ledger_revision
+WHERE s.tenant_id=$1 AND s.id=$2
+`
+
+type ContextCreationTimeParams struct {
+	TenantID string
+	ID       string
+}
+
+func (q *Queries) ContextCreationTime(ctx context.Context, arg ContextCreationTimeParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, ContextCreationTime, arg.TenantID, arg.ID)
+	var recorded_at pgtype.Timestamptz
+	err := row.Scan(&recorded_at)
+	return recorded_at, err
+}
+
+const ContextDisposalBlocked = `-- name: ContextDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.context_id=$2)
+OR EXISTS(SELECT 1 FROM audit_export_requests a JOIN context_scopes i ON i.tenant_id=a.tenant_id AND i.scope_id=a.scope_id WHERE i.tenant_id=$1 AND i.context_id=$2)
+OR EXISTS(SELECT 1 FROM consumer_offsets co JOIN context_manifests s ON s.tenant_id=co.tenant_id WHERE s.tenant_id=$1 AND s.id=$2 AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<s.ledger_revision)
+`
+
+type ContextDisposalBlockedParams struct {
+	TenantID  string
+	ContextID pgtype.Text
+}
+
+func (q *Queries) ContextDisposalBlocked(ctx context.Context, arg ContextDisposalBlockedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, ContextDisposalBlocked, arg.TenantID, arg.ContextID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const ContextScopes = `-- name: ContextScopes :many
+SELECT DISTINCT scope_id FROM context_scopes WHERE tenant_id=$1 AND context_id=$2 ORDER BY scope_id
+`
+
+type ContextScopesParams struct {
+	TenantID  string
+	ContextID string
+}
+
+func (q *Queries) ContextScopes(ctx context.Context, arg ContextScopesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, ContextScopes, arg.TenantID, arg.ContextID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var scope_id string
+		if err := rows.Scan(&scope_id); err != nil {
+			return nil, err
+		}
+		items = append(items, scope_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DeleteContextPayload = `-- name: DeleteContextPayload :execrows
+DELETE FROM context_payloads WHERE tenant_id=$1 AND context_id=$2
+`
+
+type DeleteContextPayloadParams struct {
+	TenantID  string
+	ContextID string
+}
+
+func (q *Queries) DeleteContextPayload(ctx context.Context, arg DeleteContextPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteContextPayload, arg.TenantID, arg.ContextID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const DeleteEvidenceObject = `-- name: DeleteEvidenceObject :execrows
 DELETE
 FROM evidence_objects
@@ -446,6 +544,21 @@ func (q *Queries) HasUnselectedSharedEvidenceObject(ctx context.Context, arg Has
 	return exists, err
 }
 
+const InsertContextDisposal = `-- name: InsertContextDisposal :exec
+INSERT INTO context_disposals(tenant_id,context_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertContextDisposalParams struct {
+	TenantID  string
+	ContextID string
+	Payload   []byte
+}
+
+func (q *Queries) InsertContextDisposal(ctx context.Context, arg InsertContextDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertContextDisposal, arg.TenantID, arg.ContextID, arg.Payload)
+	return err
+}
+
 const InsertLegalHold = `-- name: InsertLegalHold :execrows
 INSERT INTO legal_holds (tenant_id,scope_id,id)
 VALUES ($1,$2,$3)
@@ -586,6 +699,21 @@ func (q *Queries) ListActiveLegalHolds(ctx context.Context, arg ListActiveLegalH
 		return nil, err
 	}
 	return items, nil
+}
+
+const LockContextGuard = `-- name: LockContextGuard :exec
+INSERT INTO context_guards(tenant_id,context_id,epoch) VALUES($1,$2,1)
+ON CONFLICT(tenant_id,context_id) DO UPDATE SET epoch=context_guards.epoch+1
+`
+
+type LockContextGuardParams struct {
+	TenantID  string
+	ContextID string
+}
+
+func (q *Queries) LockContextGuard(ctx context.Context, arg LockContextGuardParams) error {
+	_, err := q.db.Exec(ctx, LockContextGuard, arg.TenantID, arg.ContextID)
+	return err
 }
 
 const LockRetentionObject = `-- name: LockRetentionObject :one
