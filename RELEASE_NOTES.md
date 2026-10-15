@@ -1,0 +1,35 @@
+# v0.2.0-rc.1
+
+**Release date:** 2026-10-15  
+**Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
+
+This is the first tagged release of `github.com/caxqueiroz/facts_engine`. It gives consumers a pin-able Go module and protobuf contract for the v0.2 specification. It is not a production banking approval or a v1 compatibility promise.
+
+## Consumer contract
+
+- Minimum Go version: Go 1.26.0. The repository was verified with Go 1.27.2.
+- Go module: `github.com/caxqueiroz/facts_engine`.
+- Remote API: generated Connect and gRPC contracts in `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
+- Persistence: PostgreSQL is authoritative. The release includes forward-only migrations through `00052_conversation_disposal_storage.sql`; run migrations with a privileged deployment identity and use restricted runtime roles.
+- Authorization: OpenFGA model and adapter are included. The host publishes and pins a store/model and provisions tenant/scope tuples.
+- Lifecycle: constructors do not migrate, start listeners/workers, provision external systems, or own injected resources. Hosts control setup and shutdown.
+- Compatibility: APIs and migrations may change in later 0.2 prereleases. Pin this exact version and upgrade the application, service, workers, and migration set together. A later prerelease may require code changes or a rehearsed database migration.
+
+## Included
+
+- Embedded engine and optional Connect/gRPC service for governed facts and memories, temporal history, snapshots, evidence, attestations, context/decision records, calculations, audit exports, identities, retrieval, extraction scheduling, and retention administration.
+- PostgreSQL tenant isolation, OpenFGA authorization, durable outbox workers, CortexDB projections/recall, managed rebuilds, signed event archives, and explicit payload-disposal workflows.
+- Eight standalone worker modes: projection, audit, archive, refresh, refresh-sweep, extraction, orphan-cleanup, and projection-cleanup.
+- All 77 declared protobuf RPC methods have PostgreSQL integration fixtures that use both Connect and generated gRPC clients. Tested inputs cover representative success, replay, authorization, validation, and lifecycle behavior; this is not an exhaustive input/error cross-product.
+
+## Host responsibilities and known limits
+
+The host supplies trusted identity-to-tenant mapping, OpenFGA tuples, evidence and immutable archive stores, production key management, approved extraction/embedding providers, worker supervision, telemetry collection, and backup/recovery. The host also owns the domain catalogue, business validation, and confirmation presentation. External evidence deletion requires an idempotent versioned-store deleter and a running `evidence-disposal` outbox consumer.
+
+This release ships development/reference key and local storage integrations, not bank-managed envelope encryption or a production immutable archive. Search, cache, export, backup and archive copies follow their own retention controls. Extraction quality, capacity, retrieval quality, RPO/RTO, and compliance require consuming-application evaluation and owner approval. The engine does not implement wealth onboarding, profile completeness, allocation, or business decisions.
+
+See [SETUP.md](SETUP.md) for installation, configuration, the first application workflow, worker setup, upgrades, and the production acceptance gates. See [spec-acceptance.md](spec-acceptance.md) for test evidence and external sign-off owners.
+
+## Verification
+
+The release source passed `make check`, `make build`, and `sh scripts/ci-integration.sh`. The integration suite used disposable PostgreSQL, OpenFGA, and CortexDB services and completed its logical restore and fresh search rebuild drill. These checks establish repository behavior only; they do not replace the production approvals above.
