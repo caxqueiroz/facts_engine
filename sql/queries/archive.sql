@@ -26,19 +26,22 @@ LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id
 WHERE v.tenant_id=$1 AND v.ledger_revision=$2;
 
 -- name: ListArchiveExtractionAttempt :many
-SELECT id,payload
-FROM extraction_attempts
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT h.id,p.payload
+FROM extraction_attempts h
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionResult :many
-SELECT attempt_id,payload
-FROM extraction_results
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT h.attempt_id,p.payload
+FROM extraction_results h
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionJob :many
-SELECT id,payload
-FROM extraction_jobs
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT h.id,p.payload
+FROM extraction_jobs h
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionRetry :many
 SELECT id,payload
@@ -151,8 +154,9 @@ FROM decision_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001;
 
 -- name: ListAuditExtractionAttempt :many
-SELECT a.id,a.payload
+SELECT a.id,p.payload
 FROM extraction_attempts a
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -161,8 +165,9 @@ FROM memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY a.ledger_revision LIMIT 10001;
 
 -- name: ListAuditExtractionResult :many
-SELECT a.attempt_id,a.payload
+SELECT a.attempt_id,p.payload
 FROM extraction_results a
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.attempt_id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -177,8 +182,9 @@ JOIN extraction_jobs j ON j.tenant_id=r.tenant_id AND j.id=r.job_id
 WHERE r.tenant_id=$1 AND j.scope_id=$2 ORDER BY r.ledger_revision LIMIT 10001;
 
 -- name: ListAuditExtractionJob :many
-SELECT j.id,j.payload
+SELECT j.id,p.payload
 FROM extraction_jobs j
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=j.tenant_id AND p.job_id=j.id
 WHERE j.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1

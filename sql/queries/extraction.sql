@@ -1,7 +1,8 @@
 -- name: GetExtractionJobPayload :one
-SELECT payload
-FROM extraction_jobs
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM extraction_jobs h
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+WHERE h.tenant_id=$1 AND h.id=$2;
 
 -- name: GetExtractionJobStatus :one
 SELECT j.scope_id,j.ledger_revision,s.state,s.fence,s.attempts,s.max_attempts,s.attempt_id,s.available_at,s.lease_until,s.last_failure_code
@@ -13,9 +14,9 @@ WHERE j.tenant_id=$1 AND j.id=$2;
 UPDATE extraction_job_state SET state='pending',fence=fence+1,attempts=0,lease_until=NULL,available_at=clock_timestamp(),last_failure_code=''
 WHERE tenant_id=$1 AND id=$2 AND state='failed' AND fence=$3;
 
--- name: InsertExtractionJob :exec
-INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,payload,memory_record_id,memory_version_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+-- name: InsertExtractionJobHeader :exec
+INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,memory_record_id,memory_version_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
 -- name: InsertExtractionRedaction :exec
 INSERT INTO extraction_redactions(tenant_id,job_id,scope_id,evidence_id)
@@ -64,26 +65,28 @@ UPDATE extraction_quota SET reserved_tokens=reserved_tokens+$2,reserved_cost_uni
 WHERE tenant_id=$1;
 
 -- name: GetExtractionAttemptPayload :one
-SELECT payload
-FROM extraction_attempts
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM extraction_attempts h
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+WHERE h.tenant_id=$1 AND h.id=$2;
 
 -- name: GetExtractionResultPayload :one
-SELECT payload
-FROM extraction_results
-WHERE tenant_id=$1 AND attempt_id=$2;
+SELECT p.payload
+FROM extraction_results h
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+WHERE h.tenant_id=$1 AND h.attempt_id=$2;
 
 -- name: FinishExtractionJob :execrows
 UPDATE extraction_job_state SET state=CASE WHEN sqlc.arg(next_state)::text='pending' AND attempts>=max_attempts THEN 'failed' ELSE sqlc.arg(next_state)::text END,lease_until=NULL,last_failure_code=sqlc.arg(last_failure_code),available_at=clock_timestamp()+sqlc.arg(delay_millis)::bigint*interval '1 millisecond'
 WHERE tenant_id=sqlc.arg(tenant_id) AND id=sqlc.arg(id) AND attempt_id=sqlc.arg(attempt_id) AND fence=sqlc.arg(fence) AND state='running' AND lease_until>clock_timestamp();
 
--- name: InsertExtractionAttempt :exec
-INSERT INTO extraction_attempts (tenant_id,id,job_id,scope_id,fence,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7);
-
--- name: InsertExtractionResult :exec
-INSERT INTO extraction_results (tenant_id,attempt_id,job_id,scope_id,ledger_revision,payload)
+-- name: InsertExtractionAttemptHeader :exec
+INSERT INTO extraction_attempts(tenant_id,id,job_id,scope_id,fence,ledger_revision)
 VALUES ($1,$2,$3,$4,$5,$6);
+
+-- name: InsertExtractionResultHeader :exec
+INSERT INTO extraction_results(tenant_id,attempt_id,job_id,scope_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5);
 
 -- name: InsertExtractionMemoryProposal :exec
 INSERT INTO extraction_memory_proposals (tenant_id,attempt_id,ordinal,record_id,version_id)
@@ -114,8 +117,9 @@ INSERT INTO extraction_attempt_memory_inputs(tenant_id,attempt_id,record_id,vers
 SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL);
 
 -- name: ListUninventoriedExtractionAttemptPage :many
-SELECT a.id,a.job_id,a.scope_id,a.payload
+SELECT a.id,a.job_id,a.scope_id,p.payload
 FROM extraction_attempts a
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
 LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id
 WHERE a.tenant_id=$1 AND i.attempt_id IS NULL
 ORDER BY a.id COLLATE "C" LIMIT $2;
@@ -123,3 +127,12 @@ ORDER BY a.id COLLATE "C" LIMIT $2;
 -- name: HasPartialExtractionInputInventory :one
 SELECT EXISTS(SELECT 1 FROM extraction_attempt_fact_inputs f WHERE f.tenant_id=sqlc.arg(tenant_id) AND f.attempt_id=sqlc.arg(attempt_id))
  OR EXISTS(SELECT 1 FROM extraction_attempt_memory_inputs m WHERE m.tenant_id=sqlc.arg(tenant_id) AND m.attempt_id=sqlc.arg(attempt_id));
+
+-- name: InsertExtractionJobPayload :exec
+INSERT INTO extraction_job_payloads(tenant_id,job_id,payload) VALUES($1,$2,$3);
+
+-- name: InsertExtractionAttemptPayload :exec
+INSERT INTO extraction_attempt_payloads(tenant_id,attempt_id,payload) VALUES($1,$2,$3);
+
+-- name: InsertExtractionResultPayload :exec
+INSERT INTO extraction_result_payloads(tenant_id,attempt_id,payload) VALUES($1,$2,$3);

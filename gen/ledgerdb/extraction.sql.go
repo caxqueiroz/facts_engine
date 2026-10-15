@@ -99,9 +99,10 @@ func (q *Queries) FinishExtractionJob(ctx context.Context, arg FinishExtractionJ
 }
 
 const GetExtractionAttemptPayload = `-- name: GetExtractionAttemptPayload :one
-SELECT payload
-FROM extraction_attempts
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM extraction_attempts h
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+WHERE h.tenant_id=$1 AND h.id=$2
 `
 
 type GetExtractionAttemptPayloadParams struct {
@@ -117,9 +118,10 @@ func (q *Queries) GetExtractionAttemptPayload(ctx context.Context, arg GetExtrac
 }
 
 const GetExtractionJobPayload = `-- name: GetExtractionJobPayload :one
-SELECT payload
-FROM extraction_jobs
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM extraction_jobs h
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+WHERE h.tenant_id=$1 AND h.id=$2
 `
 
 type GetExtractionJobPayloadParams struct {
@@ -178,9 +180,10 @@ func (q *Queries) GetExtractionJobStatus(ctx context.Context, arg GetExtractionJ
 }
 
 const GetExtractionResultPayload = `-- name: GetExtractionResultPayload :one
-SELECT payload
-FROM extraction_results
-WHERE tenant_id=$1 AND attempt_id=$2
+SELECT p.payload
+FROM extraction_results h
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+WHERE h.tenant_id=$1 AND h.attempt_id=$2
 `
 
 type GetExtractionResultPayloadParams struct {
@@ -223,31 +226,44 @@ func (q *Queries) HasUninventoriedExtractionAttempts(ctx context.Context, tenant
 	return exists, err
 }
 
-const InsertExtractionAttempt = `-- name: InsertExtractionAttempt :exec
-INSERT INTO extraction_attempts (tenant_id,id,job_id,scope_id,fence,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
+const InsertExtractionAttemptHeader = `-- name: InsertExtractionAttemptHeader :exec
+INSERT INTO extraction_attempts(tenant_id,id,job_id,scope_id,fence,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6)
 `
 
-type InsertExtractionAttemptParams struct {
+type InsertExtractionAttemptHeaderParams struct {
 	TenantID       string
 	ID             string
 	JobID          string
 	ScopeID        string
 	Fence          int64
 	LedgerRevision int64
-	Payload        []byte
 }
 
-func (q *Queries) InsertExtractionAttempt(ctx context.Context, arg InsertExtractionAttemptParams) error {
-	_, err := q.db.Exec(ctx, InsertExtractionAttempt,
+func (q *Queries) InsertExtractionAttemptHeader(ctx context.Context, arg InsertExtractionAttemptHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionAttemptHeader,
 		arg.TenantID,
 		arg.ID,
 		arg.JobID,
 		arg.ScopeID,
 		arg.Fence,
 		arg.LedgerRevision,
-		arg.Payload,
 	)
+	return err
+}
+
+const InsertExtractionAttemptPayload = `-- name: InsertExtractionAttemptPayload :exec
+INSERT INTO extraction_attempt_payloads(tenant_id,attempt_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertExtractionAttemptPayloadParams struct {
+	TenantID  string
+	AttemptID string
+	Payload   []byte
+}
+
+func (q *Queries) InsertExtractionAttemptPayload(ctx context.Context, arg InsertExtractionAttemptPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionAttemptPayload, arg.TenantID, arg.AttemptID, arg.Payload)
 	return err
 }
 
@@ -321,12 +337,12 @@ func (q *Queries) InsertExtractionInputInventory(ctx context.Context, arg Insert
 	return err
 }
 
-const InsertExtractionJob = `-- name: InsertExtractionJob :exec
-INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,payload,memory_record_id,memory_version_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+const InsertExtractionJobHeader = `-- name: InsertExtractionJobHeader :exec
+INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,memory_record_id,memory_version_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 `
 
-type InsertExtractionJobParams struct {
+type InsertExtractionJobHeaderParams struct {
 	TenantID        string
 	ID              string
 	ScopeID         string
@@ -334,13 +350,12 @@ type InsertExtractionJobParams struct {
 	ProfileID       string
 	ProfileDigest   string
 	LedgerRevision  int64
-	Payload         []byte
 	MemoryRecordID  pgtype.Text
 	MemoryVersionID pgtype.Text
 }
 
-func (q *Queries) InsertExtractionJob(ctx context.Context, arg InsertExtractionJobParams) error {
-	_, err := q.db.Exec(ctx, InsertExtractionJob,
+func (q *Queries) InsertExtractionJobHeader(ctx context.Context, arg InsertExtractionJobHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionJobHeader,
 		arg.TenantID,
 		arg.ID,
 		arg.ScopeID,
@@ -348,10 +363,24 @@ func (q *Queries) InsertExtractionJob(ctx context.Context, arg InsertExtractionJ
 		arg.ProfileID,
 		arg.ProfileDigest,
 		arg.LedgerRevision,
-		arg.Payload,
 		arg.MemoryRecordID,
 		arg.MemoryVersionID,
 	)
+	return err
+}
+
+const InsertExtractionJobPayload = `-- name: InsertExtractionJobPayload :exec
+INSERT INTO extraction_job_payloads(tenant_id,job_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertExtractionJobPayloadParams struct {
+	TenantID string
+	JobID    string
+	Payload  []byte
+}
+
+func (q *Queries) InsertExtractionJobPayload(ctx context.Context, arg InsertExtractionJobPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionJobPayload, arg.TenantID, arg.JobID, arg.Payload)
 	return err
 }
 
@@ -508,29 +537,42 @@ func (q *Queries) InsertExtractionRefreshTrigger(ctx context.Context, arg Insert
 	return err
 }
 
-const InsertExtractionResult = `-- name: InsertExtractionResult :exec
-INSERT INTO extraction_results (tenant_id,attempt_id,job_id,scope_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6)
+const InsertExtractionResultHeader = `-- name: InsertExtractionResultHeader :exec
+INSERT INTO extraction_results(tenant_id,attempt_id,job_id,scope_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5)
 `
 
-type InsertExtractionResultParams struct {
+type InsertExtractionResultHeaderParams struct {
 	TenantID       string
 	AttemptID      string
 	JobID          string
 	ScopeID        string
 	LedgerRevision int64
-	Payload        []byte
 }
 
-func (q *Queries) InsertExtractionResult(ctx context.Context, arg InsertExtractionResultParams) error {
-	_, err := q.db.Exec(ctx, InsertExtractionResult,
+func (q *Queries) InsertExtractionResultHeader(ctx context.Context, arg InsertExtractionResultHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionResultHeader,
 		arg.TenantID,
 		arg.AttemptID,
 		arg.JobID,
 		arg.ScopeID,
 		arg.LedgerRevision,
-		arg.Payload,
 	)
+	return err
+}
+
+const InsertExtractionResultPayload = `-- name: InsertExtractionResultPayload :exec
+INSERT INTO extraction_result_payloads(tenant_id,attempt_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertExtractionResultPayloadParams struct {
+	TenantID  string
+	AttemptID string
+	Payload   []byte
+}
+
+func (q *Queries) InsertExtractionResultPayload(ctx context.Context, arg InsertExtractionResultPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionResultPayload, arg.TenantID, arg.AttemptID, arg.Payload)
 	return err
 }
 
@@ -581,8 +623,9 @@ func (q *Queries) InsertExtractionSubject(ctx context.Context, arg InsertExtract
 }
 
 const ListUninventoriedExtractionAttemptPage = `-- name: ListUninventoriedExtractionAttemptPage :many
-SELECT a.id,a.job_id,a.scope_id,a.payload
+SELECT a.id,a.job_id,a.scope_id,p.payload
 FROM extraction_attempts a
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
 LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id
 WHERE a.tenant_id=$1 AND i.attempt_id IS NULL
 ORDER BY a.id COLLATE "C" LIMIT $2

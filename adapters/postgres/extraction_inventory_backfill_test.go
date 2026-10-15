@@ -68,7 +68,7 @@ func testExtractionInventoryBackfill(t *testing.T, ctx context.Context, admin, r
 	originalCount := count()
 	var last, record, version string
 	var original []byte
-	if err := admin.QueryRow(ctx, `SELECT id,payload FROM extraction_attempts WHERE tenant_id=$1 ORDER BY id COLLATE "C" DESC LIMIT 1`, tenant).Scan(&last, &original); err != nil {
+	if err := admin.QueryRow(ctx, `SELECT attempt_id,payload FROM extraction_attempt_payloads WHERE tenant_id=$1 ORDER BY attempt_id COLLATE "C" DESC LIMIT 1`, tenant).Scan(&last, &original); err != nil {
 		t.Fatal(err)
 	}
 	if err := admin.QueryRow(ctx, `SELECT record_id,version_id FROM extraction_attempt_fact_inputs WHERE tenant_id=$1 LIMIT 1`, tenant).Scan(&record, &version); err != nil {
@@ -104,13 +104,13 @@ func testExtractionInventoryBackfill(t *testing.T, ctx context.Context, admin, r
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := admin.Exec(ctx, "UPDATE extraction_attempts SET payload=$3 WHERE tenant_id=$1 AND id=$2", tenant, last, sealed); err != nil {
+	if _, err := admin.Exec(ctx, "UPDATE extraction_attempt_payloads SET payload=$3 WHERE tenant_id=$1 AND attempt_id=$2", tenant, last, sealed); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := ledger.BackfillExtractionInputInventories(ctx, tenant, 100); !errors.Is(err, model.ErrInvalid) || got != (postgres.ExtractionInventoryBackfill{}) || count() != 0 {
 		t.Fatal("corrupt request accepted", got, err)
 	}
-	if _, err := admin.Exec(ctx, "UPDATE extraction_attempts SET payload=$3 WHERE tenant_id=$1 AND id=$2", tenant, last, original); err != nil {
+	if _, err := admin.Exec(ctx, "UPDATE extraction_attempt_payloads SET payload=$3 WHERE tenant_id=$1 AND attempt_id=$2", tenant, last, original); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := ledger.BackfillExtractionInputInventories(ctx, "other-backfill-tenant", 1); err != nil || !got.Complete || got.Inventoried != 0 || count() != 0 {
@@ -163,7 +163,7 @@ func testExtractionInventoryBackfill(t *testing.T, ctx context.Context, admin, r
 		t.Fatal("completed page replay changed inventory", again, err)
 	}
 	var retained []byte
-	if err := admin.QueryRow(ctx, "SELECT payload FROM extraction_attempts WHERE tenant_id=$1 AND id=$2", tenant, last).Scan(&retained); err != nil || !bytes.Equal(retained, original) {
+	if err := admin.QueryRow(ctx, "SELECT payload FROM extraction_attempt_payloads WHERE tenant_id=$1 AND attempt_id=$2", tenant, last).Scan(&retained); err != nil || !bytes.Equal(retained, original) {
 		t.Fatal("backfill rewrote retained artifact", err)
 	}
 }

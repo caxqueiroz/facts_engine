@@ -37,6 +37,9 @@ func (t *transaction) ExtractionJob(ctx context.Context, id string) (model.Extra
 	if err != nil {
 		return j, translate(err)
 	}
+	if len(payload) == 0 {
+		return j, model.ErrPrecondition
+	}
 	err = t.decode(payload, &j)
 	return j, err
 }
@@ -84,7 +87,10 @@ func (t *transaction) flushExtraction(ctx context.Context, e model.Event) error 
 			memoryRecord = pgtype.Text{String: j.Request.Refresh.RecordID, Valid: true}
 			memoryVersion = pgtype.Text{String: j.Request.Refresh.VersionID, Valid: true}
 		}
-		if err = ledgerdb.New(t.tx).InsertExtractionJob(ctx, ledgerdb.InsertExtractionJobParams{TenantID: t.tenant, ID: j.ID, ScopeID: j.Request.Scope, ConversationID: nullableID(j.Request.ConversationID), ProfileID: j.Profile.ID, ProfileDigest: j.ProfileDigest, LedgerRevision: e.LedgerRevision, Payload: b, MemoryRecordID: memoryRecord, MemoryVersionID: memoryVersion}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertExtractionJobHeader(ctx, ledgerdb.InsertExtractionJobHeaderParams{TenantID: t.tenant, ID: j.ID, ScopeID: j.Request.Scope, ConversationID: nullableID(j.Request.ConversationID), ProfileID: j.Profile.ID, ProfileDigest: j.ProfileDigest, LedgerRevision: e.LedgerRevision, MemoryRecordID: memoryRecord, MemoryVersionID: memoryVersion}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertExtractionJobPayload(ctx, ledgerdb.InsertExtractionJobPayloadParams{TenantID: t.tenant, JobID: j.ID, Payload: b}); err != nil {
 			return err
 		}
 		for _, evidenceID := range j.Request.RedactedEvidenceIDs {

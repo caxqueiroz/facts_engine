@@ -133,3 +133,7 @@ GRANT SELECT ON extraction_attempt_inventories,extraction_attempt_fact_inputs,ex
 
 GRANT SELECT,INSERT ON extraction_inventory_guards TO facts_runtime;
 GRANT UPDATE(epoch) ON extraction_inventory_guards TO facts_runtime;
+
+GRANT SELECT,INSERT ON extraction_job_payloads,extraction_attempt_payloads,extraction_result_payloads TO facts_runtime;
+GRANT SELECT ON extraction_job_payloads,extraction_attempt_payloads,extraction_result_payloads TO facts_archiver;
+REVOKE UPDATE,DELETE,TRUNCATE ON extraction_job_payloads,extraction_attempt_payloads,extraction_result_payloads,extraction_jobs,extraction_attempts,extraction_results FROM facts_runtime;

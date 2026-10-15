@@ -220,6 +220,10 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 					rows.Close()
 					return err
 				}
+				if len(b) == 0 {
+					rows.Close()
+					return model.ErrPrecondition
+				}
 				plain, err := t.cipher.Open(d.Key.Tenant, b)
 				if err != nil {
 					rows.Close()

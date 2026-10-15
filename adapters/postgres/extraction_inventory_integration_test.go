@@ -16,10 +16,10 @@ import (
 
 func testExtractionInputInventories(t *testing.T, ctx context.Context, admin, runtime *pgxpool.Pool) {
 	cipher, _ := postgres.NewAESGCM(bytes.Repeat([]byte{4}, 32))
-	rows, err := admin.Query(ctx, `SELECT a.tenant_id,a.id,a.payload,i.request_digest,i.fact_count,i.memory_count,
+	rows, err := admin.Query(ctx, `SELECT a.tenant_id,a.id,p.payload,i.request_digest,i.fact_count,i.memory_count,
  (SELECT count(*) FROM extraction_attempt_fact_inputs f WHERE f.tenant_id=a.tenant_id AND f.attempt_id=a.id),
  (SELECT count(*) FROM extraction_attempt_memory_inputs m WHERE m.tenant_id=a.tenant_id AND m.attempt_id=a.id)
- FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id`)
+ FROM extraction_attempts a LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id`)
 	if err != nil {
 		t.Fatal(err)
 	}

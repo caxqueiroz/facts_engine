@@ -57,6 +57,10 @@ func (l *Ledger) BackfillExtractionInputInventories(ctx context.Context, tenant 
 			rows.Close()
 			return result, err
 		}
+		if len(payload) == 0 {
+			rows.Close()
+			return result, model.ErrPrecondition
+		}
 		total += len(payload)
 		if total > 64<<20 {
 			rows.Close()

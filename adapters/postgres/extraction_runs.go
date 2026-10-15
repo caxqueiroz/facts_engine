@@ -61,6 +61,9 @@ func (t *transaction) ExtractionAttempt(ctx context.Context, id string) (model.E
 	if err != nil {
 		return a, translate(err)
 	}
+	if len(payload) == 0 {
+		return a, model.ErrPrecondition
+	}
 	err = t.decode(payload, &a)
 	return a, err
 }
@@ -69,6 +72,9 @@ func (t *transaction) ExtractionResult(ctx context.Context, id string) (model.Ex
 	payload, err := ledgerdb.New(t.tx).GetExtractionResultPayload(ctx, ledgerdb.GetExtractionResultPayloadParams{TenantID: t.tenant, AttemptID: id})
 	if err != nil {
 		return r, translate(err)
+	}
+	if len(payload) == 0 {
+		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
 	return r, err
@@ -102,7 +108,10 @@ func (t *transaction) flushExtractionRun(ctx context.Context, e model.Event) err
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertExtractionAttempt(ctx, ledgerdb.InsertExtractionAttemptParams{TenantID: t.tenant, ID: a.ID, JobID: a.JobID, ScopeID: a.Scope, Fence: a.Fence, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertExtractionAttemptHeader(ctx, ledgerdb.InsertExtractionAttemptHeaderParams{TenantID: t.tenant, ID: a.ID, JobID: a.JobID, ScopeID: a.Scope, Fence: a.Fence, LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertExtractionAttemptPayload(ctx, ledgerdb.InsertExtractionAttemptPayloadParams{TenantID: t.tenant, AttemptID: a.ID, Payload: b}); err != nil {
 			return err
 		}
 		if err := t.retainExtractionInputInventory(ctx, a); err != nil {
@@ -117,7 +126,10 @@ func (t *transaction) flushExtractionRun(ctx context.Context, e model.Event) err
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertExtractionResult(ctx, ledgerdb.InsertExtractionResultParams{TenantID: t.tenant, AttemptID: r.AttemptID, JobID: r.JobID, ScopeID: r.Scope, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertExtractionResultHeader(ctx, ledgerdb.InsertExtractionResultHeaderParams{TenantID: t.tenant, AttemptID: r.AttemptID, JobID: r.JobID, ScopeID: r.Scope, LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertExtractionResultPayload(ctx, ledgerdb.InsertExtractionResultPayloadParams{TenantID: t.tenant, AttemptID: r.AttemptID, Payload: b}); err != nil {
 			return err
 		}
 		for _, p := range r.Proposals {

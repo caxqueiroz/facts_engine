@@ -254,9 +254,10 @@ func (q *Queries) ListArchiveDecision(ctx context.Context, arg ListArchiveDecisi
 }
 
 const ListArchiveExtractionAttempt = `-- name: ListArchiveExtractionAttempt :many
-SELECT id,payload
-FROM extraction_attempts
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT h.id,p.payload
+FROM extraction_attempts h
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
 type ListArchiveExtractionAttemptParams struct {
@@ -290,9 +291,10 @@ func (q *Queries) ListArchiveExtractionAttempt(ctx context.Context, arg ListArch
 }
 
 const ListArchiveExtractionJob = `-- name: ListArchiveExtractionJob :many
-SELECT id,payload
-FROM extraction_jobs
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT h.id,p.payload
+FROM extraction_jobs h
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
 type ListArchiveExtractionJobParams struct {
@@ -326,9 +328,10 @@ func (q *Queries) ListArchiveExtractionJob(ctx context.Context, arg ListArchiveE
 }
 
 const ListArchiveExtractionResult = `-- name: ListArchiveExtractionResult :many
-SELECT attempt_id,payload
-FROM extraction_results
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT h.attempt_id,p.payload
+FROM extraction_results h
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
 type ListArchiveExtractionResultParams struct {
@@ -1033,8 +1036,9 @@ func (q *Queries) ListAuditEvidence(ctx context.Context, arg ListAuditEvidencePa
 }
 
 const ListAuditExtractionAttempt = `-- name: ListAuditExtractionAttempt :many
-SELECT a.id,a.payload
+SELECT a.id,p.payload
 FROM extraction_attempts a
+LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -1074,8 +1078,9 @@ func (q *Queries) ListAuditExtractionAttempt(ctx context.Context, arg ListAuditE
 }
 
 const ListAuditExtractionJob = `-- name: ListAuditExtractionJob :many
-SELECT j.id,j.payload
+SELECT j.id,p.payload
 FROM extraction_jobs j
+LEFT JOIN extraction_job_payloads p ON p.tenant_id=j.tenant_id AND p.job_id=j.id
 WHERE j.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1
@@ -1114,8 +1119,9 @@ func (q *Queries) ListAuditExtractionJob(ctx context.Context, arg ListAuditExtra
 }
 
 const ListAuditExtractionResult = `-- name: ListAuditExtractionResult :many
-SELECT a.attempt_id,a.payload
+SELECT a.attempt_id,p.payload
 FROM extraction_results a
+LEFT JOIN extraction_result_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.attempt_id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d

@@ -62,6 +62,10 @@ func (t *transaction) AuditEntries(ctx context.Context, scope string) ([]model.A
 				rows.Close()
 				return nil, nil, err
 			}
+			if len(encrypted) == 0 {
+				rows.Close()
+				return nil, nil, model.ErrPrecondition
+			}
 			plain, err := t.cipher.Open(t.tenant, encrypted)
 			if err != nil {
 				rows.Close()

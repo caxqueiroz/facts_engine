@@ -318,7 +318,6 @@ type ExtractionAttempt struct {
 	ScopeID        string
 	Fence          int64
 	LedgerRevision int64
-	Payload        []byte
 }
 
 type ExtractionAttemptFactInput struct {
@@ -346,6 +345,12 @@ type ExtractionAttemptMemoryInput struct {
 	PayloadRetained bool
 }
 
+type ExtractionAttemptPayload struct {
+	TenantID  string
+	AttemptID string
+	Payload   []byte
+}
+
 type ExtractionInventoryGuard struct {
 	TenantID  string
 	AttemptID string
@@ -360,9 +365,14 @@ type ExtractionJob struct {
 	ProfileID       string
 	ProfileDigest   string
 	LedgerRevision  int64
-	Payload         []byte
 	MemoryRecordID  pgtype.Text
 	MemoryVersionID pgtype.Text
+}
+
+type ExtractionJobPayload struct {
+	TenantID string
+	JobID    string
+	Payload  []byte
 }
 
 type ExtractionJobState struct {
@@ -440,7 +450,12 @@ type ExtractionResult struct {
 	JobID          string
 	ScopeID        string
 	LedgerRevision int64
-	Payload        []byte
+}
+
+type ExtractionResultPayload struct {
+	TenantID  string
+	AttemptID string
+	Payload   []byte
 }
 
 type ExtractionRetryEvent struct {
