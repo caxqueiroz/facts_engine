@@ -183,9 +183,11 @@ func (q *Queries) ListArchiveContext(ctx context.Context, arg ListArchiveContext
 }
 
 const ListArchiveConversation = `-- name: ListArchiveConversation :many
-SELECT id,payload
-FROM conversations
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT c.id,(CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.ledger_revision=$2
 `
 
 type ListArchiveConversationParams struct {
@@ -928,9 +930,11 @@ func (q *Queries) ListAuditContext(ctx context.Context, arg ListAuditContextPara
 }
 
 const ListAuditConversation = `-- name: ListAuditConversation :many
-SELECT id,payload
-FROM conversations
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001
+SELECT c.id,(CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.scope_id=$2 ORDER BY c.ledger_revision LIMIT 10001
 `
 
 type ListAuditConversationParams struct {

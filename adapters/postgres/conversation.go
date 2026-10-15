@@ -15,6 +15,12 @@ func (t *transaction) Conversation(ctx context.Context, id string) (model.Conver
 		return r, translate(err)
 	}
 	err = t.decode(b, &r)
+	if err == nil && r.PayloadDisposed {
+		if !model.ValidConversationTombstone(r, t.tenant, id) {
+			return model.ConversationRecord{}, model.ErrPrecondition
+		}
+		return model.ConversationRecord{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) StageConversation(ctx context.Context, r model.ConversationRecord) error {
@@ -39,7 +45,10 @@ func (t *transaction) flushConversation(ctx context.Context, e model.Event) erro
 	if err != nil {
 		return err
 	}
-	if err = ledgerdb.New(t.tx).InsertConversationPayload(ctx, ledgerdb.InsertConversationPayloadParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Request.Scope, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+	if err = ledgerdb.New(t.tx).InsertConversationHeader(ctx, ledgerdb.InsertConversationHeaderParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Request.Scope, LedgerRevision: e.LedgerRevision}); err != nil {
+		return err
+	}
+	if err = ledgerdb.New(t.tx).InsertConversationPayload(ctx, ledgerdb.InsertConversationPayloadParams{TenantID: t.tenant, ConversationID: r.ID, Payload: b}); err != nil {
 		return err
 	}
 	for ordinal, id := range r.EvidenceIDs {

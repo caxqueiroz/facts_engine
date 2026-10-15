@@ -12,6 +12,7 @@ option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 service RetentionService {
   rpc DisposeBatch(DisposeBatchRequest) returns (DisposeBatchResponse);
   rpc DisposeAttestation(DisposeAttestationRequest) returns (DisposeAttestationResponse);
+  rpc DisposeConversation(DisposeConversationRequest) returns (DisposeConversationResponse);
   rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
@@ -29,6 +30,7 @@ message RetentionPolicy {
   string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   string record_class = 3 [
     (buf.validate.field).string.in = "evidence_bytes",
+    (buf.validate.field).string.in = "conversation_payload",
     (buf.validate.field).string.in = "orphan_evidence_bytes",
     (buf.validate.field).string.in = "snapshot_payload",
     (buf.validate.field).string.in = "context_payload",
@@ -39,7 +41,8 @@ message RetentionPolicy {
     (buf.validate.field).string.in = "extraction_response_payload",
     (buf.validate.field).string.in = "fact_payload",
     (buf.validate.field).string.in = "memory_payload",
-    (buf.validate.field).string.in = "attestation_payload"
+    (buf.validate.field).string.in = "attestation_payload",
+    (buf.validate.field).string.in = "conversation_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -74,6 +77,25 @@ message DisposeAttestationRequest {
   string version_id = 11 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
 }
 message DisposeAttestationResponse {
+  CommitResult result = 1;
+}
+message DisposeConversationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string conversation_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 7 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string reason = 8 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+}
+message DisposeConversationResponse {
   CommitResult result = 1;
 }
 message RegisterRetentionPolicyRequest {
@@ -324,6 +346,17 @@ message DisposeBatchRequest {
   repeated BatchContextSelection contexts = 8 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchCalculationSelection calculations = 9 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchDecisionSelection decisions = 10 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchConversationSelection conversations = 11 [(buf.validate.field).repeated.max_items = 32];
+}
+message BatchConversationSelection {
+  string conversation_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 5 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
 }
 message DisposeBatchResponse {
   CommitResult result = 1;

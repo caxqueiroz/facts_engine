@@ -14,6 +14,7 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 	}
 	r.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
 	r.Extractions = append([]model.ExtractionDisposalRequest(nil), r.Extractions...)
+	r.Conversations = append([]model.ConversationDisposalRequest(nil), r.Conversations...)
 	selected := map[string]bool{}
 	scopes := map[string]bool{}
 	for i := range r.Versions {
@@ -57,6 +58,18 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 			scopes[b.Scope] = true
 		}
 	}
+	for i := range r.Conversations {
+		item := &r.Conversations[i]
+		key := "conversation/" + item.ConversationID
+		if !model.ValidID(item.ConversationID) || !model.ValidID(item.Scope) || !model.ValidID(item.PolicyID) || !model.ValidID(item.Jurisdiction) || item.Purpose == "" || len(item.Purpose) > 256 || selected[key] || (item.Command != (model.Command{}) && item.Command != r.Command) || (item.Reason != "" && item.Reason != r.Reason) {
+			return r, model.ErrInvalid
+		}
+		selected[key] = true
+		item.Command = r.Command
+		item.Reason = r.Reason
+		scopes[item.Scope] = true
+	}
+	sort.Slice(r.Conversations, func(i, j int) bool { return r.Conversations[i].ConversationID < r.Conversations[j].ConversationID })
 	r.Snapshots = append([]model.SnapshotDisposalRequest(nil), r.Snapshots...)
 	for i := range r.Snapshots {
 		item := &r.Snapshots[i]
@@ -253,6 +266,13 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 				receipts = append(receipts, decisions[b.Scope])
 			}
 			event := model.RetentionEvent{Scope: e.Bindings[0].Scope, Kind: "dispose_extraction", TargetID: e.JobID, ExtractionDisposal: &e, AdditionalAuthorization: receipts, Limitations: []string{"structural_metadata_retained", "unselected_sources_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
+			if err = appendChild(event, "", "", "", 0); err != nil {
+				return err
+			}
+		}
+		for _, item := range r.Conversations {
+			d := decisions[item.Scope]
+			event := model.RetentionEvent{Scope: item.Scope, Kind: "dispose_conversation", TargetID: item.ConversationID, ConversationDisposal: &item, AdditionalAuthorization: []model.AuthorizationDecision{d}, Limitations: []string{"source_evidence_retained_under_separate_policy", "exports_and_archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
 			if err = appendChild(event, "", "", "", 0); err != nil {
 				return err
 			}

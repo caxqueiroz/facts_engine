@@ -25,6 +25,7 @@ type ConversationRecord struct {
 	EvidenceIDs        []string
 	Authorization      []AuthorizationDecision
 	LedgerRevision     int64
+	PayloadDisposed    bool `json:",omitempty"`
 }
 type ConversationQuery struct{ ID, Scope, Purpose string }
 

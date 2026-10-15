@@ -30,6 +30,9 @@ const (
 	// RetentionServiceDisposeAttestationProcedure is the procedure name of the RetentionService's
 	// DisposeAttestation RPC.
 	RetentionServiceDisposeAttestationProcedure = "/memory.v1.RetentionService/DisposeAttestation"
+	// RetentionServiceDisposeConversationProcedure is the procedure name of the RetentionService's
+	// DisposeConversation RPC.
+	RetentionServiceDisposeConversationProcedure = "/memory.v1.RetentionService/DisposeConversation"
 	// RetentionServiceRegisterRetentionPolicyProcedure is the procedure name of the RetentionService's
 	// RegisterRetentionPolicy RPC.
 	RetentionServiceRegisterRetentionPolicyProcedure = "/memory.v1.RetentionService/RegisterRetentionPolicy"
@@ -78,6 +81,13 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_memory_v1_retention_proto.Services().ByName("RetentionService").Methods().ByName("DisposeAttestation"),
 			Procedure:  RetentionServiceDisposeAttestationProcedure,
+		}
+	})
+	retentionServiceDisposeConversationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_retention_proto.Services().ByName("RetentionService").Methods().ByName("DisposeConversation"),
+			Procedure:  RetentionServiceDisposeConversationProcedure,
 		}
 	})
 	retentionServiceRegisterRetentionPolicySpec = sync.OnceValue(func() connect.Spec {
@@ -163,6 +173,7 @@ var (
 type RetentionServiceClient interface {
 	DisposeBatch(context.Context, *v1.DisposeBatchRequest) (*v1.DisposeBatchResponse, error)
 	DisposeAttestation(context.Context, *v1.DisposeAttestationRequest) (*v1.DisposeAttestationResponse, error)
+	DisposeConversation(context.Context, *v1.DisposeConversationRequest) (*v1.DisposeConversationResponse, error)
 	RegisterRetentionPolicy(context.Context, *v1.RegisterRetentionPolicyRequest) (*v1.RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(context.Context, *v1.PlaceLegalHoldRequest) (*v1.PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *v1.ReleaseLegalHoldRequest) (*v1.ReleaseLegalHoldResponse, error)
@@ -186,6 +197,7 @@ func NewRetentionServiceClient(client *connect.Client) RetentionServiceClient {
 type RetentionServiceHandler interface {
 	DisposeBatch(context.Context, *v1.DisposeBatchRequest) (*v1.DisposeBatchResponse, error)
 	DisposeAttestation(context.Context, *v1.DisposeAttestationRequest) (*v1.DisposeAttestationResponse, error)
+	DisposeConversation(context.Context, *v1.DisposeConversationRequest) (*v1.DisposeConversationResponse, error)
 	RegisterRetentionPolicy(context.Context, *v1.RegisterRetentionPolicyRequest) (*v1.RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(context.Context, *v1.PlaceLegalHoldRequest) (*v1.PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *v1.ReleaseLegalHoldRequest) (*v1.ReleaseLegalHoldResponse, error)
@@ -206,6 +218,7 @@ func RegisterRetentionServiceHandler(server *connect.Server, svc RetentionServic
 	server.Register(
 		connect.Method{Spec: retentionServiceDisposeBatchSpec(), Handler: adapter.disposeBatch},
 		connect.Method{Spec: retentionServiceDisposeAttestationSpec(), Handler: adapter.disposeAttestation},
+		connect.Method{Spec: retentionServiceDisposeConversationSpec(), Handler: adapter.disposeConversation},
 		connect.Method{Spec: retentionServiceRegisterRetentionPolicySpec(), Handler: adapter.registerRetentionPolicy},
 		connect.Method{Spec: retentionServicePlaceLegalHoldSpec(), Handler: adapter.placeLegalHold},
 		connect.Method{Spec: retentionServiceReleaseLegalHoldSpec(), Handler: adapter.releaseLegalHold},
@@ -229,6 +242,10 @@ func (UnimplementedRetentionServiceHandler) DisposeBatch(context.Context, *v1.Di
 
 func (UnimplementedRetentionServiceHandler) DisposeAttestation(context.Context, *v1.DisposeAttestationRequest) (*v1.DisposeAttestationResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.RetentionService.DisposeAttestation is not implemented")
+}
+
+func (UnimplementedRetentionServiceHandler) DisposeConversation(context.Context, *v1.DisposeConversationRequest) (*v1.DisposeConversationResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.RetentionService.DisposeConversation is not implemented")
 }
 
 func (UnimplementedRetentionServiceHandler) RegisterRetentionPolicy(context.Context, *v1.RegisterRetentionPolicyRequest) (*v1.RegisterRetentionPolicyResponse, error) {
@@ -290,6 +307,14 @@ func (c *retentionServiceClient) DisposeBatch(ctx context.Context, req *v1.Dispo
 func (c *retentionServiceClient) DisposeAttestation(ctx context.Context, req *v1.DisposeAttestationRequest) (*v1.DisposeAttestationResponse, error) {
 	var res v1.DisposeAttestationResponse
 	if err := c.client.CallUnary(ctx, retentionServiceDisposeAttestationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *retentionServiceClient) DisposeConversation(ctx context.Context, req *v1.DisposeConversationRequest) (*v1.DisposeConversationResponse, error) {
+	var res v1.DisposeConversationResponse
+	if err := c.client.CallUnary(ctx, retentionServiceDisposeConversationSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -403,6 +428,18 @@ func (h retentionServiceHandler) disposeAttestation(ctx context.Context, _ conne
 		return err
 	}
 	res, err := h.svc.DisposeAttestation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h retentionServiceHandler) disposeConversation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DisposeConversationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DisposeConversation(ctx, &req)
 	if err != nil {
 		return err
 	}

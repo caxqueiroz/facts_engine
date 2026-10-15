@@ -432,6 +432,11 @@ func (e *Engine) DisposeAttestation(ctx context.Context, c Caller, r model.Attes
 	return e.service.DisposeAttestation(ctx, c, r)
 }
 
+// DisposeConversation removes retained conversation message references while preserving its audit tombstone.
+func (e *Engine) DisposeConversation(ctx context.Context, c Caller, r model.ConversationDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeConversation(ctx, c, r)
+}
+
 // DisposeExtraction removes eligible terminal-job artifacts and retains provenance.
 func (e *Engine) DisposeExtraction(ctx context.Context, c Caller, r model.ExtractionDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeExtraction(ctx, c, r)

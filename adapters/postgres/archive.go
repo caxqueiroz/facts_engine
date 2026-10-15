@@ -229,6 +229,12 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 					rows.Close()
 					return err
 				}
+				if q.kind == "conversation" {
+					if err = ledgerdb.New(t.tx).LockConversationGuard(ctx, ledgerdb.LockConversationGuardParams{TenantID: t.tenant, ConversationID: id}); err != nil {
+						rows.Close()
+						return err
+					}
+				}
 				if len(b) == 0 {
 					rows.Close()
 					return model.ErrPrecondition
@@ -255,6 +261,33 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// worker authorizes disclosure to its external archive destination.
 		for _, entry := range p.Entries {
 			switch entry.Kind {
+			case "conversation":
+				var conversation model.ConversationRecord
+				if err := json.Unmarshal(entry.Payload, &conversation); err != nil {
+					return err
+				}
+				if conversation.ID != entry.ID || conversation.Tenant != t.tenant {
+					return model.ErrPrecondition
+				}
+				if conversation.PayloadDisposed {
+					if !model.ValidConversationTombstone(conversation, t.tenant, entry.ID) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "conversation_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
+				}
+				scopes[conversation.Request.Scope] = true
+				for _, id := range conversation.EvidenceIDs {
+					evidence, err := tx.Evidence(ctx, id)
+					if err != nil {
+						return err
+					}
+					if evidence.Scope != conversation.Request.Scope {
+						return model.ErrPrecondition
+					}
+					if err := add("evidence", id, evidence); err != nil {
+						return err
+					}
+				}
 			case "version":
 				var v model.Version
 				if err := json.Unmarshal(entry.Payload, &v); err != nil {

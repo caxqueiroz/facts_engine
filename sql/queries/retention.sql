@@ -48,8 +48,8 @@ WHERE tenant_id=$1 AND parent_evidence_id=$2);
 
 -- name: HasConversationReference :one
 SELECT EXISTS(SELECT 1
-FROM conversation_messages
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM conversation_messages m JOIN conversation_payloads p ON p.tenant_id=m.tenant_id AND p.conversation_id=m.conversation_id
+WHERE m.tenant_id=$1 AND m.evidence_id=$2);
 
 -- name: HasMemoryEvidenceReference :one
 SELECT EXISTS(SELECT 1

@@ -12,10 +12,11 @@ import (
 type DisposalBatchRequest struct {
 	Command
 	Scope, Reason string
-	Decisions     []DecisionDisposalRequest    `json:",omitempty"`
-	Calculations  []CalculationDisposalRequest `json:",omitempty"`
-	Snapshots     []SnapshotDisposalRequest    `json:",omitempty"`
-	Contexts      []ContextDisposalRequest     `json:",omitempty"`
+	Conversations []ConversationDisposalRequest `json:",omitempty"`
+	Decisions     []DecisionDisposalRequest     `json:",omitempty"`
+	Calculations  []CalculationDisposalRequest  `json:",omitempty"`
+	Snapshots     []SnapshotDisposalRequest     `json:",omitempty"`
+	Contexts      []ContextDisposalRequest      `json:",omitempty"`
 	Versions      []VersionDisposalRequest
 	Extractions   []ExtractionDisposalRequest
 }
@@ -30,6 +31,9 @@ type DisposalBatchTx interface {
 // Scopes includes every scope carried by a batch for audit/archive disclosure.
 func (r DisposalBatchRequest) Scopes() []string {
 	scopes := map[string]bool{r.Scope: true}
+	for _, item := range r.Conversations {
+		scopes[item.Scope] = true
+	}
 	for _, v := range r.Versions {
 		scopes[v.Scope] = true
 		for _, b := range v.Bindings {
@@ -71,5 +75,5 @@ func (r DisposalBatchRequest) Scopes() []string {
 
 // SelectionCount bounds the complete transaction across all artifact classes.
 func (r DisposalBatchRequest) SelectionCount() int {
-	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions)
+	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions) + len(r.Conversations)
 }

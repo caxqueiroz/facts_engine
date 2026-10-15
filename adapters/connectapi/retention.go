@@ -9,6 +9,7 @@ import (
 type RetentionEngine interface {
 	DisposeBatch(context.Context, model.Caller, model.DisposalBatchRequest) (model.CommitResult, error)
 	DisposeAttestation(context.Context, model.Caller, model.AttestationDisposalRequest) (model.CommitResult, error)
+	DisposeConversation(context.Context, model.Caller, model.ConversationDisposalRequest) (model.CommitResult, error)
 	CleanupProjection(context.Context, model.Caller, model.ProjectionCleanupRequest) (model.CommitResult, error)
 	DisposeVersion(context.Context, model.Caller, model.VersionDisposalRequest) (model.CommitResult, error)
 	DisposeExtraction(context.Context, model.Caller, model.ExtractionDisposalRequest) (model.CommitResult, error)
@@ -28,6 +29,14 @@ func (s *retentionService) DisposeAttestation(ctx context.Context, r *v1.Dispose
 		return nil, err
 	}
 	return &v1.DisposeAttestationResponse{Result: commit(out)}, nil
+}
+
+func (s *retentionService) DisposeConversation(ctx context.Context, r *v1.DisposeConversationRequest) (*v1.DisposeConversationResponse, error) {
+	out, err := s.engine.DisposeConversation(ctx, callerFrom(ctx), model.ConversationDisposalRequest{Command: command(r.Command), Scope: r.Scope, ConversationID: r.ConversationId, PolicyID: r.PolicyId, Jurisdiction: r.Jurisdiction, Purpose: r.Purpose, Reason: r.Reason})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeConversationResponse{Result: commit(out)}, nil
 }
 
 type retentionService struct{ engine RetentionEngine }
@@ -153,6 +162,9 @@ func (s *retentionService) DisposeBatch(ctx context.Context, r *v1.DisposeBatchR
 			selection.Bindings = append(selection.Bindings, model.ExtractionRetentionBinding{Scope: b.Scope, JobPolicyID: b.JobPolicyId, RequestPolicyID: b.RequestPolicyId, ResponsePolicyID: b.ResponsePolicyId, Jurisdiction: b.Jurisdiction})
 		}
 		request.Extractions = append(request.Extractions, selection)
+	}
+	for _, item := range r.Conversations {
+		request.Conversations = append(request.Conversations, model.ConversationDisposalRequest{Scope: item.Scope, ConversationID: item.ConversationId, PolicyID: item.PolicyId, Jurisdiction: item.Jurisdiction, Purpose: item.Purpose})
 	}
 	for _, item := range r.Snapshots {
 		selection := model.SnapshotDisposalRequest{SnapshotID: item.SnapshotId}

@@ -125,18 +125,28 @@ type AttestationDisposalTx interface {
 	DisposeAttestation(context.Context, AttestationDisposalRequest) (int64, error)
 }
 
+type ConversationDisposalRequest struct {
+	Command
+	Scope, ConversationID, PolicyID, Jurisdiction, Purpose, Reason string
+}
+
+type ConversationDisposalTx interface {
+	DisposeConversation(context.Context, ConversationDisposalRequest) error
+}
+
 type RetentionEvent struct {
-	DecisionDisposal        *DecisionDisposalRequest    `json:",omitempty"`
-	CalculationDisposal     *CalculationDisposalRequest `json:",omitempty"`
-	BatchID                 string                      `json:",omitempty"`
-	DisposalBatch           *DisposalBatchRequest       `json:",omitempty"`
-	ProjectionCleanup       *ProjectionCleanupRequest   `json:",omitempty"`
-	VersionDisposal         *VersionDisposalRequest     `json:",omitempty"`
-	AttestationDisposal     *AttestationDisposalRequest `json:",omitempty"`
-	ExtractionDisposal      *ExtractionDisposalRequest  `json:",omitempty"`
-	ContextDisposal         *ContextDisposalRequest     `json:",omitempty"`
-	SnapshotDisposal        *SnapshotDisposalRequest    `json:",omitempty"`
-	AdditionalAuthorization []AuthorizationDecision     `json:",omitempty"`
+	DecisionDisposal        *DecisionDisposalRequest     `json:",omitempty"`
+	CalculationDisposal     *CalculationDisposalRequest  `json:",omitempty"`
+	BatchID                 string                       `json:",omitempty"`
+	DisposalBatch           *DisposalBatchRequest        `json:",omitempty"`
+	ProjectionCleanup       *ProjectionCleanupRequest    `json:",omitempty"`
+	VersionDisposal         *VersionDisposalRequest      `json:",omitempty"`
+	AttestationDisposal     *AttestationDisposalRequest  `json:",omitempty"`
+	ConversationDisposal    *ConversationDisposalRequest `json:",omitempty"`
+	ExtractionDisposal      *ExtractionDisposalRequest   `json:",omitempty"`
+	ContextDisposal         *ContextDisposalRequest      `json:",omitempty"`
+	SnapshotDisposal        *SnapshotDisposalRequest     `json:",omitempty"`
+	AdditionalAuthorization []AuthorizationDecision      `json:",omitempty"`
 
 	ID, Tenant, Scope, Kind, TargetID string
 	Caller                            Caller

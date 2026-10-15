@@ -52,9 +52,11 @@ FROM extraction_retry_events
 WHERE tenant_id=$1 AND ledger_revision=$2;
 
 -- name: ListArchiveConversation :many
-SELECT id,payload
-FROM conversations
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT c.id,(CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.ledger_revision=$2;
 
 -- name: ListArchiveRetention :many
 SELECT id,payload
@@ -201,9 +203,11 @@ FROM memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY j.ledger_revision LIMIT 10001;
 
 -- name: ListAuditConversation :many
-SELECT id,payload
-FROM conversations
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001;
+SELECT c.id,(CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.scope_id=$2 ORDER BY c.ledger_revision LIMIT 10001;
 
 -- name: ListAuditRetention :many
 SELECT id,payload

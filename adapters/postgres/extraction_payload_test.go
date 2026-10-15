@@ -39,7 +39,8 @@ func seedExtractionPayloadMigration(t *testing.T, ctx context.Context, admin *pg
 	result := model.ExtractionResult{AttemptID: attempt.ID, JobID: job.ID, Tenant: "legacy", Scope: "scope", Outcome: "completed", ResponseComplete: true, RequestDigest: attempt.RequestDigest, ResponseBytes: response, ResponseDigest: model.BytesDigest(response), LedgerRevision: 3}
 	values := map[string][]byte{"job": seal(job), "attempt": seal(attempt), "result": seal(result)}
 	conversation := model.ConversationRecord{ID: "payload-conversation", Tenant: "legacy", Caller: caller, Request: model.ConversationRequest{Scope: "scope"}}
-	if _, err := admin.Exec(ctx, "INSERT INTO conversations(tenant_id,id,scope_id,ledger_revision,payload) VALUES('legacy','payload-conversation','scope',3,$1)", seal(conversation)); err != nil {
+	values["conversation"] = seal(conversation)
+	if _, err := admin.Exec(ctx, "INSERT INTO conversations(tenant_id,id,scope_id,ledger_revision,payload) VALUES('legacy','payload-conversation','scope',3,$1)", values["conversation"]); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := admin.Exec(ctx, "INSERT INTO extraction_jobs(tenant_id,id,scope_id,conversation_id,profile_id,profile_digest,ledger_revision,payload) VALUES('legacy','payload-job','scope','payload-conversation',$1,$2,3,$3)", profile.ID, job.ProfileDigest, values["job"]); err != nil {
@@ -203,5 +204,20 @@ func testExtractionPayloadMigration(t *testing.T, ctx context.Context, admin, ru
 	page, err := ledger.BackfillExtractionInputInventories(ctx, "legacy", 1)
 	if err != nil || page.Inventoried != 1 || !page.Complete {
 		t.Fatal("migrated request backfill", page, err)
+	}
+}
+
+func testConversationPayloadMigration(t *testing.T, ctx context.Context, admin, runtime *pgxpool.Pool, want []byte) {
+	t.Helper()
+	var got []byte
+	if err := admin.QueryRow(ctx, "SELECT payload FROM conversation_payloads WHERE tenant_id='legacy' AND conversation_id='payload-conversation'").Scan(&got); err != nil || !bytes.Equal(got, want) {
+		t.Fatal("conversation migration changed ciphertext", err)
+	}
+	var columns int
+	if err := admin.QueryRow(ctx, "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='conversations' AND column_name='payload'").Scan(&columns); err != nil || columns != 0 {
+		t.Fatal("conversation header retains payload", err)
+	}
+	if _, err := runtime.Exec(ctx, "DELETE FROM conversation_payloads WHERE tenant_id='legacy' AND conversation_id='payload-conversation'"); err == nil {
+		t.Fatal("runtime role can delete conversation payload")
 	}
 }

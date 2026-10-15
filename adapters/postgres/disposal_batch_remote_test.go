@@ -34,6 +34,9 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 		}
 		request.Extractions = append(request.Extractions, selection)
 	}
+	for _, item := range r.Conversations {
+		request.Conversations = append(request.Conversations, &v1.BatchConversationSelection{ConversationId: item.ConversationID, Scope: item.Scope, PolicyId: item.PolicyID, Jurisdiction: item.Jurisdiction, Purpose: item.Purpose})
+	}
 	for _, item := range r.Snapshots {
 		selection := &v1.BatchSnapshotSelection{SnapshotId: item.SnapshotID}
 		for _, b := range item.Bindings {
@@ -90,6 +93,7 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 	bad.Contexts = nil
 	bad.Calculations = nil
 	bad.Decisions = nil
+	bad.Conversations = nil
 	if out, err := grpc.DisposeBatch(ctx, bad); out != nil || grpcstatus.Code(err) != codes.InvalidArgument {
 		t.Fatal("batch selection missing", out, err)
 	}

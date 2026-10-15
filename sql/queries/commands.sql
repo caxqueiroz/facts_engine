@@ -89,13 +89,18 @@ VALUES ($1,$2,$3,$4)
 ON CONFLICT DO NOTHING;
 
 -- name: GetConversationPayload :one
-SELECT payload
-FROM conversations
-WHERE tenant_id=$1 AND id=$2;
+SELECT (CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2;
+
+-- name: InsertConversationHeader :exec
+INSERT INTO conversations (tenant_id,id,scope_id,ledger_revision)
+VALUES ($1,$2,$3,$4);
 
 -- name: InsertConversationPayload :exec
-INSERT INTO conversations (tenant_id,id,scope_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5);
+INSERT INTO conversation_payloads(tenant_id,conversation_id,payload) VALUES($1,$2,$3);
 
 -- name: InsertConversationMessage :exec
 INSERT INTO conversation_messages (tenant_id,conversation_id,ordinal,evidence_id)

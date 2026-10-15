@@ -91,9 +91,11 @@ func (q *Queries) GetCommandReceipt(ctx context.Context, arg GetCommandReceiptPa
 }
 
 const GetConversationPayload = `-- name: GetConversationPayload :one
-SELECT payload
-FROM conversations
-WHERE tenant_id=$1 AND id=$2
+SELECT (CASE WHEN d.conversation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
+FROM conversations c
+LEFT JOIN conversation_payloads p ON p.tenant_id=c.tenant_id AND p.conversation_id=c.id
+LEFT JOIN conversation_disposals d ON d.tenant_id=c.tenant_id AND d.conversation_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2
 `
 
 type GetConversationPayloadParams struct {
@@ -313,6 +315,28 @@ func (q *Queries) InsertConfirmationArtifact(ctx context.Context, arg InsertConf
 	return err
 }
 
+const InsertConversationHeader = `-- name: InsertConversationHeader :exec
+INSERT INTO conversations (tenant_id,id,scope_id,ledger_revision)
+VALUES ($1,$2,$3,$4)
+`
+
+type InsertConversationHeaderParams struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	LedgerRevision int64
+}
+
+func (q *Queries) InsertConversationHeader(ctx context.Context, arg InsertConversationHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertConversationHeader,
+		arg.TenantID,
+		arg.ID,
+		arg.ScopeID,
+		arg.LedgerRevision,
+	)
+	return err
+}
+
 const InsertConversationMessage = `-- name: InsertConversationMessage :exec
 INSERT INTO conversation_messages (tenant_id,conversation_id,ordinal,evidence_id)
 VALUES ($1,$2,$3,$4)
@@ -336,26 +360,17 @@ func (q *Queries) InsertConversationMessage(ctx context.Context, arg InsertConve
 }
 
 const InsertConversationPayload = `-- name: InsertConversationPayload :exec
-INSERT INTO conversations (tenant_id,id,scope_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5)
+INSERT INTO conversation_payloads(tenant_id,conversation_id,payload) VALUES($1,$2,$3)
 `
 
 type InsertConversationPayloadParams struct {
 	TenantID       string
-	ID             string
-	ScopeID        string
-	LedgerRevision int64
+	ConversationID string
 	Payload        []byte
 }
 
 func (q *Queries) InsertConversationPayload(ctx context.Context, arg InsertConversationPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertConversationPayload,
-		arg.TenantID,
-		arg.ID,
-		arg.ScopeID,
-		arg.LedgerRevision,
-		arg.Payload,
-	)
+	_, err := q.db.Exec(ctx, InsertConversationPayload, arg.TenantID, arg.ConversationID, arg.Payload)
 	return err
 }
 

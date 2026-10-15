@@ -204,3 +204,15 @@ GRANT INSERT ON fact_attestation_disposals,memory_attestation_disposals TO facts
 GRANT DELETE ON fact_attestation_payloads,memory_attestation_payloads TO facts_retention;
 REVOKE UPDATE,DELETE,TRUNCATE ON fact_attestation_disposals,memory_attestation_disposals FROM facts_runtime;
 REVOKE DELETE,TRUNCATE ON attestation_guards FROM facts_runtime;
+GRANT SELECT,INSERT ON conversation_payloads TO facts_runtime;
+GRANT SELECT ON conversation_payloads,conversation_disposals TO facts_retention;
+GRANT SELECT ON conversation_payloads,conversation_disposals TO facts_archiver;
+GRANT SELECT ON conversation_disposals TO facts_runtime;
+GRANT SELECT,INSERT ON conversation_guards TO facts_runtime,facts_archiver;
+GRANT UPDATE(epoch) ON conversation_guards TO facts_runtime,facts_archiver;
+GRANT SELECT,INSERT ON conversation_guards TO facts_retention;
+GRANT UPDATE(epoch) ON conversation_guards TO facts_retention;
+GRANT INSERT ON conversation_disposals TO facts_retention;
+GRANT DELETE ON conversation_payloads TO facts_retention;
+REVOKE UPDATE,DELETE,TRUNCATE ON conversation_payloads,conversation_disposals FROM facts_runtime;
+REVOKE DELETE,TRUNCATE ON conversation_guards FROM facts_runtime;

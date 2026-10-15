@@ -245,7 +245,19 @@ type Conversation struct {
 	ID             string
 	ScopeID        string
 	LedgerRevision int64
+}
+
+type ConversationDisposal struct {
+	TenantID       string
+	ConversationID string
 	Payload        []byte
+	DisposedAt     pgtype.Timestamptz
+}
+
+type ConversationGuard struct {
+	TenantID       string
+	ConversationID string
+	Epoch          int64
 }
 
 type ConversationMessage struct {
@@ -253,6 +265,12 @@ type ConversationMessage struct {
 	ConversationID string
 	Ordinal        int32
 	EvidenceID     string
+}
+
+type ConversationPayload struct {
+	TenantID       string
+	ConversationID string
+	Payload        []byte
 }
 
 type DecisionArtifact struct {

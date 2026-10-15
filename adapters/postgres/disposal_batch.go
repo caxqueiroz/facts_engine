@@ -40,6 +40,14 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 			scopes[b.Scope] = true
 		}
 	}
+	for _, item := range r.Conversations {
+		key := "conversation/" + item.ConversationID
+		if !model.ValidID(item.ConversationID) || !model.ValidID(item.Scope) || !model.ValidID(item.PolicyID) || !model.ValidID(item.Jurisdiction) || item.Purpose == "" || seen[key] || item.Command != r.Command || item.Reason != r.Reason {
+			return nil, model.ErrInvalid
+		}
+		seen[key] = true
+		scopes[item.Scope] = true
+	}
 	for _, item := range r.Snapshots {
 		key := "snapshot/" + item.SnapshotID
 		if !model.ValidID(item.SnapshotID) || seen[key] || item.Command != r.Command || item.Reason != r.Reason {
@@ -131,6 +139,13 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].JobID < jobs[j].JobID })
 	for _, e := range jobs {
 		if err := t.disposeExtraction(ctx, e, facts, memories); err != nil {
+			return nil, err
+		}
+	}
+	conversations := append([]model.ConversationDisposalRequest(nil), r.Conversations...)
+	sort.Slice(conversations, func(i, j int) bool { return conversations[i].ConversationID < conversations[j].ConversationID })
+	for _, item := range conversations {
+		if err := t.DisposeConversation(ctx, item); err != nil {
 			return nil, err
 		}
 	}

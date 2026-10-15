@@ -370,6 +370,9 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 					include = include && b.Scope == r.Scope
 				}
 			}
+			if event.ConversationDisposal != nil {
+				include = include && event.ConversationDisposal.Scope == r.Scope
+			}
 			if event.ExtractionDisposal != nil {
 				for _, b := range event.ExtractionDisposal.Bindings {
 					include = include && b.Scope == r.Scope
@@ -483,6 +486,20 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				}
 				entry.Payload, _ = json.Marshal(v)
 				gaps = append(gaps, model.AuditGap{Kind: "version", ID: v.ID, Reason: "source_quotes_withheld"})
+			}
+		case "conversation":
+			var conversation model.ConversationRecord
+			if err := json.Unmarshal(entry.Payload, &conversation); err != nil {
+				return nil, nil, err
+			}
+			if conversation.ID != entry.ID || conversation.Tenant != c.Tenant || conversation.Request.Scope != r.Scope {
+				return nil, nil, model.ErrPrecondition
+			}
+			if conversation.PayloadDisposed {
+				if !model.ValidConversationTombstone(conversation, c.Tenant, entry.ID) {
+					return nil, nil, model.ErrPrecondition
+				}
+				gaps = append(gaps, model.AuditGap{Kind: "conversation_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
 			}
 		}
 		if !include {
