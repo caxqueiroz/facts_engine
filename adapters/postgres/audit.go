@@ -35,6 +35,9 @@ func (t *transaction) Calculation(ctx context.Context, id string) (model.Calcula
 		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
+	if err == nil && r.PayloadDisposed {
+		return model.CalculationRecord{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) CalculationRun(ctx context.Context, application, run string) (model.CalculationRecord, error) {
@@ -51,6 +54,9 @@ func (t *transaction) CalculationRun(ctx context.Context, application, run strin
 		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
+	if err == nil && r.PayloadDisposed {
+		return model.CalculationRecord{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) StageAuditJob(ctx context.Context, j model.AuditExportJob) error {

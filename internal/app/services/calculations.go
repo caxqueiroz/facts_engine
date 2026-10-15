@@ -138,7 +138,7 @@ func (s *Service) GetCalculationReceipt(ctx context.Context, c model.Caller, q m
 	if err != nil {
 		return model.CalculationRecord{}, err
 	}
-	if record.Tenant != c.Tenant || model.CalculationDigest(record.Receipt) != record.Digest {
+	if record.PayloadDisposed || record.Tenant != c.Tenant || model.CalculationDigest(record.Receipt) != record.Digest {
 		return model.CalculationRecord{}, model.ErrPrecondition
 	}
 	for _, id := range append([]string{record.Receipt.SnapshotID}, record.Receipt.ReferenceSnapshotIDs...) {

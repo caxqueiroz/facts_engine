@@ -107,6 +107,19 @@ type CalculationArtifact struct {
 	Role          string
 }
 
+type CalculationDisposal struct {
+	TenantID      string
+	CalculationID string
+	Payload       []byte
+	DisposedAt    pgtype.Timestamptz
+}
+
+type CalculationGuard struct {
+	TenantID      string
+	CalculationID string
+	Epoch         int64
+}
+
 type CalculationPayload struct {
 	TenantID      string
 	CalculationID string

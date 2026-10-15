@@ -170,3 +170,9 @@ GRANT INSERT ON projection_cleanup_acknowledgements TO facts_retention;
 GRANT SELECT,INSERT ON calculation_payloads TO facts_runtime;
 REVOKE UPDATE,DELETE,TRUNCATE ON calculation_payloads,calculation_receipts FROM facts_runtime;
 GRANT SELECT ON calculation_payloads TO facts_archiver;
+
+GRANT SELECT ON calculation_disposals TO facts_runtime,facts_archiver;
+GRANT SELECT,INSERT ON calculation_guards TO facts_runtime,facts_archiver;
+GRANT UPDATE(epoch) ON calculation_guards TO facts_runtime,facts_archiver;
+REVOKE UPDATE,DELETE,TRUNCATE ON calculation_disposals FROM facts_runtime;
+REVOKE DELETE,TRUNCATE ON calculation_guards FROM facts_runtime;

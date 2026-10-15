@@ -58,16 +58,18 @@ INSERT INTO decision_artifacts (tenant_id,decision_id,role,evidence_id)
 VALUES ($1,$2,$3,$4);
 
 -- name: GetCalculationPayload :one
-SELECT p.payload
+SELECT (CASE WHEN d.calculation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
 FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+LEFT JOIN calculation_disposals d ON d.tenant_id=c.tenant_id AND d.calculation_id=c.id
 WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: LockCalculationRun :exec
 SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(lock_key)::text,0));
 
 -- name: GetCalculationRunPayload :one
-SELECT p.payload
+SELECT (CASE WHEN d.calculation_id IS NOT NULL THEN d.payload ELSE p.payload END)::bytea AS payload
 FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+LEFT JOIN calculation_disposals d ON d.tenant_id=c.tenant_id AND d.calculation_id=c.id
 WHERE c.tenant_id=$1 AND c.application_id=$2 AND c.external_run_id=$3;
 
 -- name: GetAuditJob :one

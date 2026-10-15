@@ -785,7 +785,15 @@ Migration `00046_calculation_payloads.sql` moves calculation receipt ciphertext 
 
 Runtime credentials can insert/read calculation payloads but cannot update, delete or truncate them. The archive role has read access and tenant RLS covers the child table. Reads by receipt ID or external-run identity fail explicitly when a header lacks its payload, rather than treating the run as absent. Audit/archive inventories preserve missing-content rows so incomplete receipts cannot silently disappear from coverage. Integration tests cover byte-preserving migration (including opaque ciphertext), read parity, tenant isolation, runtime immutability, transaction rollback when payload insertion is denied, missing payloads and retained audit/archive rows.
 
-This storage separation prepares calculation retention; it does not enable calculation disposal. Calculation tombstones, serialization with new references, class-specific policies and batch selection remain to implement. Referenced snapshots and evidence continue to block disposal under the existing rules.
+This storage separation prepares calculation retention; it does not enable calculation disposal. The tombstone and reference guards described below are implemented; class-specific disposal policies and batch selection remain to implement. Referenced snapshots and evidence continue to block disposal under the existing rules.
+
+## Calculation tombstones and reference guards
+
+Migration `00047_calculation_disposal_storage.sql` adds encrypted `calculation_disposals` and per-calculation guard epochs. Payload insertion, tombstone insertion and new decision references update the same guard. A committed disposal marker rejects reinsertion (including conflict-ignoring inserts), payload updates and new decision references. A stale repeatable-read reference writer conflicts with the changed epoch instead of trusting its earlier view. `StageDecision` checks availability through this guard before staging a calculation reference. Runtime actors cannot write or remove tombstones or delete guard rows; this migration does not grant a disposal capability.
+
+Tombstones retain run identity, snapshot/evidence lineage, original integrity digests and authorization metadata; they omit method/configuration identity, execution times and outcome. They are structural history, not anonymous data. Ordinary calculation reads reject a marked record even if an invalid state retains its live payload too. Audit/archive inventories prefer tombstones, validate their identity and stripped shape, and report `calculation_content` gaps. Single-scope exports still withhold calculations whose referenced snapshots span other scopes. Archive readers acquire the calculation guard so concurrent disposal cannot silently change retained coverage.
+
+Upgrade writers and audit/archive readers together, apply the migration and refresh role grants before using this schema. Tests cover live-reference admission, stale-transaction rejection, resurrection attempts, role restrictions, tombstone precedence, malformed metadata and scoped audit gaps. Governed calculation disposal is not enabled yet: its complete scope inventory, policy/age/hold checks, reference blockers, retention events and batch API remain implementation work.
 
 ## Atomic disposal of related payloads
 

@@ -19,6 +19,7 @@ type CalculationReceipt struct {
 	Outcome                                                                              string
 }
 type CalculationRecord struct {
+	PayloadDisposed                    bool `json:",omitempty"`
 	Authorization                      []AuthorizationDecision
 	ID, Tenant, Digest, SnapshotDigest string
 	Caller                             Caller

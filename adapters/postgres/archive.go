@@ -438,6 +438,15 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				if err := json.Unmarshal(entry.Payload, &calculation); err != nil {
 					return err
 				}
+				if err := ledgerdb.New(t.tx).LockCalculationGuard(ctx, ledgerdb.LockCalculationGuardParams{TenantID: d.Key.Tenant, CalculationID: calculation.ID}); err != nil {
+					return err
+				}
+				if calculation.PayloadDisposed {
+					if !model.ValidCalculationTombstone(calculation, d.Key.Tenant, entry.ID) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "calculation_content", ID: calculation.ID, Reason: "disposed_under_retention_policy"})
+				}
 				for _, id := range append([]string{calculation.Receipt.SnapshotID}, calculation.Receipt.ReferenceSnapshotIDs...) {
 					var snapshot model.FactSnapshot
 					if err := t.read(ctx, &snapshot, ledgerdb.GetSnapshotPayload, d.Key.Tenant, id); err != nil {

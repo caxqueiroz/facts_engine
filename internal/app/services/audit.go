@@ -426,6 +426,9 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &calc); err != nil {
 				return nil, nil, err
 			}
+			if calc.PayloadDisposed && !model.ValidCalculationTombstone(calc, c.Tenant, entry.ID) {
+				return nil, nil, model.ErrPrecondition
+			}
 			include = snapshots[calc.Receipt.SnapshotID]
 			for _, id := range calc.Receipt.ReferenceSnapshotIDs {
 				include = include && snapshots[id]
@@ -433,6 +436,9 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			_, input := evidence[calc.Receipt.Input.EvidenceID]
 			_, output := evidence[calc.Receipt.Output.EvidenceID]
 			include = include && input && output
+			if include && calc.PayloadDisposed {
+				gaps = append(gaps, model.AuditGap{Kind: "calculation_content", ID: calc.ID, Reason: "disposed_under_retention_policy"})
+			}
 		case "version":
 			var v model.Version
 			if err := json.Unmarshal(entry.Payload, &v); err != nil {
