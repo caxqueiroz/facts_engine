@@ -26,10 +26,13 @@ func (source) ArchivePayload(_ context.Context, d model.Delivery) (model.Archive
 
 type auth struct{ denied string }
 
-type archiveProgress struct{ ledger, acknowledged int64 }
+type archiveProgress struct {
+	ledger, acknowledged int64
+	err                  error
+}
 
 func (p archiveProgress) ReadOutboxProgress(context.Context, model.ConsumerKey) (model.OutboxProgress, error) {
-	return model.OutboxProgress{LedgerRevision: p.ledger, AcknowledgedRevision: p.acknowledged, State: "active"}, nil
+	return model.OutboxProgress{LedgerRevision: p.ledger, AcknowledgedRevision: p.acknowledged, State: "active"}, p.err
 }
 
 func (a auth) Check(_ context.Context, r model.AuthorizationRequest) (model.AuthorizationDecision, error) {
@@ -103,6 +106,13 @@ func TestArchiveChainRecovery(t *testing.T) {
 	}
 	if _, err := lagging.VerifyAuditCoverage(ctx, "bank", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("archive lag claimed complete coverage", err)
+	}
+	unregistered, err := archive.NewCoverageVerifier(store, archiveProgress{err: model.ErrNotFound}, "stream1", 2, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := unregistered.VerifyAuditCoverage(ctx, "bank", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
+		t.Fatal("unregistered archive consumer was not reported as pending", err)
 	}
 	testObservedArchiveVerification(t, store, head, keys)
 	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 3, 3, keys); err == nil {

@@ -63,7 +63,7 @@ func verifyChain(ctx context.Context, store model.ArchiveStore, tenant, stream s
 		}
 		var b model.ArchiveBatch
 		if err = json.Unmarshal(raw, &b); err != nil {
-			return true, err
+			return true, model.ErrPrecondition
 		}
 		if err = VerifyBatch(b, keys); err != nil {
 			return true, err
@@ -84,7 +84,7 @@ func verifyChain(ctx context.Context, store model.ArchiveStore, tenant, stream s
 		}
 		var p model.ArchivePayload
 		if err = json.Unmarshal(payload, &p); err != nil {
-			return true, err
+			return true, model.ErrPrecondition
 		}
 		if p.Event.Caller.Tenant != tenant || p.Event.LedgerRevision != revision || !model.ValidID(p.Event.ID) {
 			return true, model.ErrPrecondition
