@@ -149,7 +149,7 @@ Tests cover value presence and validation boundaries, tenant binding, authentica
 
 ## Standalone workload service
 
-`make build` builds `bin/memoryd`, `bin/memoryworker` and the offline scorer `bin/memoryeval`. Configure it using [examples/memoryd.json](examples/memoryd.json), then run `bin/memoryd -config /path/to/config.json`. Configuration parsing rejects unknown fields, trailing JSON and files larger than 1 MiB. Paths resolve from the process working directory. Provision migrations, restricted runtime credentials, the pinned OpenFGA model/tuples, and certificates before startup; the service does not provision infrastructure or start workers.
+`make build` builds `bin/memoryd`, `bin/memoryworker`, the offline scorer `bin/memoryeval` and the archive verifier `bin/memoryverify`. Configure the service using [examples/memoryd.json](examples/memoryd.json), then run `bin/memoryd -config /path/to/config.json`. Configuration parsing rejects unknown fields, trailing JSON and files larger than 1 MiB. Paths resolve from the process working directory. Provision migrations, restricted runtime credentials, the pinned OpenFGA model/tuples, and certificates before startup; the service does not provision infrastructure or start workers.
 
 Supply secrets through the deployment's secret manager as `MEMORY_DATABASE_URL`, `MEMORY_ENCRYPTION_KEY_HEX` (32-byte AES key encoded as hex), `MEMORY_PAGINATION_KEY_HEX` (a separate 32-byte hex key), and optional `MEMORY_OPENFGA_TOKEN`. If `audit_key_id` is configured, supply `MEMORY_AUDIT_PRIVATE_KEY_HEX` as a 64-byte Ed25519 private key encoded as hex. Keep keys stable across restarts for retained data and pagination. The supplied AES-GCM and Ed25519 implementations remain development/reference key integrations; production envelope encryption and managed signing require approved adapters and key-recovery procedures.
 
@@ -539,7 +539,32 @@ Each event produces an encrypted payload object and a signed one-event batch man
 
 `archive.NewFiles` supplies an encrypted local development implementation. Create its directory explicitly, inject an archive-specific cipher/key, and retain that key separately. Atomic create-once publication, fsync, digest checks, and tenant-bound decryption make ordinary retries safe. Filesystem ownership alone does not establish WORM protection: production hosts must use separately administered immutable storage with appropriate retention controls or implement `model.ArchiveStore` for their approved object service. Local tests do not establish protection against a privileged storage administrator.
 
-Retain the archive head object reference and expected revision independently, then call `archive.VerifyChain`. Verification checks signatures, exact object versions, payload hashes, contiguous revision coverage, and predecessor links up to an explicit batch bound. Missing or tampered batches fail. An independently retained head is necessary to detect tail truncation; a mutable database offset alone is insufficient. Archive and projection offsets remain independent. Archive heads are not yet included in scoped `GetAuditExport` bundles, and complete restore/retention drills remain pending.
+Retain the archive head object reference and expected revision independently, then call `archive.VerifyChain`. Verification checks signatures, exact object versions, payload hashes, contiguous revision coverage, and predecessor links up to an explicit batch bound. Missing or tampered batches fail. An independently retained head is necessary to detect tail truncation; a mutable database offset alone is insufficient. Archive and projection offsets remain independent. Archive heads are not yet included in scoped `GetAuditExport` bundles. The disposable logical restore and fresh index rebuild drill is implemented; production recovery and coordinated retention drills remain pending.
+
+For the encrypted local archive adapter, `make build` also produces `bin/memoryverify`. Run `bin/memoryverify -config /absolute/path/verification.json` with `MEMORY_ARCHIVE_ENCRYPTION_KEY_HEX` supplied through the environment. The command only reads archive objects; it needs no database credentials, signing private key or running worker. Its configuration is bounded to 1 MiB and rejects unknown fields and trailing JSON:
+
+```json
+{
+  "directory": "/srv/facts/archive",
+  "tenant": "bank1",
+  "stream": "ledger-v1",
+  "head": {
+    "Locator": "<64 lowercase hex characters>",
+    "Version": "<64 lowercase hex characters>",
+    "Digest": "<64 lowercase hex characters>",
+    "Size": 1234
+  },
+  "expected_revision": 100,
+  "max_batches": 100,
+  "timeout_seconds": 60,
+  "trusted_keys": {"archive-key-v1": "<32-byte Ed25519 public key in hex>"}
+}
+```
+
+Replace every placeholder and the illustrative size/revision with the independently retained head receipt and approved trust configuration. Keep every trusted signing key needed across rotation. Do not derive the expected head from the directory being checked: an attacker could remove its tail. The expected revision must be positive and no greater than `max_batches` (1–1,000,000); timeout is explicit (1–3,600 seconds). Cancellation and deadlines are checked between archive operations; synchronous local filesystem reads must return before cancellation can be observed.
+
+Exit 0 means the entire chain through the supplied head verified; exit 1 means configuration, key, storage, verification, cancellation or report-output failure; exit 2 means invalid command usage. Failures emit a generic diagnostic to stderr. Verification failures emit no success report; an output-write failure may leave a partial report, so always check the exit status. Success emits one JSON report containing the tenant, stream, exact head, verified revision, and a digest of the parsed configuration (including public trust keys but no encryption secret). The report is unsigned operational evidence: retain it with the configuration, verifier build/commit and independently held anchor. It does not prove immutable storage, freshness beyond the supplied anchor, bank approval or scoped export coverage. Tests exercise actual encrypted files and signed two-key chains, including missing predecessors, tail truncation, incorrect trust/identity, wrong encryption keys and cancellation.
+
 
 ## Registered redacted evidence
 

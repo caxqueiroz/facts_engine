@@ -1,6 +1,7 @@
 .PHONY: build test integration ci-integration check vet lint vuln generate migrate tools
 
 build:
+	go build -trimpath -o bin/memoryverify ./cmd/memoryverify
 	go build -trimpath -o bin/memoryeval ./cmd/memoryeval
 	go build -trimpath -o bin/memoryd ./cmd/memoryd
 	go build -trimpath -o bin/memoryworker ./cmd/memoryworker
