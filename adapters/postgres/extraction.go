@@ -41,6 +41,9 @@ func (t *transaction) ExtractionJob(ctx context.Context, id string) (model.Extra
 		return j, model.ErrPrecondition
 	}
 	err = t.decode(payload, &j)
+	if err == nil && j.PayloadDisposed {
+		return model.ExtractionJob{}, model.ErrPrecondition
+	}
 	return j, err
 }
 func (t *transaction) ExtractionJobStatus(ctx context.Context, id string) (model.JobStatus, error) {

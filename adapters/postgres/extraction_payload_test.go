@@ -124,6 +124,35 @@ func testExtractionPayloadMigration(t *testing.T, ctx context.Context, admin, ru
 			if err := tx.Rollback(ctx); err != nil {
 				t.Fatal(err)
 			}
+			// A disposal marker is not a usable model artifact, even if the
+			// envelope still contains its original bytes.
+			var marked map[string]any
+			if err := json.Unmarshal(original, &marked); err != nil {
+				t.Fatal(err)
+			}
+			marked["PayloadDisposed"] = true
+			markedRaw, err := json.Marshal(marked)
+			if err != nil {
+				t.Fatal(err)
+			}
+			markedBytes, err := cipher.Seal("legacy", markedRaw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx, fmt.Sprintf("UPDATE %s SET payload=$2 WHERE tenant_id='legacy' AND %s=$1", table, f.key), f.id, markedBytes); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := read(f.kind); !errors.Is(err, model.ErrPrecondition) {
+				t.Fatal("disposed artifact exposed", err)
+			}
+			if f.kind == "attempt" {
+				if _, err := ledger.BackfillExtractionInputInventories(ctx, "legacy", 1); !errors.Is(err, model.ErrInvalid) {
+					t.Fatal("disposed request backfilled", err)
+				}
+			}
+			if _, err := admin.Exec(ctx, fmt.Sprintf("UPDATE %s SET payload=$2 WHERE tenant_id='legacy' AND %s=$1", table, f.key), f.id, want[f.kind]); err != nil {
+				t.Fatal(err)
+			}
 			if _, err := admin.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE tenant_id='legacy' AND %s=$1", table, f.key), f.id); err != nil {
 				t.Fatal(err)
 			}

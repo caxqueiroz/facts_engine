@@ -70,6 +70,7 @@ type ExtractionRequest struct {
 	MemoryTargets                    []MemoryExtractionTarget `json:",omitempty"`
 }
 type ExtractionJob struct {
+	PayloadDisposed           bool `json:",omitempty"`
 	ID, Tenant, ProfileDigest string
 	Caller                    Caller
 	Request                   ExtractionRequest
@@ -162,6 +163,7 @@ type ExtractedProposal struct {
 	RecordID, VersionID string
 }
 type ExtractionAttempt struct {
+	PayloadDisposed                                                    bool                   `json:",omitempty"`
 	Reservation                                                        *ExtractionReservation `json:",omitempty"`
 	ContentScopes                                                      []string               `json:",omitempty"`
 	RefreshScopes                                                      []string               `json:",omitempty"`
@@ -175,6 +177,7 @@ type ExtractionAttempt struct {
 	Authorization                                                      []AuthorizationDecision
 }
 type ExtractionResult struct {
+	PayloadDisposed                                                                        bool     `json:",omitempty"`
 	ContentScopes                                                                          []string `json:",omitempty"`
 	RefreshScopes                                                                          []string `json:",omitempty"`
 	AttemptID, JobID, Tenant, Scope, Outcome, ModelIdentity, RequestDigest, ResponseDigest string

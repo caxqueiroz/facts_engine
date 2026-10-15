@@ -55,7 +55,7 @@ func (s *Service) loadExtractionJob(ctx context.Context, c model.Caller, q model
 	if err != nil {
 		return j, status, err
 	}
-	if j.Tenant != c.Tenant || j.Request.Scope != q.Scope || model.ExtractionProfileDigest(j.Profile) != j.ProfileDigest {
+	if j.PayloadDisposed || j.Tenant != c.Tenant || j.Request.Scope != q.Scope || model.ExtractionProfileDigest(j.Profile) != j.ProfileDigest {
 		return j, status, model.ErrPrecondition
 	}
 	return j, status, nil
@@ -211,6 +211,9 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 	})
 	if err != nil {
 		return model.JobStatus{}, err
+	}
+	if retained.PayloadDisposed {
+		return model.JobStatus{}, model.ErrPrecondition
 	}
 	if retained.OwnerNonce != attempt.OwnerNonce {
 		return model.JobStatus{}, model.ErrUnavailable
@@ -480,6 +483,9 @@ func (s *Service) GetExtractionRun(ctx context.Context, c model.Caller, q model.
 	}
 	if run.Attempt.Tenant != c.Tenant || run.Attempt.Scope != q.Scope {
 		return model.ExtractionRun{}, model.ErrDenied
+	}
+	if run.Attempt.PayloadDisposed || (run.Result != nil && run.Result.PayloadDisposed) {
+		return model.ExtractionRun{}, model.ErrPrecondition
 	}
 	if model.BytesDigest(run.Attempt.RequestBytes) != run.Attempt.RequestDigest {
 		return model.ExtractionRun{}, model.ErrPrecondition

@@ -23,7 +23,7 @@ type extractionInputVersion struct {
 // Derive references from the exact retained wire request, after approved field
 // omission. No caller-supplied inventory can conceal a copied version body.
 func extractionInputReferences(a model.ExtractionAttempt) ([]extractionInputReference, []extractionInputReference, error) {
-	if len(a.RequestBytes) == 0 || len(a.RequestBytes) > 64<<20 || model.BytesDigest(a.RequestBytes) != a.RequestDigest {
+	if a.PayloadDisposed || len(a.RequestBytes) == 0 || len(a.RequestBytes) > 64<<20 || model.BytesDigest(a.RequestBytes) != a.RequestDigest {
 		return nil, nil, model.ErrInvalid
 	}
 	var input struct {

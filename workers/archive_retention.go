@@ -31,6 +31,10 @@ func archiveRetentionReplay(retained []byte, current model.ArchivePayload) bool 
 			return false
 		}
 		switch entry.Kind {
+		case "extraction_job", "extraction_attempt", "extraction_result":
+			if !extractionRetentionTransition(old, entry, current.Event) {
+				return false
+			}
 		case "version":
 			if !versionRetentionTransition(old, entry, current.Event) {
 				return false

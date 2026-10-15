@@ -65,6 +65,9 @@ func (t *transaction) ExtractionAttempt(ctx context.Context, id string) (model.E
 		return a, model.ErrPrecondition
 	}
 	err = t.decode(payload, &a)
+	if err == nil && a.PayloadDisposed {
+		return model.ExtractionAttempt{}, model.ErrPrecondition
+	}
 	return a, err
 }
 func (t *transaction) ExtractionResult(ctx context.Context, id string) (model.ExtractionResult, error) {
@@ -77,6 +80,9 @@ func (t *transaction) ExtractionResult(ctx context.Context, id string) (model.Ex
 		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
+	if err == nil && r.PayloadDisposed {
+		return model.ExtractionResult{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) FinishExtraction(ctx context.Context, job, attempt string, fence int64, state, code string, delay time.Duration) error {
