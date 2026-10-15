@@ -801,6 +801,7 @@ func TestPostgresLedger(t *testing.T) {
 
 	t.Run("projection and archive consumers", func(t *testing.T) { testPipeline(t, ctx, ledger, store, admin) })
 	t.Run("extraction input inventories", func(t *testing.T) { testExtractionInputInventories(t, ctx, admin, runtime) })
+	t.Run("extraction inventory backfill", func(t *testing.T) { testExtractionInventoryBackfill(t, ctx, admin, runtime) })
 	t.Run("atomic ordering", func(t *testing.T) {
 		var count, maxRev int64
 		if err := admin.QueryRow(ctx, `SELECT count(*),max(ledger_revision) FROM ledger_events WHERE tenant_id='bank1'`).Scan(&count, &maxRev); err != nil || count != maxRev {

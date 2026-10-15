@@ -112,3 +112,14 @@ INSERT INTO extraction_attempt_memory_inputs(tenant_id,attempt_id,record_id,vers
 
 -- name: HasUninventoriedExtractionAttempts :one
 SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL);
+
+-- name: ListUninventoriedExtractionAttemptPage :many
+SELECT a.id,a.job_id,a.scope_id,a.payload
+FROM extraction_attempts a
+LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id
+WHERE a.tenant_id=$1 AND i.attempt_id IS NULL
+ORDER BY a.id COLLATE "C" LIMIT $2;
+
+-- name: HasPartialExtractionInputInventory :one
+SELECT EXISTS(SELECT 1 FROM extraction_attempt_fact_inputs f WHERE f.tenant_id=sqlc.arg(tenant_id) AND f.attempt_id=sqlc.arg(attempt_id))
+ OR EXISTS(SELECT 1 FROM extraction_attempt_memory_inputs m WHERE m.tenant_id=sqlc.arg(tenant_id) AND m.attempt_id=sqlc.arg(attempt_id));

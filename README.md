@@ -699,7 +699,23 @@ Migration `00038_extraction_input_inventory.sql` adds append-only, tenant-isolat
 
 Inventories distinguish retained proposal payloads from version metadata left by approved whole-field omission. Copied inputs acquire the same database guard used by version disposal before the attempt can commit and reach the provider. Redacted metadata retains version identity without being counted as a copied body. Refresh inventories include the original memory and the current fact versions actually supplied, which can differ from the memory's original dependencies. Result artifacts remain linked to their input attempt.
 
-Existing encrypted attempts are not silently backfilled by this migration: a missing `extraction_attempt_inventories` row is an explicit inventory gap, detectable by the generated `HasUninventoriedExtractionAttempts` query. The pending disposal coordinator must fail closed on those gaps until an owner-approved, decrypted backfill is verified. The new inventory supplies dependency evidence; it does not authorize deletion, remove model inputs/results or establish complete derivative disposal. Upgrade every extraction writer and refresh runtime grants before relying on these inventories.
+Existing encrypted attempts are not silently backfilled by this migration: a missing `extraction_attempt_inventories` row is an explicit inventory gap, detectable by the generated `HasUninventoriedExtractionAttempts` query. The pending disposal coordinator must fail closed on those gaps until the maintenance backfill below has completed and its results are verified. The new inventory supplies dependency evidence; it does not authorize deletion, remove model inputs/results or establish complete derivative disposal. Upgrade every extraction writer and refresh runtime grants before relying on these inventories.
+
+For existing installations, the PostgreSQL adapter exposes `ledger.BackfillExtractionInputInventories(ctx, tenant, limit)` as a host-authorized maintenance operation. It is not a public RPC or an engine disposal command. Upgrade and stop legacy extraction writers first, supply the correct tenant decryption keys and inventory write credentials, and invoke it separately for each authorized tenant. Each call reads at most 1–100 missing attempts, bounded by 64 MiB of ciphertext; use a smaller page if that byte limit is exceeded.
+
+```go
+for {
+    page, err := ledger.BackfillExtractionInputInventories(ctx, tenant, 25)
+    if err != nil {
+        return err
+    }
+    if page.Complete {
+        break
+    }
+}
+```
+
+A page validates the retained envelope against its database identity, verifies the request digest and input bindings, and derives references using the same rules as new attempts. It commits all inventories in the page together, returns a committed `Inventoried` count, and never rewrites retained request bytes or completed inventories. Missing source content, undecryptable/malformed input, and partial inventory rows fail the whole page. Partial rows require explicit operator investigation; the backfill does not overwrite them or infer completeness. Per-tenant maintenance locks serialize simultaneous callers. Repeat calls resume from remaining missing receipts, so no external cursor is needed. `Complete` means no missing inventory receipts were observed at the final query; it does not certify policy eligibility, every retained derivative or production erasure.
 
 ## Retention governance and evidence disposal
 

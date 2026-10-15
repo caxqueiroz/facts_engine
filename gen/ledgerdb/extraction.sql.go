@@ -195,6 +195,23 @@ func (q *Queries) GetExtractionResultPayload(ctx context.Context, arg GetExtract
 	return payload, err
 }
 
+const HasPartialExtractionInputInventory = `-- name: HasPartialExtractionInputInventory :one
+SELECT EXISTS(SELECT 1 FROM extraction_attempt_fact_inputs f WHERE f.tenant_id=$1 AND f.attempt_id=$2)
+ OR EXISTS(SELECT 1 FROM extraction_attempt_memory_inputs m WHERE m.tenant_id=$1 AND m.attempt_id=$2)
+`
+
+type HasPartialExtractionInputInventoryParams struct {
+	TenantID  string
+	AttemptID string
+}
+
+func (q *Queries) HasPartialExtractionInputInventory(ctx context.Context, arg HasPartialExtractionInputInventoryParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, HasPartialExtractionInputInventory, arg.TenantID, arg.AttemptID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const HasUninventoriedExtractionAttempts = `-- name: HasUninventoriedExtractionAttempts :one
 SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL)
 `
@@ -561,6 +578,51 @@ func (q *Queries) InsertExtractionSubject(ctx context.Context, arg InsertExtract
 		arg.SubjectID,
 	)
 	return err
+}
+
+const ListUninventoriedExtractionAttemptPage = `-- name: ListUninventoriedExtractionAttemptPage :many
+SELECT a.id,a.job_id,a.scope_id,a.payload
+FROM extraction_attempts a
+LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id
+WHERE a.tenant_id=$1 AND i.attempt_id IS NULL
+ORDER BY a.id COLLATE "C" LIMIT $2
+`
+
+type ListUninventoriedExtractionAttemptPageParams struct {
+	TenantID string
+	Limit    int32
+}
+
+type ListUninventoriedExtractionAttemptPageRow struct {
+	ID      string
+	JobID   string
+	ScopeID string
+	Payload []byte
+}
+
+func (q *Queries) ListUninventoriedExtractionAttemptPage(ctx context.Context, arg ListUninventoriedExtractionAttemptPageParams) ([]ListUninventoriedExtractionAttemptPageRow, error) {
+	rows, err := q.db.Query(ctx, ListUninventoriedExtractionAttemptPage, arg.TenantID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUninventoriedExtractionAttemptPageRow{}
+	for rows.Next() {
+		var i ListUninventoriedExtractionAttemptPageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.ScopeID,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const LockExtractionQuota = `-- name: LockExtractionQuota :one
