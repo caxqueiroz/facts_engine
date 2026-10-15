@@ -52,7 +52,7 @@ func standaloneRoute(t *testing.T, ctx context.Context, tenant string) runtimeco
 	if err := cortex.Provision(ctx, db, cortex.Config{Tenant: tenant, Generation: "standalone-g1", EmbeddingID: "none", Dimensions: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='standalone_index_runtime') THEN CREATE ROLE standalone_index_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO standalone_index_runtime; GRANT SELECT ON collections,facts_projection_identity TO standalone_index_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO standalone_index_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO standalone_index_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO standalone_index_runtime`); err != nil {
+	if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='standalone_index_runtime') THEN CREATE ROLE standalone_index_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO standalone_index_runtime; GRANT SELECT ON collections,facts_projection_identity,facts_projection_tombstones TO standalone_index_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO standalone_index_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO standalone_index_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO standalone_index_runtime`); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("MEMORY_TEST_INDEX_URL", databaseRole(t, dsn, "standalone_index_runtime"))

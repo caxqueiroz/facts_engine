@@ -31,7 +31,7 @@ func coreConfig(c Config) core.Config {
 
 // Provision requires a fresh, dedicated database and privileged migration pool.
 // Runtime identities must be granted only SELECT/INSERT/UPDATE on embeddings,
-// SELECT on collections/identity, and SELECT/INSERT on facts_projection_receipts.
+// SELECT on collections/identity/tombstones, and SELECT/INSERT on receipts.
 func Provision(ctx context.Context, db *sql.DB, c Config) error {
 	if db == nil || !valid(c) {
 		return model.ErrInvalid
@@ -52,6 +52,9 @@ func Provision(ctx context.Context, db *sql.DB, c Config) error {
 	}
 	defer tx.Rollback()
 	if _, err = tx.ExecContext(ctx, `CREATE INDEX facts_lexical_content ON embeddings USING gin(to_tsvector('simple',content)); CREATE TABLE facts_projection_identity(singleton boolean PRIMARY KEY CHECK(singleton),tenant text NOT NULL,generation text NOT NULL,embedding_id text NOT NULL,dimensions integer NOT NULL,cortex_version text NOT NULL); CREATE TABLE facts_projection_receipts(id text PRIMARY KEY,digest text NOT NULL); CREATE TABLE facts_projection_gate(singleton boolean PRIMARY KEY CHECK(singleton),fence bigint NOT NULL CHECK(fence>=0),sealed boolean NOT NULL); INSERT INTO facts_projection_gate VALUES(true,0,false)`); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, retentionSchema); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO facts_projection_identity VALUES(true,$1,$2,$3,$4,$5)`, c.Tenant, c.Generation, c.EmbeddingID, c.Dimensions, Version); err != nil {
@@ -87,7 +90,7 @@ func New(ctx context.Context, db *sql.DB, c Config, embedder model.Embedder) (*I
 		return nil, model.ErrPrecondition
 	}
 	var gate bool
-	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_gate WHERE singleton)`).Scan(&gate); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_gate WHERE singleton) AND to_regclass('public.facts_projection_tombstones') IS NOT NULL`).Scan(&gate); err != nil {
 		return nil, err
 	}
 	if !gate {
@@ -137,6 +140,14 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 		return err
 	}
 	id, digest := model.ProjectionID(d), model.Digest(d)
+	var disposed bool
+	if err := i.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_tombstones WHERE id=$1)`, id).Scan(&disposed); err != nil {
+		return err
+	}
+	if disposed {
+		return model.ErrPrecondition
+	}
+
 	var retained string
 	lookupErr := i.db.QueryRowContext(ctx, `SELECT digest FROM facts_projection_receipts WHERE id=$1`, id).Scan(&retained)
 	if lookupErr == nil {
@@ -170,6 +181,12 @@ func (i *Index) Put(ctx context.Context, d model.ProjectionDocument) error {
 	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, id); err != nil {
 		return err
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_tombstones WHERE id=$1)`, id).Scan(&disposed); err != nil {
+		return err
+	}
+	if disposed {
+		return model.ErrPrecondition
 	}
 	var old string
 	err = tx.QueryRowContext(ctx, `SELECT digest FROM facts_projection_receipts WHERE id=$1`, id).Scan(&old)

@@ -48,7 +48,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err := cortex.Provision(ctx, db, config); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='pipeline_runtime') THEN CREATE ROLE pipeline_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO pipeline_runtime; GRANT SELECT ON collections,facts_projection_identity TO pipeline_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO pipeline_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO pipeline_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO pipeline_runtime`); err != nil {
+	if _, err := db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='pipeline_runtime') THEN CREATE ROLE pipeline_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO pipeline_runtime; GRANT SELECT ON collections,facts_projection_identity,facts_projection_tombstones TO pipeline_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO pipeline_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO pipeline_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO pipeline_runtime`); err != nil {
 		t.Fatal(err)
 	}
 	runtime, err := sql.Open("pgx", dsn+"&options=-c%20role%3Dpipeline_runtime")
