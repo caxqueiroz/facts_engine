@@ -222,7 +222,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil || len(lexicalManifest.Items) == 0 || lexicalManifest.Retrieval.EmbeddingID != "none" || lexicalManifest.Retrieval.Dimensions != 0 {
 		t.Fatal("lexical context provenance", lexicalManifest, err)
 	}
-	testContexts(t, ctx, engine, l, store, c, index, query)
+	testContexts(t, ctx, engine, l, store, c, index, query, admin)
 	drain(worker, projector, key)
 	result, err = engine.Recall(ctx, c, query)
 	if err != nil {

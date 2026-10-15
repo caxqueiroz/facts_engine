@@ -33,6 +33,9 @@ func (t *transaction) Decision(ctx context.Context, id string) (model.DecisionRe
 	if err != nil {
 		return r, translate(err)
 	}
+	if len(payload) == 0 {
+		return r, model.ErrPrecondition
+	}
 	err = t.decode(payload, &r)
 	return r, err
 }
@@ -45,6 +48,9 @@ func (t *transaction) DecisionRun(ctx context.Context, application, run string) 
 	payload, err := ledgerdb.New(t.tx).GetDecisionRunPayload(ctx, ledgerdb.GetDecisionRunPayloadParams{TenantID: t.tenant, ApplicationID: application, ExternalDecisionID: run})
 	if err != nil {
 		return r, translate(err)
+	}
+	if len(payload) == 0 {
+		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
 	return r, err
@@ -120,7 +126,10 @@ func (t *transaction) flushContext(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertDecisionPayload(ctx, ledgerdb.InsertDecisionPayloadParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Receipt.Scope, ApplicationID: r.Receipt.ApplicationID, ExternalDecisionID: r.Receipt.ExternalDecisionID, RequestDigest: r.Digest, ContextID: nullableID(r.Receipt.ContextID), SnapshotID: nullableID(r.Receipt.SnapshotID), CalculationID: nullableID(r.Receipt.CalculationID), LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertDecisionHeader(ctx, ledgerdb.InsertDecisionHeaderParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Receipt.Scope, ApplicationID: r.Receipt.ApplicationID, ExternalDecisionID: r.Receipt.ExternalDecisionID, RequestDigest: r.Digest, ContextID: nullableID(r.Receipt.ContextID), SnapshotID: nullableID(r.Receipt.SnapshotID), CalculationID: nullableID(r.Receipt.CalculationID), LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertDecisionPayload(ctx, ledgerdb.InsertDecisionPayloadParams{TenantID: t.tenant, DecisionID: r.ID, Payload: b}); err != nil {
 			return err
 		}
 		for _, scope := range r.Scopes {

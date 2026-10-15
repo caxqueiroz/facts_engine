@@ -12,6 +12,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/evidence"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func (l failedContextLedger) Transact(ctx context.Context, tenant string, fn fun
 	return l.Ledger.Transact(ctx, tenant, func(tx model.Tx) error { return fn(failedContextTx{tx.(model.ContextTx)}) })
 }
 
-func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgres.Ledger, store *evidence.Postgres, c model.Caller, index model.RetrievalIndex, q model.RecallRequest) {
+func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgres.Ledger, store *evidence.Postgres, c model.Caller, index model.RetrievalIndex, q model.RecallRequest, admin *pgxpool.Pool) {
 	t.Helper()
 	r := model.ContextRequest{Command: model.Command{Key: "context-one", Purpose: q.Purpose}, Scope: "case1", Query: q}
 	testRetrievalInterruption(t, ctx, l, store, l, index, c, r)
@@ -95,6 +96,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	}
 	item := model.VersionReference{RecordID: m.Items[0].Fact.RecordID, VersionID: m.Items[0].Fact.VersionID}
 	d := model.DecisionReceipt{Command: model.Command{Key: "decision-one", Purpose: q.Purpose}, Scope: "case1", ApplicationID: "app", ExternalDecisionID: "one", ContextID: m.ID, SelectedItems: []model.VersionReference{item}, UsedItems: []model.VersionReference{item}, MethodKind: "rule", MethodID: "rule1", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact("decision-input"), Output: artifact("decision-output"), DecidedAt: time.Now(), Outcome: "succeeded"}
+	testDecisionPayloadAtomicity(t, ctx, e, admin, c, d)
 	receipt, err := remoteRecordDecision(t, ctx, e, c, d)
 	if err != nil {
 		t.Fatal(err)

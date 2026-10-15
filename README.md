@@ -779,6 +779,14 @@ The transaction deletes the encrypted child payload, retains a metadata-only tom
 
 After disposal, direct payload reads fail and signed exports report explicit content gaps. Already signed archive batches retain their original bytes. Source evidence, structural history, archives and backups remain subject to their own policies. **A successful disposal receipt establishes ledger payload removal, not completed index cleanup or full erasure.** Check `ProjectionCleanupStatus` for captured obligations; use `CleanupProjection` for each captured destination or configure the scheduler below.
 
+## Decision payload storage
+
+Migration `00048_decision_payloads.sql` moves encrypted decision receipts into `decision_payloads` without decrypting or rewriting their bytes. Permanent application/decision identity, ledger revision, request digest and context/snapshot/calculation links remain in `decision_receipts`; normalized scope, version and artifact inventories remain intact. Headers, payloads, inventories, ledger events and command receipts commit together. Stop writers and upgrade service, audit/archive workers and maintenance readers together, then refresh `scripts/runtime-role.sql`. Older readers expect the removed `decision_receipts.payload` column; upgraded ledger startup requires the child table. This is a forward-only migration with verified-backup recovery.
+
+Runtime credentials can read/insert decision ciphertext but cannot update, delete or truncate it. The archive role has read access; tenant RLS protects the child table. Receipt-ID and external-decision lookups fail explicitly when a structural record lacks bytes. Audit/archive inventories retain missing-payload rows so unavailable decisions cannot disappear from coverage. Tests cover unchanged ciphertext (including opaque legacy envelopes), read parity, tenant isolation, immutable runtime permissions, missing payloads and rollback when payload insertion fails.
+
+This is a storage prerequisite for governed decision disposal. Decision tombstones, policy/hold checks and batch selection remain to implement; retained decisions still block disposal of their referenced calculations, contexts, snapshots, versions and evidence.
+
 ## Calculation payload storage
 
 Migration `00046_calculation_payloads.sql` moves calculation receipt ciphertext into `calculation_payloads` without decrypting or rewriting it. Immutable run identity, request digest, ledger revision, snapshot links and evidence references remain in their structural tables. Header, payload, references and ledger event still commit in one transaction. Stop writers and upgrade service, audit/archive workers and maintenance readers together, then refresh `scripts/runtime-role.sql`; older readers expect the removed `calculation_receipts.payload` column. The ledger startup check requires the new table. This migration is forward-only; recovery requires a verified backup.

@@ -219,9 +219,9 @@ func (q *Queries) ListArchiveConversation(ctx context.Context, arg ListArchiveCo
 }
 
 const ListArchiveDecision = `-- name: ListArchiveDecision :many
-SELECT id,payload
-FROM decision_receipts
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT d.id,p.payload
+FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+WHERE d.tenant_id=$1 AND d.ledger_revision=$2
 `
 
 type ListArchiveDecisionParams struct {
@@ -963,8 +963,8 @@ func (q *Queries) ListAuditConversation(ctx context.Context, arg ListAuditConver
 }
 
 const ListAuditDecision = `-- name: ListAuditDecision :many
-SELECT c.id,c.payload
-FROM decision_receipts c
+SELECT c.id,p.payload
+FROM decision_receipts c LEFT JOIN decision_payloads p ON p.tenant_id=c.tenant_id AND p.decision_id=c.id
 WHERE c.tenant_id=$1 AND EXISTS(SELECT 1
 FROM decision_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001

@@ -165,9 +165,9 @@ func (q *Queries) GetContextPayload(ctx context.Context, arg GetContextPayloadPa
 }
 
 const GetDecisionPayload = `-- name: GetDecisionPayload :one
-SELECT payload
-FROM decision_receipts
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+WHERE d.tenant_id=$1 AND d.id=$2
 `
 
 type GetDecisionPayloadParams struct {
@@ -183,9 +183,9 @@ func (q *Queries) GetDecisionPayload(ctx context.Context, arg GetDecisionPayload
 }
 
 const GetDecisionRunPayload = `-- name: GetDecisionRunPayload :one
-SELECT payload
-FROM decision_receipts
-WHERE tenant_id=$1 AND application_id=$2 AND external_decision_id=$3
+SELECT p.payload
+FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+WHERE d.tenant_id=$1 AND d.application_id=$2 AND d.external_decision_id=$3
 `
 
 type GetDecisionRunPayloadParams struct {
@@ -504,6 +504,40 @@ func (q *Queries) InsertDecisionFactItem(ctx context.Context, arg InsertDecision
 	return err
 }
 
+const InsertDecisionHeader = `-- name: InsertDecisionHeader :exec
+INSERT INTO decision_receipts (tenant_id,id,scope_id,application_id,external_decision_id,request_digest,context_id,snapshot_id,calculation_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+`
+
+type InsertDecisionHeaderParams struct {
+	TenantID           string
+	ID                 string
+	ScopeID            string
+	ApplicationID      string
+	ExternalDecisionID string
+	RequestDigest      string
+	ContextID          pgtype.Text
+	SnapshotID         pgtype.Text
+	CalculationID      pgtype.Text
+	LedgerRevision     int64
+}
+
+func (q *Queries) InsertDecisionHeader(ctx context.Context, arg InsertDecisionHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertDecisionHeader,
+		arg.TenantID,
+		arg.ID,
+		arg.ScopeID,
+		arg.ApplicationID,
+		arg.ExternalDecisionID,
+		arg.RequestDigest,
+		arg.ContextID,
+		arg.SnapshotID,
+		arg.CalculationID,
+		arg.LedgerRevision,
+	)
+	return err
+}
+
 const InsertDecisionMemoryItem = `-- name: InsertDecisionMemoryItem :exec
 INSERT INTO decision_memory_items (tenant_id,decision_id,role,ordinal,record_id,version_id,scope_id)
 VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -533,38 +567,17 @@ func (q *Queries) InsertDecisionMemoryItem(ctx context.Context, arg InsertDecisi
 }
 
 const InsertDecisionPayload = `-- name: InsertDecisionPayload :exec
-INSERT INTO decision_receipts (tenant_id,id,scope_id,application_id,external_decision_id,request_digest,context_id,snapshot_id,calculation_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+INSERT INTO decision_payloads(tenant_id,decision_id,payload) VALUES ($1,$2,$3)
 `
 
 type InsertDecisionPayloadParams struct {
-	TenantID           string
-	ID                 string
-	ScopeID            string
-	ApplicationID      string
-	ExternalDecisionID string
-	RequestDigest      string
-	ContextID          pgtype.Text
-	SnapshotID         pgtype.Text
-	CalculationID      pgtype.Text
-	LedgerRevision     int64
-	Payload            []byte
+	TenantID   string
+	DecisionID string
+	Payload    []byte
 }
 
 func (q *Queries) InsertDecisionPayload(ctx context.Context, arg InsertDecisionPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertDecisionPayload,
-		arg.TenantID,
-		arg.ID,
-		arg.ScopeID,
-		arg.ApplicationID,
-		arg.ExternalDecisionID,
-		arg.RequestDigest,
-		arg.ContextID,
-		arg.SnapshotID,
-		arg.CalculationID,
-		arg.LedgerRevision,
-		arg.Payload,
-	)
+	_, err := q.db.Exec(ctx, InsertDecisionPayload, arg.TenantID, arg.DecisionID, arg.Payload)
 	return err
 }
 

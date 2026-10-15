@@ -6,17 +6,17 @@ LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: GetDecisionPayload :one
-SELECT payload
-FROM decision_receipts
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+WHERE d.tenant_id=$1 AND d.id=$2;
 
 -- name: LockDecisionRun :exec
 SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(lock_key)::text,0));
 
 -- name: GetDecisionRunPayload :one
-SELECT payload
-FROM decision_receipts
-WHERE tenant_id=$1 AND application_id=$2 AND external_decision_id=$3;
+SELECT p.payload
+FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+WHERE d.tenant_id=$1 AND d.application_id=$2 AND d.external_decision_id=$3;
 
 -- name: InsertContextManifest :exec
 INSERT INTO context_manifests (tenant_id,id,scope_id,selection_revision,ledger_revision)
@@ -37,9 +37,12 @@ VALUES ($1,$2,$3,$4,$5,$6);
 INSERT INTO context_items (tenant_id,context_id,ordinal,record_id,version_id,scope_id)
 VALUES ($1,$2,$3,$4,$5,$6);
 
+-- name: InsertDecisionHeader :exec
+INSERT INTO decision_receipts (tenant_id,id,scope_id,application_id,external_decision_id,request_digest,context_id,snapshot_id,calculation_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+
 -- name: InsertDecisionPayload :exec
-INSERT INTO decision_receipts (tenant_id,id,scope_id,application_id,external_decision_id,request_digest,context_id,snapshot_id,calculation_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
+INSERT INTO decision_payloads(tenant_id,decision_id,payload) VALUES ($1,$2,$3);
 
 -- name: InsertDecisionScope :exec
 INSERT INTO decision_scopes (tenant_id,decision_id,scope_id)

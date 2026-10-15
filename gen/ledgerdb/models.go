@@ -277,6 +277,12 @@ type DecisionMemoryItem struct {
 	ScopeID    string
 }
 
+type DecisionPayload struct {
+	TenantID   string
+	DecisionID string
+	Payload    []byte
+}
+
 type DecisionReceipt struct {
 	TenantID           string
 	ID                 string
@@ -288,7 +294,6 @@ type DecisionReceipt struct {
 	SnapshotID         pgtype.Text
 	CalculationID      pgtype.Text
 	LedgerRevision     int64
-	Payload            []byte
 }
 
 type DecisionScope struct {

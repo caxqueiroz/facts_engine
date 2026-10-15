@@ -39,7 +39,7 @@ func testCalculationDisposalStorage(t *testing.T, ctx context.Context, admin, ru
 	if err != nil {
 		t.Fatal(err)
 	}
-	decisionSQL := "INSERT INTO decision_receipts(tenant_id,id,scope_id,application_id,external_decision_id,request_digest,snapshot_id,calculation_id,ledger_revision,payload) VALUES('legacy','guard-decision','scope','app','guard-decision','digest','legacy-snapshot-a','legacy-calculation',2,decode('01','hex'))"
+	decisionSQL := "INSERT INTO decision_receipts(tenant_id,id,scope_id,application_id,external_decision_id,request_digest,snapshot_id,calculation_id,ledger_revision) VALUES('legacy','guard-decision','scope','app','guard-decision','digest','legacy-snapshot-a','legacy-calculation',2)"
 	// A live calculation accepts references; roll back this fixture before disposal.
 	live, err := admin.Begin(ctx)
 	if err != nil {

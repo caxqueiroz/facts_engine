@@ -179,3 +179,7 @@ REVOKE DELETE,TRUNCATE ON calculation_guards FROM facts_runtime;
 
 GRANT INSERT ON calculation_disposals TO facts_retention;
 GRANT DELETE ON calculation_payloads TO facts_retention;
+
+GRANT SELECT,INSERT ON decision_payloads TO facts_runtime;
+REVOKE UPDATE,DELETE,TRUNCATE ON decision_payloads,decision_receipts FROM facts_runtime;
+GRANT SELECT ON decision_payloads TO facts_archiver;
