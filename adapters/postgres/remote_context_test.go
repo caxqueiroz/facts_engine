@@ -8,6 +8,8 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
@@ -24,6 +26,11 @@ func remotePrepareContext(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	created, err := client.PrepareContext(ctx, request)
 	if err != nil {
 		return model.ContextManifest{}, err
+	}
+	grpcClient := v1.NewContextServiceClient(governanceGRPC(t, e, caller))
+	grpcCreated, err := grpcClient.PrepareContext(ctx, request)
+	if err != nil || !proto.Equal(created, grpcCreated) {
+		t.Fatal("gRPC context replay differs", grpcCreated, err)
 	}
 	direct, err := e.PrepareContext(ctx, caller, r)
 	if err != nil {
@@ -63,6 +70,15 @@ func remotePrepareContext(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	if err != nil || !proto.Equal(m, fetched.Manifest) {
 		t.Fatalf("context read: %v", err)
 	}
+	grpcFetched, err := grpcClient.GetContextManifest(ctx, &v1.GetContextManifestRequest{Tenant: caller.Tenant, Id: m.Id, Purpose: r.Purpose})
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC context read differs", grpcFetched, err)
+	}
+	forged := proto.Clone(request).(*v1.PrepareContextRequest)
+	forged.Tenant = "another-tenant"
+	if result, err := grpcClient.PrepareContext(ctx, forged); result != nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC forged context tenant", result, err)
+	}
 	return direct, nil
 }
 func remoteRecordDecision(t *testing.T, ctx context.Context, e *facts.Engine, caller model.Caller, r model.DecisionReceipt) (model.DecisionRecord, error) {
@@ -82,9 +98,15 @@ func remoteRecordDecision(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	}
 	receipt := &v1.DecisionReceipt{Command: &v1.Command{Key: r.Key, Purpose: r.Purpose, CorrelationId: r.CorrelationID}, Scope: r.Scope, ApplicationId: r.ApplicationID, ExternalDecisionId: r.ExternalDecisionID, ContextId: r.ContextID, SnapshotId: r.SnapshotID, CalculationId: r.CalculationID, SelectedItems: refs(r.SelectedItems), UsedItems: refs(r.UsedItems), MethodKind: r.MethodKind, MethodId: r.MethodID, MethodVersion: r.MethodVersion, TransformationVersion: r.TransformationVersion, Input: artifact(&r.Input), Output: artifact(&r.Output), ModelRequest: artifact(r.ModelRequest), ModelResponse: artifact(r.ModelResponse), ActionReceipt: artifact(r.ActionReceipt), DecidedAt: timestamppb.New(r.DecidedAt), Outcome: r.Outcome}
 	client := memoryv1connect.NewContextServiceClient(governanceClient(t, e, caller))
-	created, err := client.RecordDecision(ctx, &v1.RecordDecisionRequest{Tenant: caller.Tenant, Receipt: receipt})
+	request := &v1.RecordDecisionRequest{Tenant: caller.Tenant, Receipt: receipt}
+	grpcClient := v1.NewContextServiceClient(governanceGRPC(t, e, caller))
+	created, err := grpcClient.RecordDecision(ctx, request)
 	if err != nil {
 		return model.DecisionRecord{}, err
+	}
+	connectCreated, err := client.RecordDecision(ctx, request)
+	if err != nil || !proto.Equal(created, connectCreated) {
+		t.Fatal("Connect decision replay differs from gRPC", connectCreated, err)
 	}
 	direct, err := e.RecordDecision(ctx, caller, r)
 	if err != nil {
@@ -98,10 +120,18 @@ func remoteRecordDecision(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	if err != nil || !proto.Equal(record, fetched.Record) {
 		t.Fatalf("decision read: %v", err)
 	}
+	grpcFetched, err := grpcClient.GetDecisionReceipt(ctx, &v1.GetDecisionReceiptRequest{Tenant: caller.Tenant, Id: record.Id, Purpose: r.Purpose})
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC decision read differs", grpcFetched, err)
+	}
 	receipt.Command.Key += "-external-retry"
 	again, err := client.RecordDecision(ctx, &v1.RecordDecisionRequest{Tenant: caller.Tenant, Receipt: receipt})
 	if err != nil || again.Record.Id != record.Id {
 		t.Fatalf("decision external identity: %v", err)
+	}
+	grpcAgain, err := grpcClient.RecordDecision(ctx, request)
+	if err != nil || !proto.Equal(again, grpcAgain) {
+		t.Fatal("gRPC decision external identity differs", grpcAgain, err)
 	}
 	receipt.Command.Key += "-changed"
 	receipt.Outcome = "failed"
@@ -110,6 +140,9 @@ func remoteRecordDecision(t *testing.T, ctx context.Context, e *facts.Engine, ca
 	}
 	if _, err := client.RecordDecision(ctx, &v1.RecordDecisionRequest{Tenant: caller.Tenant, Receipt: receipt}); connect.CodeOf(err) != connect.CodeAlreadyExists {
 		t.Fatalf("decision conflict: %v", err)
+	}
+	if result, err := grpcClient.RecordDecision(ctx, request); result != nil || status.Code(err) != codes.AlreadyExists {
+		t.Fatal("gRPC decision conflict", result, err)
 	}
 	return direct, nil
 }
@@ -120,6 +153,10 @@ func testRemoteContextFailure(t *testing.T, ctx context.Context, e *facts.Engine
 	if result != nil || connect.CodeOf(err) != connect.CodeUnavailable {
 		t.Fatalf("uncommitted context delivered: %v, %v", result, err)
 	}
+	grpcClient := v1.NewContextServiceClient(governanceGRPC(t, e, caller))
+	if result, err := grpcClient.PrepareContext(ctx, contextRequestProto(caller, r)); result != nil || status.Code(err) != codes.Unavailable {
+		t.Fatal("gRPC uncommitted context delivered", result, err)
+	}
 }
 func testRemoteContextDenied(t *testing.T, ctx context.Context, e *facts.Engine, caller model.Caller, manifest, decision string) {
 	t.Helper()
@@ -129,5 +166,12 @@ func testRemoteContextDenied(t *testing.T, ctx context.Context, e *facts.Engine,
 	}
 	if _, err := client.GetDecisionReceipt(ctx, &v1.GetDecisionReceiptRequest{Tenant: caller.Tenant, Id: decision, Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("decision permission: %v", err)
+	}
+	grpcClient := v1.NewContextServiceClient(governanceGRPC(t, e, caller))
+	if result, err := grpcClient.GetContextManifest(ctx, &v1.GetContextManifestRequest{Tenant: caller.Tenant, Id: manifest, Purpose: "review"}); result != nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC context permission", result, err)
+	}
+	if result, err := grpcClient.GetDecisionReceipt(ctx, &v1.GetDecisionReceiptRequest{Tenant: caller.Tenant, Id: decision, Purpose: "review"}); result != nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC decision permission", result, err)
 	}
 }
