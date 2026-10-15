@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
+	"github.com/caxqueiroz/facts_engine/internal/pgcleanup"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,7 +32,7 @@ func (s *Postgres) transaction(ctx context.Context, tenant string, fn func(pgx.T
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(context.WithoutCancel(ctx))
+	defer pgcleanup.Rollback(ctx, tx.Rollback)
 	if err = ledgerdb.New(tx).BindTenant(ctx, tenant); err != nil {
 		return err
 	}
