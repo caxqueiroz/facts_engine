@@ -105,6 +105,7 @@ func TestPostgresLedger(t *testing.T) {
 	t.Run("remote extraction", func(t *testing.T) { testRemoteExtraction(t, ctx, ledger, store) })
 	t.Run("remote memories", func(t *testing.T) { testRemoteMemories(t, ctx, ledger, store) })
 	t.Run("remote governance", func(t *testing.T) { testRemoteGovernance(t, ctx, ledger, store) })
+	t.Run("gRPC memory governance", func(t *testing.T) { testGRPCMemoryGovernance(t, ctx, ledger, store) })
 	t.Run("policy controls", func(t *testing.T) { testPolicyControls(t, ctx, ledger, store, admin) })
 	t.Run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
 	t.Run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })
