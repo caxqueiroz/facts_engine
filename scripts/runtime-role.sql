@@ -127,3 +127,6 @@ GRANT SELECT ON fact_version_payloads,memory_version_payloads TO facts_projector
 GRANT SELECT ON fact_version_disposals,memory_version_disposals TO facts_runtime,facts_projector,facts_archiver;
 GRANT SELECT,INSERT ON fact_version_guards,memory_version_guards TO facts_runtime,facts_archiver;
 GRANT UPDATE(epoch) ON fact_version_guards,memory_version_guards TO facts_runtime,facts_archiver;
+
+GRANT SELECT,INSERT ON extraction_attempt_inventories,extraction_attempt_fact_inputs,extraction_attempt_memory_inputs TO facts_runtime;
+GRANT SELECT ON extraction_attempt_inventories,extraction_attempt_fact_inputs,extraction_attempt_memory_inputs TO facts_archiver;

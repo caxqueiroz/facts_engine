@@ -100,3 +100,15 @@ WHERE tenant_id=$1 AND id=$2 AND fence=$3 AND state='running' AND attempts>=max_
 -- name: RejectExtractionInput :execrows
 UPDATE extraction_job_state SET state='failed',fence=fence+1,lease_until=NULL,last_failure_code='input_limit'
 WHERE tenant_id=$1 AND id=$2 AND (state='pending' OR (state='running' AND lease_until<=clock_timestamp()));
+
+-- name: InsertExtractionInputInventory :exec
+INSERT INTO extraction_attempt_inventories(tenant_id,attempt_id,inventory_version,request_digest,fact_count,memory_count) VALUES($1,$2,1,$3,$4,$5);
+
+-- name: InsertExtractionFactInput :exec
+INSERT INTO extraction_attempt_fact_inputs(tenant_id,attempt_id,record_id,version_id,payload_retained) VALUES($1,$2,$3,$4,$5);
+
+-- name: InsertExtractionMemoryInput :exec
+INSERT INTO extraction_attempt_memory_inputs(tenant_id,attempt_id,record_id,version_id,payload_retained) VALUES($1,$2,$3,$4,$5);
+
+-- name: HasUninventoriedExtractionAttempts :one
+SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL);

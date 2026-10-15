@@ -195,6 +195,17 @@ func (q *Queries) GetExtractionResultPayload(ctx context.Context, arg GetExtract
 	return payload, err
 }
 
+const HasUninventoriedExtractionAttempts = `-- name: HasUninventoriedExtractionAttempts :one
+SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL)
+`
+
+func (q *Queries) HasUninventoriedExtractionAttempts(ctx context.Context, tenantID string) (bool, error) {
+	row := q.db.QueryRow(ctx, HasUninventoriedExtractionAttempts, tenantID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const InsertExtractionAttempt = `-- name: InsertExtractionAttempt :exec
 INSERT INTO extraction_attempts (tenant_id,id,job_id,scope_id,fence,ledger_revision,payload)
 VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -223,6 +234,29 @@ func (q *Queries) InsertExtractionAttempt(ctx context.Context, arg InsertExtract
 	return err
 }
 
+const InsertExtractionFactInput = `-- name: InsertExtractionFactInput :exec
+INSERT INTO extraction_attempt_fact_inputs(tenant_id,attempt_id,record_id,version_id,payload_retained) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertExtractionFactInputParams struct {
+	TenantID        string
+	AttemptID       string
+	RecordID        string
+	VersionID       string
+	PayloadRetained bool
+}
+
+func (q *Queries) InsertExtractionFactInput(ctx context.Context, arg InsertExtractionFactInputParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionFactInput,
+		arg.TenantID,
+		arg.AttemptID,
+		arg.RecordID,
+		arg.VersionID,
+		arg.PayloadRetained,
+	)
+	return err
+}
+
 const InsertExtractionFactProposal = `-- name: InsertExtractionFactProposal :exec
 INSERT INTO extraction_proposals (tenant_id,attempt_id,ordinal,record_id,version_id)
 VALUES ($1,$2,$3,$4,$5)
@@ -243,6 +277,29 @@ func (q *Queries) InsertExtractionFactProposal(ctx context.Context, arg InsertEx
 		arg.Ordinal,
 		arg.RecordID,
 		arg.VersionID,
+	)
+	return err
+}
+
+const InsertExtractionInputInventory = `-- name: InsertExtractionInputInventory :exec
+INSERT INTO extraction_attempt_inventories(tenant_id,attempt_id,inventory_version,request_digest,fact_count,memory_count) VALUES($1,$2,1,$3,$4,$5)
+`
+
+type InsertExtractionInputInventoryParams struct {
+	TenantID      string
+	AttemptID     string
+	RequestDigest string
+	FactCount     int32
+	MemoryCount   int32
+}
+
+func (q *Queries) InsertExtractionInputInventory(ctx context.Context, arg InsertExtractionInputInventoryParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionInputInventory,
+		arg.TenantID,
+		arg.AttemptID,
+		arg.RequestDigest,
+		arg.FactCount,
+		arg.MemoryCount,
 	)
 	return err
 }
@@ -319,6 +376,29 @@ func (q *Queries) InsertExtractionMemoryDependency(ctx context.Context, arg Inse
 		arg.ScopeID,
 		arg.RecordID,
 		arg.VersionID,
+	)
+	return err
+}
+
+const InsertExtractionMemoryInput = `-- name: InsertExtractionMemoryInput :exec
+INSERT INTO extraction_attempt_memory_inputs(tenant_id,attempt_id,record_id,version_id,payload_retained) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertExtractionMemoryInputParams struct {
+	TenantID        string
+	AttemptID       string
+	RecordID        string
+	VersionID       string
+	PayloadRetained bool
+}
+
+func (q *Queries) InsertExtractionMemoryInput(ctx context.Context, arg InsertExtractionMemoryInputParams) error {
+	_, err := q.db.Exec(ctx, InsertExtractionMemoryInput,
+		arg.TenantID,
+		arg.AttemptID,
+		arg.RecordID,
+		arg.VersionID,
+		arg.PayloadRetained,
 	)
 	return err
 }

@@ -25,6 +25,7 @@ func testDisposedVersionReferences(t *testing.T, ctx context.Context, runtime *p
 			refs = append(refs, struct{ table, column string }{table, "memory_version_id"})
 		}
 	}
+	refs = append(refs, struct{ table, column string }{"extraction_attempt_" + kind + "_inputs", "version_id"})
 	for _, ref := range refs {
 		t.Run(ref.table+"-"+ref.column, func(t *testing.T) {
 			tx, err := runtime.Begin(ctx)
@@ -37,7 +38,11 @@ func testDisposedVersionReferences(t *testing.T, ctx context.Context, runtime *p
 			}
 			// BEFORE triggers must reject the disposed source before other row-shape
 			// constraints. The full integration workflows exercise valid live inserts.
-			_, err = tx.Exec(ctx, "INSERT INTO "+ref.table+"(tenant_id,"+ref.column+") VALUES($1,$2)", tenant, version)
+			query := "INSERT INTO " + ref.table + "(tenant_id," + ref.column + ") VALUES($1,$2)"
+			if ref.table == "extraction_attempt_"+kind+"_inputs" {
+				query = "INSERT INTO " + ref.table + "(tenant_id,version_id,payload_retained) VALUES($1,$2,true)"
+			}
+			_, err = tx.Exec(ctx, query, tenant, version)
 			var pg *pgconn.PgError
 			if !errors.As(err, &pg) || pg.Code != "23514" {
 				t.Fatal("disposed reference was not fenced", err)

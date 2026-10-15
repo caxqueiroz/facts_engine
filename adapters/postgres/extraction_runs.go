@@ -105,6 +105,9 @@ func (t *transaction) flushExtractionRun(ctx context.Context, e model.Event) err
 		if err = ledgerdb.New(t.tx).InsertExtractionAttempt(ctx, ledgerdb.InsertExtractionAttemptParams{TenantID: t.tenant, ID: a.ID, JobID: a.JobID, ScopeID: a.Scope, Fence: a.Fence, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
 			return err
 		}
+		if err := t.retainExtractionInputInventory(ctx, a); err != nil {
+			return err
+		}
 	}
 	if t.pendingExtractionResult != nil {
 		r := *t.pendingExtractionResult

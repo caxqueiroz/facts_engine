@@ -321,6 +321,31 @@ type ExtractionAttempt struct {
 	Payload        []byte
 }
 
+type ExtractionAttemptFactInput struct {
+	TenantID        string
+	AttemptID       string
+	RecordID        string
+	VersionID       string
+	PayloadRetained bool
+}
+
+type ExtractionAttemptInventory struct {
+	TenantID         string
+	AttemptID        string
+	InventoryVersion int32
+	RequestDigest    string
+	FactCount        int32
+	MemoryCount      int32
+}
+
+type ExtractionAttemptMemoryInput struct {
+	TenantID        string
+	AttemptID       string
+	RecordID        string
+	VersionID       string
+	PayloadRetained bool
+}
+
 type ExtractionJob struct {
 	TenantID        string
 	ID              string
