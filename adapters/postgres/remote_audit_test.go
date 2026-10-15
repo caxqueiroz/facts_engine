@@ -27,12 +27,17 @@ import (
 func testRemoteCalculation(t *testing.T, ctx context.Context, engine *facts.Engine, caller model.Caller, r model.CalculationReceipt) {
 	t.Helper()
 	client := memoryv1connect.NewCalculationServiceClient(governanceClient(t, engine, caller))
+	grpcClient := v1.NewCalculationServiceClient(governanceGRPC(t, engine, caller))
 	r.Key = "remote-calculation"
 	r.ExternalRunID = "remote-run"
 	request := &v1.RecordCalculationRequest{Tenant: caller.Tenant, Receipt: &v1.CalculationReceipt{Command: &v1.Command{Key: r.Key, Purpose: r.Purpose, CorrelationId: r.CorrelationID}, Scope: r.Scope, SnapshotId: r.SnapshotID, ApplicationId: r.ApplicationID, ExternalRunId: r.ExternalRunID, MethodId: r.MethodID, MethodVersion: r.MethodVersion, ExecutableDigest: r.ExecutableDigest, ConfigurationDigest: r.ConfigurationDigest, NormalizationVersion: r.NormalizationVersion, ReferenceSnapshotIds: r.ReferenceSnapshotIDs, Input: &v1.ArtifactReference{EvidenceId: r.Input.EvidenceID, Digest: r.Input.Digest}, Output: &v1.ArtifactReference{EvidenceId: r.Output.EvidenceID, Digest: r.Output.Digest}, StartedAt: timestamppb.New(r.StartedAt), CompletedAt: timestamppb.New(r.CompletedAt), Outcome: r.Outcome}}
 	created, err := client.RecordCalculation(ctx, request)
 	if err != nil {
 		t.Fatal(err)
+	}
+	grpcCreated, err := grpcClient.RecordCalculation(ctx, request)
+	if err != nil || !proto.Equal(created, grpcCreated) {
+		t.Fatal("gRPC calculation replay differs", grpcCreated, err)
 	}
 	embedded, err := engine.RecordCalculation(ctx, caller, r)
 	if err != nil || embedded.ID != created.Record.Id || embedded.Digest != created.Record.Digest || embedded.SnapshotDigest != created.Record.SnapshotDigest || embedded.LedgerRevision != created.Record.LedgerRevision {
@@ -45,21 +50,35 @@ func testRemoteCalculation(t *testing.T, ctx context.Context, engine *facts.Engi
 	if err != nil || !proto.Equal(created.Record, fetched.Record) {
 		t.Fatalf("calculation read: %v, %v", fetched, err)
 	}
+	grpcFetched, err := grpcClient.GetCalculationReceipt(ctx, &v1.GetCalculationReceiptRequest{Tenant: caller.Tenant, Id: embedded.ID, Purpose: r.Purpose})
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC calculation read differs", grpcFetched, err)
+	}
 	request.Receipt.Command.Key = "remote-same-external-run"
 	duplicate, err := client.RecordCalculation(ctx, request)
 	if err != nil || duplicate.Record.Id != embedded.ID {
 		t.Fatalf("external run idempotency: %v, %v", duplicate, err)
+	}
+	grpcDuplicate, err := grpcClient.RecordCalculation(ctx, request)
+	if err != nil || !proto.Equal(duplicate, grpcDuplicate) {
+		t.Fatal("gRPC external run retry differs", grpcDuplicate, err)
 	}
 	request.Receipt.Command.Key = "remote-changed-run"
 	request.Receipt.ConfigurationDigest = model.BytesDigest([]byte("changed"))
 	if _, err := client.RecordCalculation(ctx, request); connect.CodeOf(err) != connect.CodeAlreadyExists {
 		t.Fatalf("external run conflict: %v", err)
 	}
+	if result, err := grpcClient.RecordCalculation(ctx, request); result != nil || status.Code(err) != codes.AlreadyExists {
+		t.Fatal("gRPC external run conflict", result, err)
+	}
 	request.Receipt.ExternalRunId = "remote-bad-artifact"
 	request.Receipt.Command.Key = "remote-bad-artifact"
 	request.Receipt.Input.Digest = model.BytesDigest([]byte("wrong"))
 	if _, err := client.RecordCalculation(ctx, request); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("artifact digest bypass: %v", err)
+	}
+	if result, err := grpcClient.RecordCalculation(ctx, request); result != nil || status.Code(err) != codes.FailedPrecondition {
+		t.Fatal("gRPC artifact digest bypass", result, err)
 	}
 }
 

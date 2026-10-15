@@ -19,6 +19,9 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 func testRetentionLineage(t *testing.T, ctx context.Context, ledger *postgres.Ledger, store *evidence.Postgres, engine *facts.Engine, c model.Caller, register func(string, string, string, string) model.ObjectRef) {
@@ -124,9 +127,15 @@ func testRetentionLineage(t *testing.T, ctx context.Context, ledger *postgres.Le
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := memoryv1connect.NewRetentionServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
-	remote, err := client.DisposeEvidence(ctx, &v1.DisposeEvidenceRequest{Tenant: c.Tenant, Command: &v1.Command{Key: request.Key, Purpose: request.Purpose}, Scope: request.Scope, EvidenceId: request.EvidenceID, PolicyId: request.PolicyID, Jurisdiction: request.Jurisdiction, Reason: request.Reason, DerivativeEvidenceIds: ids})
+	grpcClient := v1.NewRetentionServiceClient(governanceGRPC(t, engine, c))
+	rpcRequest := &v1.DisposeEvidenceRequest{Tenant: c.Tenant, Command: &v1.Command{Key: request.Key, Purpose: request.Purpose}, Scope: request.Scope, EvidenceId: request.EvidenceID, PolicyId: request.PolicyID, Jurisdiction: request.Jurisdiction, Reason: request.Reason, DerivativeEvidenceIds: ids}
+	remote, err := grpcClient.DisposeEvidence(ctx, rpcRequest)
 	if err != nil {
 		t.Fatal(err)
+	}
+	connectReplay, err := client.DisposeEvidence(ctx, rpcRequest)
+	if err != nil || !proto.Equal(remote, connectReplay) {
+		t.Fatal("lineage disposal Connect/gRPC replay differs", connectReplay, err)
 	}
 	replay, err := engine.DisposeEvidence(ctx, c, request)
 	if err != nil || replay.ID != remote.Result.Id {
@@ -136,6 +145,10 @@ func testRetentionLineage(t *testing.T, ctx context.Context, ledger *postgres.Le
 	changed.DerivativeEvidenceIDs = []string{ids[0]}
 	if _, err := engine.DisposeEvidence(ctx, c, changed); !errors.Is(err, model.ErrConflict) {
 		t.Fatal("changed selection replay", err)
+	}
+	rpcRequest.DerivativeEvidenceIds = changed.DerivativeEvidenceIDs
+	if result, err := grpcClient.DisposeEvidence(ctx, rpcRequest); result != nil || grpcstatus.Code(err) != codes.AlreadyExists {
+		t.Fatal("gRPC changed lineage selection replay", result, err)
 	}
 	for i, id := range append([]string{request.EvidenceID}, ids...) {
 		if _, err := store.Read(ctx, c.Tenant, refs[i]); !errors.Is(err, model.ErrPrecondition) {
