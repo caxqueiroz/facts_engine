@@ -109,6 +109,30 @@ func testPagedProjectionVerification(t *testing.T, ctx context.Context, index *c
 	if check != expected.Check() {
 		t.Fatal("inventory digest differs", check, expected.Check())
 	}
+	// Retention can leave an empty initial page or a disposed tail after the
+	// last retained document. Scan progress does not change the content proof.
+	withDisposed := func(ctx context.Context, after model.ProjectionCursor) (model.ProjectionPage, error) {
+		if after == (model.ProjectionCursor{}) {
+			next := model.ProjectionCursor{Kind: "fact", VersionID: "tombstone"}
+			return model.ProjectionPage{Next: &next}, nil
+		}
+		if after.Kind == "memory" {
+			return model.ProjectionPage{}, nil
+		}
+		if after.VersionID == "tombstone" {
+			after = model.ProjectionCursor{}
+		}
+		page, err := loader(ctx, after)
+		if err == nil && page.Next == nil {
+			next := model.ProjectionCursor{Kind: "memory", VersionID: "disposed"}
+			page.Next = &next
+		}
+		return page, err
+	}
+	disposedCheck, err := index.VerifyProjectionPages(ctx, key, 1, withDisposed)
+	if err != nil || disposedCheck != check {
+		t.Fatal("disposed scan changed inventory", disposedCheck, err)
+	}
 	// A duplicate page must not substitute for the next canonical page.
 	if _, err = index.VerifyProjectionPages(ctx, key, 1, func(ctx context.Context, _ model.ProjectionCursor) (model.ProjectionPage, error) {
 		return loader(ctx, model.ProjectionCursor{})

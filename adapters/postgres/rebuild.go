@@ -337,7 +337,7 @@ func (l *Ledger) ProjectionDocuments(ctx context.Context, k model.GenerationKey,
 			return nil, err
 		}
 		if d == nil {
-			return nil, model.ErrPrecondition
+			continue
 		}
 		b, err := tallyDocument(*d)
 		if err != nil {

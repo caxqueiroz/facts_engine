@@ -44,3 +44,32 @@ func TestProjectionInventoryRequiresCanonicalOrder(t *testing.T) {
 		t.Fatal("content omitted from proof")
 	}
 }
+
+func TestProjectionPagesCanAdvanceAcrossDisposedVersions(t *testing.T) {
+	cursor := func(id string) *ProjectionCursor { return &ProjectionCursor{Kind: "fact", VersionID: id} }
+	doc := ProjectionDocument{VersionID: "b"}
+	tests := []struct {
+		name  string
+		page  ProjectionPage
+		after ProjectionCursor
+		valid bool
+	}{
+		{"empty terminal", ProjectionPage{}, ProjectionCursor{}, true},
+		{"disposed only", ProjectionPage{Next: cursor("b")}, *cursor("a"), true},
+		{"disposed tail", ProjectionPage{Documents: []ProjectionDocument{doc}, Next: cursor("c")}, *cursor("a"), true},
+		{"same cursor", ProjectionPage{Next: cursor("a")}, *cursor("a"), false},
+		{"backwards cursor", ProjectionPage{Next: cursor("a")}, *cursor("b"), false},
+		{"invalid cursor", ProjectionPage{Next: &ProjectionCursor{Kind: "other", VersionID: "b"}}, ProjectionCursor{}, false},
+		{"document behind scan", ProjectionPage{Documents: []ProjectionDocument{doc}}, *cursor("c"), false},
+		{"cursor behind document", ProjectionPage{Documents: []ProjectionDocument{doc}, Next: cursor("a")}, ProjectionCursor{}, false},
+		{"duplicate document", ProjectionPage{Documents: []ProjectionDocument{doc, doc}}, ProjectionCursor{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateProjectionPage(tt.page, tt.after)
+			if (err == nil) != tt.valid {
+				t.Fatal(err)
+			}
+		})
+	}
+}

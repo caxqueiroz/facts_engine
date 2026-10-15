@@ -33,6 +33,9 @@ func ProjectionID(d ProjectionDocument) string {
 }
 func ProjectionConsumer(generation string) string { return "projection-" + Digest(generation) }
 
+// ProjectionSource returns nil for an event with no projectable content,
+// including a version whose durable disposal tombstone has been validated.
+// Missing or malformed retained content must return an error, not nil.
 type ProjectionSource interface {
 	ProjectionDocument(context.Context, Delivery, string) (*ProjectionDocument, error)
 }

@@ -31,7 +31,9 @@ func (c ProjectionCursor) Before(next ProjectionCursor) bool {
 
 type ProjectionPage struct {
 	Documents []ProjectionDocument
-	Next      *ProjectionCursor
+	// Next is the last scanned acceptance, including disposed versions. A page
+	// may contain no documents and still advance. Nil means the scan is complete.
+	Next *ProjectionCursor
 }
 type ProjectionPageLoader func(context.Context, ProjectionCursor) (ProjectionPage, error)
 
@@ -77,4 +79,25 @@ func (i *ProjectionInventory) Add(d ProjectionDocument) error {
 }
 func (i *ProjectionInventory) Check() ProjectionCheck {
 	return ProjectionCheck{Version: ProjectionInventoryV2, Count: i.count, Digest: hex.EncodeToString(i.hash.Sum(nil))}
+}
+
+// ValidateProjectionPage checks scan progress independently of the retained
+// document inventory. Skipped tombstones may advance the cursor past the last
+// document, but no returned document may fall behind a previously scanned row.
+func ValidateProjectionPage(page ProjectionPage, after ProjectionCursor) error {
+	if len(page.Documents) > MaxProjectionPageDocuments || (after != (ProjectionCursor{}) && !after.Valid()) {
+		return ErrInvalid
+	}
+	last := after
+	for _, d := range page.Documents {
+		cursor := ProjectionDocumentCursor(d)
+		if !cursor.Valid() || !last.Before(cursor) {
+			return ErrInvalid
+		}
+		last = cursor
+	}
+	if page.Next != nil && (!page.Next.Valid() || !after.Before(*page.Next) || page.Next.Before(last)) {
+		return ErrInvalid
+	}
+	return nil
 }

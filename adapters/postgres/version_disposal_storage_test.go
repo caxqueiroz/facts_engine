@@ -61,6 +61,10 @@ func testVersionDisposalStorage(t *testing.T, ctx context.Context, normal *facts
 	if err != nil {
 		t.Fatal(err)
 	}
+	memoryAccepted, err := normal.ApproveMemory(ctx, reviewer, model.Approval{Command: command("approve-memory"), Scope: "scope", RecordID: m.RecordID, VersionID: m.VersionID, ExpectedRevision: m.StreamRevision})
+	if err != nil {
+		t.Fatal(err)
+	}
 	cipher, _ := postgres.NewAESGCM(bytes.Repeat([]byte{4}, 32))
 	ledger, err := postgres.New(ctx, runtime, cipher)
 	if err != nil {
@@ -207,6 +211,7 @@ func testVersionDisposalStorage(t *testing.T, ctx context.Context, normal *facts
 			t.Fatal("disposed read succeeded", err)
 		}
 	}
+	testDisposedProjectionReads(t, ctx, admin, cipher, c.Tenant, accepted.LedgerRevision, memoryAccepted.LedgerRevision, fv, mv)
 	replay()
 	// A fresh archive payload contains metadata and an explicit coverage gap.
 	for _, revision := range []int64{f.LedgerRevision, accepted.LedgerRevision, m.LedgerRevision} {

@@ -41,6 +41,38 @@ func (q *Queries) GetActiveProjection(ctx context.Context, tenantID string) (Get
 	return i, err
 }
 
+const GetFactVersionDisposalPayload = `-- name: GetFactVersionDisposalPayload :one
+SELECT coalesce((SELECT payload FROM fact_version_disposals WHERE tenant_id=$1 AND version_id=$2),''::bytea)::bytea AS payload
+`
+
+type GetFactVersionDisposalPayloadParams struct {
+	TenantID  string
+	VersionID string
+}
+
+func (q *Queries) GetFactVersionDisposalPayload(ctx context.Context, arg GetFactVersionDisposalPayloadParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, GetFactVersionDisposalPayload, arg.TenantID, arg.VersionID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
+const GetMemoryVersionDisposalPayload = `-- name: GetMemoryVersionDisposalPayload :one
+SELECT coalesce((SELECT payload FROM memory_version_disposals WHERE tenant_id=$1 AND version_id=$2),''::bytea)::bytea AS payload
+`
+
+type GetMemoryVersionDisposalPayloadParams struct {
+	TenantID  string
+	VersionID string
+}
+
+func (q *Queries) GetMemoryVersionDisposalPayload(ctx context.Context, arg GetMemoryVersionDisposalPayloadParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, GetMemoryVersionDisposalPayload, arg.TenantID, arg.VersionID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
 const GetProjectionGeneration = `-- name: GetProjectionGeneration :one
 SELECT state,fence,through_revision,base_epoch,previous_generation,entry_count,digest,verification_version
 FROM projection_generations

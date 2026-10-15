@@ -66,3 +66,9 @@ JOIN (SELECT tenant_id,event_id,version_id,'fact' AS kind
 FROM record_events UNION ALL SELECT tenant_id,event_id,version_id,'memory' AS kind
 FROM memory_record_events) r ON r.tenant_id=e.tenant_id AND r.event_id=e.id
 WHERE e.tenant_id=$1 AND e.ledger_revision<=$2 AND e.event_type IN ('approve_fact','accept_fact','supersede_fact','approve_memory','accept_memory','supersede_memory') AND (r.kind COLLATE "C",r.version_id COLLATE "C")>($3::text,$4::text) ORDER BY r.kind COLLATE "C",r.version_id COLLATE "C",e.ledger_revision LIMIT $5;
+
+-- name: GetFactVersionDisposalPayload :one
+SELECT coalesce((SELECT payload FROM fact_version_disposals WHERE tenant_id=$1 AND version_id=$2),''::bytea)::bytea AS payload;
+
+-- name: GetMemoryVersionDisposalPayload :one
+SELECT coalesce((SELECT payload FROM memory_version_disposals WHERE tenant_id=$1 AND version_id=$2),''::bytea)::bytea AS payload;

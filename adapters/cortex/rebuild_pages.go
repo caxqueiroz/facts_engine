@@ -86,7 +86,7 @@ func (i *Index) VerifyProjectionPages(ctx context.Context, k model.GenerationKey
 		if err != nil {
 			return empty, err
 		}
-		if len(page.Documents) > model.MaxProjectionPageDocuments || (len(page.Documents) == 0 && page.Next != nil) {
+		if model.ValidateProjectionPage(page, cursor) != nil {
 			return empty, model.ErrInvalid
 		}
 		ids := make([]string, 0, len(page.Documents))
@@ -122,11 +122,7 @@ func (i *Index) VerifyProjectionPages(ctx context.Context, k model.GenerationKey
 		if page.Next == nil {
 			break
 		}
-		last := model.ProjectionDocumentCursor(page.Documents[len(page.Documents)-1])
-		if *page.Next != last || !cursor.Before(last) {
-			return empty, model.ErrInvalid
-		}
-		cursor = last
+		cursor = *page.Next
 	}
 	check := inventory.Check()
 	if check.Count != receipts {

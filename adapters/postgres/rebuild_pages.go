@@ -49,38 +49,50 @@ func (l *Ledger) ProjectionDocumentPage(ctx context.Context, k model.GenerationK
 		return empty, err
 	}
 	page := model.ProjectionPage{Documents: []model.ProjectionDocument{}}
-	size := 0
+	size, scanned := 0, 0
+	last := after
 	for _, event := range events {
-		if len(page.Documents) == limit {
+		// Bound scanned events as well as returned documents, so disposed-only
+		// pages advance without an unbounded search for the next retained payload.
+		if scanned == limit {
 			break
 		}
 		document, err := l.ProjectionDocument(ctx, model.Delivery{Key: model.ConsumerKey{Tenant: k.Tenant}, Event: event}, k.Generation)
 		if err != nil {
 			return empty, err
 		}
-		if document == nil {
+		if document != nil {
+			payload, err := json.Marshal(document)
+			if err != nil {
+				return empty, err
+			}
+			if len(payload) > model.MaxProjectionPageBytes {
+				return empty, model.ErrPrecondition
+			}
+			if size+len(payload) > model.MaxProjectionPageBytes {
+				break
+			}
+			size += len(payload)
+			page.Documents = append(page.Documents, *document)
+		}
+		kind := event.RecordKind
+		if kind == "" {
+			kind = "fact"
+		}
+		next := model.ProjectionCursor{Kind: kind, VersionID: event.VersionID}
+		if !next.Valid() || !last.Before(next) {
 			return empty, model.ErrPrecondition
 		}
-		payload, err := json.Marshal(document)
-		if err != nil {
-			return empty, err
-		}
-		if len(payload) > model.MaxProjectionPageBytes {
-			return empty, model.ErrPrecondition
-		}
-		if size+len(payload) > model.MaxProjectionPageBytes {
-			break
-		}
-		size += len(payload)
-		page.Documents = append(page.Documents, *document)
+		last = next
+		scanned++
 	}
-	if len(page.Documents) < len(events) {
-		if len(page.Documents) == 0 {
+	if scanned < len(events) {
+		if scanned == 0 {
 			return empty, model.ErrPrecondition
 		}
-		next := model.ProjectionDocumentCursor(page.Documents[len(page.Documents)-1])
-		page.Next = &next
+		page.Next = &last
 	}
+
 	return page, nil
 }
 

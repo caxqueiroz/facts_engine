@@ -1,9 +1,12 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
+	"io"
 	"sort"
 )
 
@@ -15,6 +18,7 @@ func (l *Ledger) ProjectionDocument(ctx context.Context, d model.Delivery, gener
 	}
 	var result *model.ProjectionDocument
 	err := l.Transact(ctx, d.Key.Tenant, func(tx model.Tx) error {
+		result = nil
 		t := tx.(*transaction)
 		var e model.Event
 		payload, err := ledgerdb.New(t.tx).GetEventAtRevision(ctx, ledgerdb.GetEventAtRevisionParams{TenantID: d.Key.Tenant, ID: d.Event.ID, LedgerRevision: d.Event.LedgerRevision})
@@ -37,9 +41,25 @@ func (l *Ledger) ProjectionDocument(ctx context.Context, d model.Delivery, gener
 			result, err = t.memoryProjection(ctx, e, generation)
 			return err
 		}
-		v, err := t.Version(ctx, e.RecordID, e.VersionID)
+		v, err := t.retainedVersion(ctx, e.RecordID, e.VersionID)
 		if err != nil {
 			return err
+		}
+		if v.ID != e.VersionID || v.RecordID != e.RecordID || v.Proposal.Key.Scope != e.Scope || v.Proposer.Tenant != t.tenant {
+			return model.ErrPrecondition
+		}
+		disposal, err := ledgerdb.New(t.tx).GetFactVersionDisposalPayload(ctx, ledgerdb.GetFactVersionDisposalPayloadParams{TenantID: t.tenant, VersionID: v.ID})
+		if err != nil {
+			return err
+		}
+		if (len(disposal) > 0) != v.PayloadDisposed {
+			return model.ErrPrecondition
+		}
+		if len(disposal) > 0 {
+			if t.decodeProjectionTombstone(disposal, &v) != nil || model.Digest(v) != model.Digest(model.VersionTombstone(v)) {
+				return model.ErrPrecondition
+			}
+			return nil
 		}
 		accepted, err := t.Acceptances(ctx, e.RecordID, e.LedgerRevision)
 		if err != nil {
@@ -77,9 +97,25 @@ func (l *Ledger) ProjectionDocument(ctx context.Context, d model.Delivery, gener
 }
 
 func (t *transaction) memoryProjection(ctx context.Context, e model.Event, generation string) (*model.ProjectionDocument, error) {
-	v, err := t.MemoryVersion(ctx, e.RecordID, e.VersionID)
+	v, err := t.retainedMemoryVersion(ctx, e.RecordID, e.VersionID)
 	if err != nil {
 		return nil, err
+	}
+	if v.ID != e.VersionID || v.RecordID != e.RecordID || v.Proposer.Tenant != t.tenant || v.Proposal.Key.Scope != e.Scope {
+		return nil, model.ErrPrecondition
+	}
+	disposal, err := ledgerdb.New(t.tx).GetMemoryVersionDisposalPayload(ctx, ledgerdb.GetMemoryVersionDisposalPayloadParams{TenantID: t.tenant, VersionID: v.ID})
+	if err != nil {
+		return nil, err
+	}
+	if (len(disposal) > 0) != v.PayloadDisposed {
+		return nil, model.ErrPrecondition
+	}
+	if len(disposal) > 0 {
+		if t.decodeProjectionTombstone(disposal, &v) != nil || model.Digest(v) != model.Digest(model.MemoryVersionTombstone(v)) {
+			return nil, model.ErrPrecondition
+		}
+		return nil, nil
 	}
 	if v.Proposal.Key.Scope != e.Scope || model.MemoryDigest(v.Proposal) != v.Digest {
 		return nil, model.ErrPrecondition
@@ -115,4 +151,21 @@ func (t *transaction) memoryProjection(ctx context.Context, e model.Event, gener
 	}
 	sort.Strings(doc.SourceClasses)
 	return doc, nil
+}
+
+// Disposal metadata must not conceal retained content in unrecognized fields.
+func (t *transaction) decodeProjectionTombstone(sealed []byte, v any) error {
+	raw, err := t.cipher.Open(t.tenant, sealed)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(v); err != nil {
+		return err
+	}
+	if decoder.Decode(new(any)) != io.EOF {
+		return model.ErrPrecondition
+	}
+	return nil
 }
