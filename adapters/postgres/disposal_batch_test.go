@@ -77,7 +77,19 @@ func testDisposalBatch(t *testing.T, ctx context.Context, normal, engine, runner
 	}
 	reject(engine, r, model.ErrPrecondition)
 	retained()
-	if _, err = engine.DisposeSnapshot(ctx, c, model.SnapshotDisposalRequest{Command: cmd("snapshot-dispose"), SnapshotID: snapshot.ID, Reason: "expired", Bindings: []model.SnapshotRetentionBinding{{Scope: job.Scope, PolicyID: "batch-snapshot", Jurisdiction: "SG"}}}); err != nil {
+	r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: snapshot.ID, Bindings: []model.SnapshotRetentionBinding{{Scope: job.Scope, PolicyID: "batch-snapshot", Jurisdiction: "SG"}}}}
+	bad = r
+	bad.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
+	bad.Versions[0].Bindings = []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-young", Jurisdiction: "SG"}}
+	reject(engine, bad, model.ErrPrecondition)
+	retained()
+	if err = ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		got, err := tx.(model.TemporalTx).Snapshot(ctx, snapshot.ID)
+		if err == nil && (got.PayloadDisposed || got.Items[0].Resolution.Value == nil) {
+			t.Fatal("failed batch lost snapshot")
+		}
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = admin.Exec(ctx, "INSERT INTO consumer_offsets(tenant_id,consumer_id,max_attempts) VALUES($1,$2,3)", c.Tenant, model.ProjectionConsumer("batch-index")); err != nil {

@@ -27,6 +27,8 @@ func TestDisposalBatchReauthorizesAndNormalizesSelection(t *testing.T) {
 			for _, kind := range []string{"fact", "memory"} {
 				r.Versions = append(r.Versions, model.VersionDisposalRequest{Kind: kind, Scope: "z", RecordID: kind + "-record", VersionID: kind + "-version", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}})
 			}
+			r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
+			r.Contexts = []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}}}}
 			revoke := func() { a.denied = "a" }
 			switch phase {
 			case "before":
@@ -87,5 +89,45 @@ func TestDisposalBatchRejectsAmbiguousSelections(t *testing.T) {
 	entries, _, err := s.prepareAuditEntries(context.Background(), model.Caller{}, model.AuditExportRequest{Scope: "scope"}, []model.AuditEntry{{Kind: "retention", ID: "batch", Payload: raw}})
 	if err != nil || len(entries) != 0 {
 		t.Fatal("cross-scope batch leaked", entries, err)
+	}
+}
+
+func TestDisposalBatchSnapshotContextNormalization(t *testing.T) {
+	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired",
+		Snapshots: []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshots", Jurisdiction: "SG"}}}},
+		Contexts:  []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "contexts", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "contexts", Jurisdiction: "SG"}}}}}
+	normalized, err := normalizeDisposalBatch(base)
+	if err != nil || normalized.SelectionCount() != 2 || normalized.Snapshots[0].Command != base.Command || normalized.Contexts[0].Reason != base.Reason || normalized.Contexts[0].Bindings[0].Scope != "a" {
+		t.Fatal(normalized, err)
+	}
+	if base.Contexts[0].Bindings[0].Scope != "z" || base.Snapshots[0].Command != (model.Command{}) {
+		t.Fatal("normalization changed caller request")
+	}
+	for _, change := range []func(*model.DisposalBatchRequest){
+		func(r *model.DisposalBatchRequest) { r.Snapshots = append(r.Snapshots, r.Snapshots[0]) },
+		func(r *model.DisposalBatchRequest) { r.Contexts = append(r.Contexts, r.Contexts[0]) },
+		func(r *model.DisposalBatchRequest) { r.Contexts[0].Command = model.Command{Key: "other"} },
+		func(r *model.DisposalBatchRequest) { r.Snapshots[0].Reason = "other" },
+		func(r *model.DisposalBatchRequest) { r.Contexts[0].Bindings = nil },
+		func(r *model.DisposalBatchRequest) {
+			r.Snapshots[0].Bindings = []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "", Jurisdiction: "SG"}}
+		},
+		func(r *model.DisposalBatchRequest) {
+			for i := 0; i < 31; i++ {
+				r.Versions = append(r.Versions, model.VersionDisposalRequest{})
+			}
+		},
+	} {
+		r := base
+		r.Snapshots = append([]model.SnapshotDisposalRequest(nil), base.Snapshots...)
+		r.Contexts = append([]model.ContextDisposalRequest(nil), base.Contexts...)
+		change(&r)
+		if _, err := normalizeDisposalBatch(r); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal("invalid artifact selection accepted", r, err)
+		}
+	}
+	scopes := base.Scopes()
+	if len(scopes) != 2 || scopes[0] != "a" || scopes[1] != "z" {
+		t.Fatal("incomplete disclosure scopes", scopes)
 	}
 }

@@ -291,7 +291,25 @@ message DisposeBatchRequest {
   }];
   repeated BatchVersionSelection versions = 5 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchExtractionSelection extractions = 6 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchSnapshotSelection snapshots = 7 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchContextSelection contexts = 8 [(buf.validate.field).repeated.max_items = 32];
 }
 message DisposeBatchResponse {
   CommitResult result = 1;
+}
+
+message BatchSnapshotSelection {
+  string snapshot_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated SnapshotRetentionBinding bindings = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+
+message BatchContextSelection {
+  string context_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated ContextRetentionBinding bindings = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
 }

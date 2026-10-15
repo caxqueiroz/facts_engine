@@ -136,6 +136,37 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 			t.Fatalf("context disposal got %v want %v", err, want)
 		}
 	}
+	batchOne, batchMulti := prepare("batch-one", false), prepare("batch-multi", true)
+	batch := model.DisposalBatchRequest{Command: command("batch-contexts"), Scope: "case1", Reason: "retention period expired"}
+	for _, m := range []model.ContextManifest{batchOne, batchMulti} {
+		item := request(m)
+		item.Command = model.Command{}
+		item.Reason = ""
+		batch.Contexts = append(batch.Contexts, item)
+	}
+	badBatch := batch
+	badBatch.Contexts = append([]model.ContextDisposalRequest(nil), batch.Contexts...)
+	badBatch.Contexts[1].Bindings = append([]model.ContextRetentionBinding(nil), batch.Contexts[1].Bindings...)
+	badBatch.Contexts[1].Bindings[0].PolicyID = "young"
+	if _, err := engine.DisposeBatch(ctx, c, badBatch); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("batch age policy", err)
+	}
+	for _, m := range []model.ContextManifest{batchOne, batchMulti} {
+		if _, err := normal.GetContextManifest(ctx, c, model.ContextQuery{ID: m.ID, Purpose: "read"}); err != nil {
+			t.Fatal("failed batch lost context", err)
+		}
+	}
+	firstBatch, err := engine.DisposeBatch(ctx, c, batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch.Contexts[0], batch.Contexts[1] = batch.Contexts[1], batch.Contexts[0]
+	testDisposalBatchRemote(t, ctx, engine, c, batch, firstBatch)
+	for _, m := range []model.ContextManifest{batchOne, batchMulti} {
+		if _, err := normal.GetContextManifest(ctx, c, model.ContextQuery{ID: m.ID, Purpose: "read"}); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("batch context retained", err)
+		}
+	}
 	reject(normal, request(one), model.ErrDenied)
 	bad := request(one)
 	bad.Bindings[0].PolicyID = "young"

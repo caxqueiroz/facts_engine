@@ -301,7 +301,7 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 		}
 		parent = parent || (event.ID == batchID && event.DisposalBatch != nil)
 	}
-	if batchChildren != 2 || !parent {
+	if batchChildren != 3 || !parent {
 		t.Fatal("batch audit grouping incomplete", batchChildren, parent)
 	}
 	if err = audit.Verify(*bundle.Bundle, map[string]ed25519.PublicKey{"extract-retention": private.Public().(ed25519.PublicKey)}); err != nil {

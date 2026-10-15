@@ -34,6 +34,20 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 		}
 		request.Extractions = append(request.Extractions, selection)
 	}
+	for _, item := range r.Snapshots {
+		selection := &v1.BatchSnapshotSelection{SnapshotId: item.SnapshotID}
+		for _, b := range item.Bindings {
+			selection.Bindings = append(selection.Bindings, &v1.SnapshotRetentionBinding{Scope: b.Scope, PolicyId: b.PolicyID, Jurisdiction: b.Jurisdiction})
+		}
+		request.Snapshots = append(request.Snapshots, selection)
+	}
+	for _, item := range r.Contexts {
+		selection := &v1.BatchContextSelection{ContextId: item.ContextID}
+		for _, b := range item.Bindings {
+			selection.Bindings = append(selection.Bindings, &v1.ContextRetentionBinding{Scope: b.Scope, PolicyId: b.PolicyID, Jurisdiction: b.Jurisdiction})
+		}
+		request.Contexts = append(request.Contexts, selection)
+	}
 	grpc := v1.NewRetentionServiceClient(governanceGRPC(t, engine, c))
 	first, err := grpc.DisposeBatch(ctx, request)
 	if err != nil || !proto.Equal(first.Result, &v1.CommitResult{Id: want.ID, RecordId: want.RecordID, VersionId: want.VersionID, RecordKind: want.RecordKind, ContentDigest: want.ContentDigest, StreamRevision: want.StreamRevision, LedgerRevision: want.LedgerRevision}) {
@@ -58,6 +72,8 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 	bad = proto.Clone(request).(*v1.DisposeBatchRequest)
 	bad.Versions = nil
 	bad.Extractions = nil
+	bad.Snapshots = nil
+	bad.Contexts = nil
 	if out, err := grpc.DisposeBatch(ctx, bad); out != nil || grpcstatus.Code(err) != codes.InvalidArgument {
 		t.Fatal("batch selection missing", out, err)
 	}
