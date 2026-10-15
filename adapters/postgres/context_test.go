@@ -43,7 +43,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if len(m.Items) == 0 || len(m.Rendered) == 0 || m.RenderedDigest != model.BytesDigest(m.Rendered) || m.Digest != model.ContextDigest(m) || m.CreationRevision <= m.SelectionRevision {
 		t.Fatal("invalid retained context", m)
 	}
-	for _, want := range []error{context.Canceled, context.DeadlineExceeded} {
+	for _, want := range []error{context.Canceled, context.DeadlineExceeded, model.ErrUnavailable} {
 		interrupted, err := facts.NewWithRetrieval(l, allow{}, interruptedEvidenceStore{store, want}, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
 		if err != nil {
 			t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/internal/pgcleanup"
+	"github.com/caxqueiroz/facts_engine/internal/pgfailure"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,7 +25,8 @@ func NewPostgres(pool *pgxpool.Pool, cipher postgres.Cipher) (*Postgres, error) 
 	}
 	return &Postgres{pool, cipher}, nil
 }
-func (s *Postgres) transaction(ctx context.Context, tenant string, fn func(pgx.Tx) error) error {
+func (s *Postgres) transaction(ctx context.Context, tenant string, fn func(pgx.Tx) error) (err error) {
+	defer func() { err = pgfailure.Normalize(err) }()
 	if !model.ValidID(tenant) {
 		return model.ErrInvalid
 	}
@@ -91,6 +93,9 @@ func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return nil, context.DeadlineExceeded
+	}
+	if errors.Is(err, model.ErrUnavailable) {
+		return nil, model.ErrUnavailable
 	}
 	if err != nil {
 		return nil, fmt.Errorf("evidence unavailable: %w", model.ErrPrecondition)

@@ -23,6 +23,25 @@ func testMemoryContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *p
 	if err != nil || len(m.Memories) != 1 || len(m.Items) == 0 || len(m.Order) != len(m.Items)+len(m.Memories) || m.CanonicalVersion != "context-manifest-v2" {
 		t.Fatal("mixed manifest", m, err)
 	}
+
+	unavailable, err := facts.NewWithRetrieval(l, allow{}, interruptedEvidenceStore{store, model.ErrUnavailable}, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unavailableMemory, err := unavailable.GetMemory(ctx, c, model.MemoryQuery{Key: m.Memories[0].Key, ValidAt: r.Query.ValidAt, Purpose: "review"})
+	if !errors.Is(err, model.ErrUnavailable) || unavailableMemory.Body != "" {
+		t.Fatal("memory storage outage disclosed content", unavailableMemory, err)
+	}
+	recalled, err := unavailable.RecallMemories(ctx, c, r.Query)
+	if !errors.Is(err, model.ErrUnavailable) || len(recalled.Items) != 0 {
+		t.Fatal("memory storage outage became empty success", recalled, err)
+	}
+	unavailableRequest := r
+	unavailableRequest.Key = "unavailable-mixed-context"
+	unavailableContext, err := unavailable.PrepareContext(ctx, c, unavailableRequest)
+	if !errors.Is(err, model.ErrUnavailable) || unavailableContext.ID != "" || len(unavailableContext.Rendered) != 0 {
+		t.Fatal("mixed context storage outage disclosed content", unavailableContext, err)
+	}
 	var rendered struct {
 		Schema   string
 		Facts    []model.RecallItem

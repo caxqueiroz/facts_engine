@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/internal/pgcleanup"
+	"github.com/caxqueiroz/facts_engine/internal/pgfailure"
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"net"
 )
 
 type Ledger struct {
@@ -98,14 +98,9 @@ func (l *Ledger) transact(ctx context.Context, tenant string, fn func(model.Tx) 
 	return tx.Commit(ctx)
 }
 func translate(err error) error {
+	err = pgfailure.Normalize(err)
 	if err == nil {
 		return nil
-	}
-	if errors.Is(err, context.Canceled) {
-		return context.Canceled
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return context.DeadlineExceeded
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrNotFound
@@ -121,14 +116,7 @@ func translate(err error) error {
 			return model.ErrPrecondition
 		case "42501":
 			return model.ErrDenied
-		case "08000", "08001", "08003", "08004", "08006", "08007", "40003", "53300", "57P01", "57P02", "57P03", "57P05":
-			return model.ErrUnavailable
 		}
-	}
-	var connection *pgconn.ConnectError
-	var network *net.OpError
-	if errors.As(err, &connection) || errors.As(err, &network) || errors.Is(err, pgconn.ErrConnClosed) {
-		return model.ErrUnavailable
 	}
 	return err
 }

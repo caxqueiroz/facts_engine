@@ -36,7 +36,7 @@ func testEvidenceInterruption(t *testing.T, ctx context.Context, l model.Ledger,
 		return n
 	}
 	before := revision()
-	for _, want := range []error{context.Canceled, context.DeadlineExceeded} {
+	for _, want := range []error{context.Canceled, context.DeadlineExceeded, model.ErrUnavailable} {
 		broken, err := facts.NewWithReads(l, allow{}, interruptedEvidenceStore{store, want}, model.ReadOptions{PaginationKey: bytes.Repeat([]byte{33}, 32)})
 		if err != nil {
 			t.Fatal(err)
@@ -58,6 +58,9 @@ func testEvidenceInterruption(t *testing.T, ctx context.Context, l model.Ledger,
 		code := codes.Canceled
 		if want == context.DeadlineExceeded {
 			code = codes.DeadlineExceeded
+		}
+		if want == model.ErrUnavailable {
+			code = codes.Unavailable
 		}
 		if status.Code(err) != code || remote != nil {
 			t.Fatal("RPC interruption changed", remote, err)

@@ -432,7 +432,7 @@ func (s *Service) GetFact(ctx context.Context, c model.Caller, q model.FactQuery
 	}
 	if len(item.EvidenceIDs) > 0 {
 		if _, err := s.loadEvidence(ctx, c, q.Key.Scope, item.EvidenceIDs); err != nil {
-			if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+			if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 				return model.FactResult{}, interrupted
 			}
 			item.Resolution.State = "ineligible"

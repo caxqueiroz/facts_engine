@@ -21,7 +21,7 @@ func (s interruptingEvidence) Read(ctx context.Context, _ string, _ model.Object
 func TestEvidenceVerificationPreservesInterruption(t *testing.T) {
 	body := []byte("private evidence")
 	evidence := model.Evidence{ID: "evidence", Object: model.ObjectRef{Size: int64(len(body)), Digest: model.BytesDigest(body)}}
-	for _, want := range []error{context.Canceled, context.DeadlineExceeded} {
+	for _, want := range []error{context.Canceled, context.DeadlineExceeded, model.ErrUnavailable} {
 		s := &Service{evidence: interruptingEvidence{read: func(context.Context) ([]byte, error) { return body, fmt.Errorf("PRIVATE storage: %w", want) }}}
 		got, mismatch, err := s.verifyEvidenceIntegrity(context.Background(), "tenant", evidence)
 		if err != want || len(got) != 0 || mismatch {

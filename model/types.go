@@ -307,6 +307,8 @@ type Authorizer interface {
 }
 
 // EvidenceStore reads only immutable references. Implementations must enforce tenant isolation.
+// Temporary dependency outages should wrap ErrUnavailable; missing or corrupt
+// content must not use that classification. Reads must honor context cancellation.
 type EvidenceStore interface {
 	Read(context.Context, string, ObjectRef) ([]byte, error)
 }

@@ -79,7 +79,7 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 			}
 		}
 		if _, err := s.loadEvidence(ctx, c, item.Selector.Scope, item.EvidenceIDs); err != nil {
-			if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+			if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 				return model.RecallResult{}, interrupted
 			}
 			continue

@@ -115,7 +115,7 @@ func (s *Service) recallContext(ctx context.Context, c model.Caller, q model.Rec
 				}
 			}
 			if _, err := s.loadEvidence(ctx, c, fact.Selector.Scope, fact.EvidenceIDs); err != nil {
-				if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+				if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 					return model.RecallResult{}, nil, nil, interrupted
 				}
 				continue

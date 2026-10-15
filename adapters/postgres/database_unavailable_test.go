@@ -69,6 +69,13 @@ func testDatabaseUnavailable(t *testing.T, ctx context.Context, cfg *pgxpool.Con
 	}
 	refuse.Store(true)
 	pool.Reset()
+
+	if body, err := store.Read(ctx, "database-outage", model.ObjectRef{Locator: "source", Version: "v1"}); err != model.ErrUnavailable || len(body) != 0 {
+		t.Fatal("evidence outage became missing/corrupt content", body, err)
+	}
+	if _, err := store.Put(ctx, "database-outage", "source", []byte("private evidence")); err != model.ErrUnavailable {
+		t.Fatal("evidence write outage", err)
+	}
 	caller := model.Caller{Tenant: "database-outage", Principal: "reader"}
 	at := time.Now().UTC()
 	query := model.FactQuery{Key: model.FactKey{Scope: "case", Subject: "subject", Predicate: "preference"}, ValidAt: at, Purpose: "review"}

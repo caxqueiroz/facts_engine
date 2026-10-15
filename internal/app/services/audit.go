@@ -403,7 +403,7 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			continue
 		}
 		b, mismatch, err := s.verifyEvidenceIntegrity(ctx, c.Tenant, e)
-		if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+		if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 			return nil, nil, interrupted
 		}
 		if mismatch {

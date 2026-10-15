@@ -75,7 +75,7 @@ func (s *Service) CreateFactSnapshot(ctx context.Context, c model.Caller, r mode
 			continue
 		}
 		if _, err := s.loadEvidence(ctx, c, item.Selector.Scope, item.EvidenceIDs); err != nil {
-			if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+			if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 				return model.FactSnapshot{}, interrupted
 			}
 			item.Resolution.State = "ineligible"
