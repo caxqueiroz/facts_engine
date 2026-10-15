@@ -415,7 +415,6 @@ type FactSnapshot struct {
 	SelectionRevision int64
 	CreationRevision  int64
 	Digest            string
-	Payload           []byte
 }
 
 type FactSnapshotItem struct {
@@ -426,6 +425,12 @@ type FactSnapshotItem struct {
 	SelectorDigest string
 	RecordID       pgtype.Text
 	VersionID      pgtype.Text
+}
+
+type FactSnapshotPayload struct {
+	TenantID   string
+	SnapshotID string
+	Payload    []byte
 }
 
 type LedgerEvent struct {

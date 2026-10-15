@@ -10,7 +10,8 @@ GRANT SELECT ON pending_evidence_uploads TO facts_runtime;
 GRANT INSERT(tenant_id,locator,object_version,scope_id,policy_id,byte_size) ON pending_evidence_uploads TO facts_runtime;
 REVOKE UPDATE,DELETE,TRUNCATE ON pending_evidence_uploads FROM facts_runtime;
 GRANT SELECT,INSERT,UPDATE ON active_predicates TO facts_runtime;
-GRANT SELECT,INSERT ON timeline_generations,timeline_history,rejected_versions,fact_snapshots,fact_snapshot_items TO facts_runtime;
+GRANT SELECT,INSERT ON timeline_generations,timeline_history,rejected_versions,fact_snapshots,fact_snapshot_items,fact_snapshot_payloads TO facts_runtime;
+REVOKE UPDATE,DELETE,TRUNCATE ON fact_snapshots,fact_snapshot_items,fact_snapshot_payloads FROM facts_runtime;
 GRANT DELETE ON accepted_intervals TO facts_runtime;
 GRANT USAGE ON SEQUENCE accepted_intervals_segment_id_seq TO facts_runtime;
 GRANT SELECT,INSERT ON calculation_receipts,calculation_snapshots,calculation_artifacts,audit_export_requests,audit_export_jobs,audit_exports TO facts_runtime;
@@ -28,7 +29,7 @@ DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_archiver')
 GRANT facts_worker TO facts_projector,facts_archiver;
 GRANT SELECT ON pending_evidence_uploads TO facts_archiver;
 GRANT SELECT ON record_versions,predicate_versions,policy_versions,evidence,timeline_generations,timeline_history,accepted_intervals TO facts_projector,facts_archiver;
-GRANT SELECT ON fact_snapshots,calculation_receipts,attestations,audit_exports TO facts_archiver;
+GRANT SELECT ON fact_snapshot_payloads,fact_snapshots,calculation_receipts,attestations,audit_exports TO facts_archiver;
 GRANT SELECT ON active_projections TO facts_runtime;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_rebuild') THEN CREATE ROLE facts_rebuild NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
 GRANT facts_projector TO facts_rebuild;

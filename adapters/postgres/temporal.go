@@ -85,7 +85,10 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertFactSnapshot(ctx, ledgerdb.InsertFactSnapshotParams{TenantID: t.tenant, ID: s.ID, SelectionRevision: s.SelectionRevision, CreationRevision: s.CreationRevision, Digest: s.Digest, Payload: b}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertFactSnapshot(ctx, ledgerdb.InsertFactSnapshotParams{TenantID: t.tenant, ID: s.ID, SelectionRevision: s.SelectionRevision, CreationRevision: s.CreationRevision, Digest: s.Digest}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertFactSnapshotPayload(ctx, ledgerdb.InsertFactSnapshotPayloadParams{TenantID: t.tenant, SnapshotID: s.ID, Payload: b}); err != nil {
 			return err
 		}
 		for i, item := range s.Items {
@@ -212,6 +215,9 @@ func (t *transaction) Snapshot(ctx context.Context, id string) (model.FactSnapsh
 	payload, err := ledgerdb.New(t.tx).GetSnapshotPayload(ctx, ledgerdb.GetSnapshotPayloadParams{TenantID: t.tenant, ID: id})
 	if err != nil {
 		return s, translate(err)
+	}
+	if len(payload) == 0 {
+		return s, model.ErrPrecondition
 	}
 	err = t.decode(payload, &s)
 	return s, err

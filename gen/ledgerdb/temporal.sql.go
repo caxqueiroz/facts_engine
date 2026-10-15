@@ -130,9 +130,10 @@ func (q *Queries) GetRevisionTime(ctx context.Context, arg GetRevisionTimeParams
 }
 
 const GetSnapshotPayload = `-- name: GetSnapshotPayload :one
-SELECT payload
-FROM fact_snapshots
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM fact_snapshots s
+LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+WHERE s.tenant_id=$1 AND s.id=$2
 `
 
 type GetSnapshotPayloadParams struct {
@@ -248,8 +249,8 @@ func (q *Queries) InsertFactRejection(ctx context.Context, arg InsertFactRejecti
 }
 
 const InsertFactSnapshot = `-- name: InsertFactSnapshot :exec
-INSERT INTO fact_snapshots (tenant_id,id,selection_revision,creation_revision,digest,payload)
-VALUES ($1,$2,$3,$4,$5,$6)
+INSERT INTO fact_snapshots (tenant_id,id,selection_revision,creation_revision,digest)
+VALUES ($1,$2,$3,$4,$5)
 `
 
 type InsertFactSnapshotParams struct {
@@ -258,7 +259,6 @@ type InsertFactSnapshotParams struct {
 	SelectionRevision int64
 	CreationRevision  int64
 	Digest            string
-	Payload           []byte
 }
 
 func (q *Queries) InsertFactSnapshot(ctx context.Context, arg InsertFactSnapshotParams) error {
@@ -268,7 +268,6 @@ func (q *Queries) InsertFactSnapshot(ctx context.Context, arg InsertFactSnapshot
 		arg.SelectionRevision,
 		arg.CreationRevision,
 		arg.Digest,
-		arg.Payload,
 	)
 	return err
 }
@@ -298,6 +297,22 @@ func (q *Queries) InsertFactSnapshotItem(ctx context.Context, arg InsertFactSnap
 		arg.RecordID,
 		arg.VersionID,
 	)
+	return err
+}
+
+const InsertFactSnapshotPayload = `-- name: InsertFactSnapshotPayload :exec
+INSERT INTO fact_snapshot_payloads(tenant_id,snapshot_id,payload)
+VALUES ($1,$2,$3)
+`
+
+type InsertFactSnapshotPayloadParams struct {
+	TenantID   string
+	SnapshotID string
+	Payload    []byte
+}
+
+func (q *Queries) InsertFactSnapshotPayload(ctx context.Context, arg InsertFactSnapshotPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertFactSnapshotPayload, arg.TenantID, arg.SnapshotID, arg.Payload)
 	return err
 }
 

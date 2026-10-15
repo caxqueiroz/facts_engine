@@ -28,8 +28,12 @@ INSERT INTO attestation_events(tenant_id,attestation_id,actor,ledger_revision)
 VALUES ($1,$2,$3,$4);
 
 -- name: InsertFactSnapshot :exec
-INSERT INTO fact_snapshots (tenant_id,id,selection_revision,creation_revision,digest,payload)
-VALUES ($1,$2,$3,$4,$5,$6);
+INSERT INTO fact_snapshots (tenant_id,id,selection_revision,creation_revision,digest)
+VALUES ($1,$2,$3,$4,$5);
+
+-- name: InsertFactSnapshotPayload :exec
+INSERT INTO fact_snapshot_payloads(tenant_id,snapshot_id,payload)
+VALUES ($1,$2,$3);
 
 -- name: InsertFactSnapshotItem :exec
 INSERT INTO fact_snapshot_items (tenant_id,snapshot_id,ordinal,scope_id,selector_digest,record_id,version_id)
@@ -90,9 +94,10 @@ JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id
 WHERE r.tenant_id=$1 AND r.record_id=$2 AND e.ledger_revision<=$3;
 
 -- name: GetSnapshotPayload :one
-SELECT payload
-FROM fact_snapshots
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM fact_snapshots s
+LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+WHERE s.tenant_id=$1 AND s.id=$2;
 
 -- name: ListFactHistoryPayloads :many
 SELECT e.payload,e.recorded_at
