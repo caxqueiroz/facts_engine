@@ -130,3 +130,6 @@ GRANT UPDATE(epoch) ON fact_version_guards,memory_version_guards TO facts_runtim
 
 GRANT SELECT,INSERT ON extraction_attempt_inventories,extraction_attempt_fact_inputs,extraction_attempt_memory_inputs TO facts_runtime;
 GRANT SELECT ON extraction_attempt_inventories,extraction_attempt_fact_inputs,extraction_attempt_memory_inputs TO facts_archiver;
+
+GRANT SELECT,INSERT ON extraction_inventory_guards TO facts_runtime;
+GRANT UPDATE(epoch) ON extraction_inventory_guards TO facts_runtime;

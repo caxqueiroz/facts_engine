@@ -346,6 +346,12 @@ type ExtractionAttemptMemoryInput struct {
 	PayloadRetained bool
 }
 
+type ExtractionInventoryGuard struct {
+	TenantID  string
+	AttemptID string
+	Epoch     int64
+}
+
 type ExtractionJob struct {
 	TenantID        string
 	ID              string
