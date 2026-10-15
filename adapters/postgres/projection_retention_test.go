@@ -103,6 +103,13 @@ func testDisposedProjectionReads(t *testing.T, ctx context.Context, admin *pgxpo
 			t.Fatal("unknown retained content silently skipped", doc, err)
 		}
 		// A retained header with no tombstone/payload remains an integrity failure.
+		// Owner-only corruption fixture removes its dependent obligation rows.
+		if _, err = admin.Exec(ctx, "DELETE FROM projection_cleanup_targets WHERE tenant_id=$1 AND kind=$2 AND version_id=$3", tenant, target.kind, target.id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, "DELETE FROM projection_cleanup_jobs WHERE tenant_id=$1 AND kind=$2 AND version_id=$3", tenant, target.kind, target.id); err != nil {
+			t.Fatal(err)
+		}
 		if _, err = admin.Exec(ctx, "DELETE FROM "+table+" WHERE tenant_id=$1 AND version_id=$2", tenant, target.id); err != nil {
 			t.Fatal(err)
 		}

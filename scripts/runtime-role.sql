@@ -151,3 +151,6 @@ GRANT UPDATE(epoch) ON projection_retention_guards TO facts_worker;
 GRANT SELECT ON projection_destinations,projection_retention_guards TO facts_runtime;
 REVOKE UPDATE,DELETE,TRUNCATE ON projection_destinations FROM facts_worker;
 REVOKE DELETE,TRUNCATE ON projection_retention_guards FROM facts_worker;
+
+-- Cleanup obligations are recorded with tombstones; execution is not enabled.
+GRANT SELECT ON projection_cleanup_jobs,projection_cleanup_targets,projection_cleanup_acknowledgements TO facts_runtime,facts_worker,facts_archiver;

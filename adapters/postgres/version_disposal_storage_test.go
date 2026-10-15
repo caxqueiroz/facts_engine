@@ -198,6 +198,12 @@ func testVersionDisposalStorage(t *testing.T, ctx context.Context, normal *facts
 			}
 		})
 	}
+	for _, k := range []model.ProjectionCleanupKey{{Tenant: c.Tenant, Kind: "fact", VersionID: f.VersionID}, {Tenant: c.Tenant, Kind: "memory", VersionID: m.VersionID}} {
+		status, err := ledger.ProjectionCleanupStatus(ctx, k)
+		if err != nil || !status.Complete || len(status.Targets) != 0 {
+			t.Fatal("zero-destination cleanup coverage", status, err)
+		}
+	}
 	for _, memory := range []bool{false, true} {
 		err := ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
 			if memory {

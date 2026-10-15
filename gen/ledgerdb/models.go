@@ -713,6 +713,33 @@ type PredicateVersion struct {
 	Payload   []byte
 }
 
+type ProjectionCleanupAcknowledgement struct {
+	TenantID          string
+	Kind              string
+	VersionID         string
+	Generation        string
+	AcknowledgementID string
+	CompletedAt       pgtype.Timestamptz
+}
+
+type ProjectionCleanupJob struct {
+	TenantID        string
+	Kind            string
+	VersionID       string
+	FactVersionID   pgtype.Text
+	MemoryVersionID pgtype.Text
+	InventoryEpoch  int64
+	TargetCount     int32
+	CreatedAt       pgtype.Timestamptz
+}
+
+type ProjectionCleanupTarget struct {
+	TenantID   string
+	Kind       string
+	VersionID  string
+	Generation string
+}
+
 type ProjectionDestination struct {
 	TenantID     string
 	Generation   string
