@@ -1,6 +1,7 @@
 .PHONY: build test integration ci-integration check vet lint vuln generate migrate tools
 
 build:
+	go build -trimpath -o bin/memoryeval ./cmd/memoryeval
 	go build -trimpath -o bin/memoryd ./cmd/memoryd
 	go build -trimpath -o bin/memoryworker ./cmd/memoryworker
 
@@ -55,3 +56,7 @@ container-smoke:
 .PHONY: ci-benchmark
 ci-benchmark:
 	sh scripts/ci-integration.sh --benchmark
+
+.PHONY: eval-example
+eval-example:
+	@go run ./cmd/memoryeval -dataset examples/evaluation/dataset.json -run examples/evaluation/run.json

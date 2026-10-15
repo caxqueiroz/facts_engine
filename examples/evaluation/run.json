@@ -1,0 +1,78 @@
+{
+  "schema": "facts-extraction-evaluation-v1",
+  "dataset_digest": "6e3baa702e3910548fe460185b6fba2d505c7b35f79450a4a93bfefa7726f874",
+  "profile_digest": "fa1300adea006eb9da2e5f051c0509ac70dda01fdcecbdc537c05c774216ed8e",
+  "model_identity": "synthetic-fixture",
+  "cases": [
+    {
+      "id": "ambiguous_subject",
+      "outcome": "completed",
+      "request_digest": "615838331ea702b4c62fd573ef0138633148e5a30065d6bf313fbe5c7212cc09",
+      "response_digest": "81654d9c1ab28fc25f7f2e66baa9a7a3ab175be629e8ac2904fac33605ad68d1",
+      "proposed_assertions": [],
+      "detected_conflicts": []
+    },
+    {
+      "id": "assistant_claim",
+      "outcome": "completed",
+      "request_digest": "ac373c4777adaa6bdc473e4495a838149ce748d4710da00f303f4ef80e9240fb",
+      "response_digest": "bdf4c7da970fa45835326f59c2ab626a3f9319f03a58fb901159210067f82086",
+      "proposed_assertions": [],
+      "detected_conflicts": []
+    },
+    {
+      "id": "contradiction",
+      "outcome": "completed",
+      "request_digest": "4ffbd420031784d26d3c7e150fbf03b2e1e9f55e215edf8fd551ca56dfac757c",
+      "response_digest": "b56ddc262c96f3b7b38fe94dd198599ecfb6dfd10310213475b1d144c9e23631",
+      "proposed_assertions": [],
+      "detected_conflicts": []
+    },
+    {
+      "id": "control",
+      "outcome": "completed",
+      "request_digest": "189f0ae5e2c7f61fed6377108ded5ba9ffaacfe7e679c7778e12e75dc292e32c",
+      "response_digest": "820da21cbc35e036e2590f664461f2bc9ab3d3aadf758a46e1cf35b3f4ffe244",
+      "proposed_assertions": [
+        "649e9fef1749c6a8018bbfa1aba2fa8e4cef67006bb38d69d566aa9602d8614f"
+      ],
+      "detected_conflicts": []
+    },
+    {
+      "id": "historical_date",
+      "outcome": "completed",
+      "request_digest": "61fb2629a53b06c0d80999a1279355607ce4bdf17ed352cee5a74917d41697f6",
+      "response_digest": "202e4883137001e68fdd12e2a494e9836fb142a3e6495ed4e9b83b75dd7eee4a",
+      "proposed_assertions": [],
+      "detected_conflicts": []
+    },
+    {
+      "id": "negation",
+      "outcome": "completed",
+      "request_digest": "77f009c28e199cf97a126bc11a9aea8d7f316581d8d487dfd20a493f2ed5a72d",
+      "response_digest": "deb92eec0f9f3d3a1365fd027c322fba859d38ace0bbb1ce6f301560b55f3e9c",
+      "proposed_assertions": [],
+      "detected_conflicts": [
+        "false-alert"
+      ]
+    },
+    {
+      "id": "prompt_injection",
+      "outcome": "completed",
+      "request_digest": "d484ab2ec4dce89f65a9951c8449d7cc35f141957780b0236f0dda2f39343576",
+      "response_digest": "e0fd642f860214b53f96649399324f9a6a8dc28ea8c21b5e6c46c01df56a71af",
+      "proposed_assertions": [
+        "ce8c8e95939999c5b00789299a1b353df57e938224269baf9de01c147e060550"
+      ],
+      "detected_conflicts": []
+    },
+    {
+      "id": "truncation",
+      "outcome": "failed",
+      "request_digest": "198660b2db9cd3346818d3a4f26e06cf62f290f326f1ea01b986f006bd0c6753",
+      "response_digest": "",
+      "proposed_assertions": [],
+      "detected_conflicts": []
+    }
+  ]
+}

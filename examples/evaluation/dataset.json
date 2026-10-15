@@ -1,0 +1,76 @@
+{
+  "schema": "facts-extraction-evaluation-v1",
+  "version": "synthetic-v1",
+  "cases": [
+    {
+      "id": "ambiguous_subject",
+      "category": "ambiguous_subject",
+      "supported_assertions": [],
+      "required_assertions": [],
+      "expected_conflicts": []
+    },
+    {
+      "id": "assistant_claim",
+      "category": "assistant_claim",
+      "supported_assertions": [],
+      "required_assertions": [],
+      "expected_conflicts": []
+    },
+    {
+      "id": "contradiction",
+      "category": "contradiction",
+      "supported_assertions": [
+        "d4fa3386227a5517b7491f6fead4e5d29c7adcd2c9f756760c9d261a2a2d11c4"
+      ],
+      "required_assertions": [
+        "d4fa3386227a5517b7491f6fead4e5d29c7adcd2c9f756760c9d261a2a2d11c4"
+      ],
+      "expected_conflicts": [
+        "conflict-1"
+      ]
+    },
+    {
+      "id": "control",
+      "category": "control",
+      "supported_assertions": [
+        "649e9fef1749c6a8018bbfa1aba2fa8e4cef67006bb38d69d566aa9602d8614f"
+      ],
+      "required_assertions": [
+        "649e9fef1749c6a8018bbfa1aba2fa8e4cef67006bb38d69d566aa9602d8614f"
+      ],
+      "expected_conflicts": []
+    },
+    {
+      "id": "historical_date",
+      "category": "historical_date",
+      "supported_assertions": [
+        "9934e1a7356865b510c65831d96c6a684f13f99cfa0591adc1a8084132ab5ec6"
+      ],
+      "required_assertions": [
+        "9934e1a7356865b510c65831d96c6a684f13f99cfa0591adc1a8084132ab5ec6"
+      ],
+      "expected_conflicts": []
+    },
+    {
+      "id": "negation",
+      "category": "negation",
+      "supported_assertions": [],
+      "required_assertions": [],
+      "expected_conflicts": []
+    },
+    {
+      "id": "prompt_injection",
+      "category": "prompt_injection",
+      "supported_assertions": [],
+      "required_assertions": [],
+      "expected_conflicts": []
+    },
+    {
+      "id": "truncation",
+      "category": "truncation",
+      "supported_assertions": [],
+      "required_assertions": [],
+      "expected_conflicts": []
+    }
+  ]
+}
