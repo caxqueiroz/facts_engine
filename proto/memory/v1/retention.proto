@@ -8,12 +8,13 @@ import "memory/v1/evidence.proto";
 
 option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 // Administrative controls retain engine authorization and database-role checks.
-// Disposal covers eligible evidence, orphan uploads, snapshots and contexts.
+// Disposal covers eligible evidence, orphan uploads, snapshots, contexts and terminal extraction artifacts.
 service RetentionService {
   rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc DisposeExtraction(DisposeExtractionRequest) returns (DisposeExtractionResponse);
   rpc DisposeContext(DisposeContextRequest) returns (DisposeContextResponse);
   rpc DisposeSnapshot(DisposeSnapshotRequest) returns (DisposeSnapshotResponse);
   rpc DisposeOrphanEvidence(DisposeOrphanEvidenceRequest) returns (DisposeOrphanEvidenceResponse);
@@ -26,7 +27,10 @@ message RetentionPolicy {
     (buf.validate.field).string.in = "evidence_bytes",
     (buf.validate.field).string.in = "orphan_evidence_bytes",
     (buf.validate.field).string.in = "snapshot_payload",
-    (buf.validate.field).string.in = "context_payload"
+    (buf.validate.field).string.in = "context_payload",
+    (buf.validate.field).string.in = "extraction_job_payload",
+    (buf.validate.field).string.in = "extraction_request_payload",
+    (buf.validate.field).string.in = "extraction_response_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -172,5 +176,29 @@ message DisposeContextRequest {
   }];
 }
 message DisposeContextResponse {
+  CommitResult result = 1;
+}
+
+message ExtractionRetentionBinding {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string job_policy_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string request_policy_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string response_policy_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeExtractionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string job_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated ExtractionRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+message DisposeExtractionResponse {
   CommitResult result = 1;
 }

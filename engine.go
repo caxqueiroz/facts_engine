@@ -426,3 +426,8 @@ func (e *Engine) DisposeSnapshot(ctx context.Context, c Caller, r model.Snapshot
 func (e *Engine) DisposeContext(ctx context.Context, c Caller, r model.ContextDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeContext(ctx, c, r)
 }
+
+// DisposeExtraction removes eligible terminal-job artifacts and retains provenance.
+func (e *Engine) DisposeExtraction(ctx context.Context, c Caller, r model.ExtractionDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeExtraction(ctx, c, r)
+}

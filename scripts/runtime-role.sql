@@ -141,3 +141,6 @@ REVOKE UPDATE,DELETE,TRUNCATE ON extraction_job_payloads,extraction_attempt_payl
 GRANT SELECT ON extraction_job_disposals,extraction_attempt_disposals,extraction_result_disposals TO facts_runtime,facts_archiver;
 GRANT SELECT,INSERT ON extraction_content_guards TO facts_runtime,facts_archiver;
 GRANT UPDATE(epoch) ON extraction_content_guards TO facts_runtime,facts_archiver;
+
+GRANT INSERT ON extraction_job_disposals,extraction_attempt_disposals,extraction_result_disposals TO facts_retention;
+GRANT DELETE ON extraction_job_payloads,extraction_attempt_payloads,extraction_result_payloads TO facts_retention;

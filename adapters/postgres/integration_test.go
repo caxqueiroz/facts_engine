@@ -806,6 +806,7 @@ func TestPostgresLedger(t *testing.T) {
 	t.Run("extraction input inventories", func(t *testing.T) { testExtractionInputInventories(t, ctx, admin, runtime) })
 	t.Run("extraction inventory sealing", func(t *testing.T) { testExtractionInventorySealing(t, ctx, admin, runtime) })
 	t.Run("extraction inventory backfill", func(t *testing.T) { testExtractionInventoryBackfill(t, ctx, admin, runtime) })
+	t.Run("extraction disposal", func(t *testing.T) { testExtractionDisposal(t, ctx, engine, ledger, store, admin) })
 	t.Run("extraction disposal storage", func(t *testing.T) { testExtractionDisposalStorage(t, ctx, admin, runtime, store) })
 	t.Run("atomic ordering", func(t *testing.T) {
 		var count, maxRev int64

@@ -7,6 +7,7 @@ import (
 )
 
 type RetentionEngine interface {
+	DisposeExtraction(context.Context, model.Caller, model.ExtractionDisposalRequest) (model.CommitResult, error)
 	DisposeContext(context.Context, model.Caller, model.ContextDisposalRequest) (model.CommitResult, error)
 	DisposeSnapshot(context.Context, model.Caller, model.SnapshotDisposalRequest) (model.CommitResult, error)
 	DisposeOrphanEvidence(context.Context, model.Caller, model.OrphanEvidenceDisposalRequest) (model.CommitResult, error)
@@ -86,4 +87,16 @@ func (s *retentionService) DisposeContext(ctx context.Context, r *v1.DisposeCont
 		return nil, err
 	}
 	return &v1.DisposeContextResponse{Result: commit(out)}, nil
+}
+
+func (s *retentionService) DisposeExtraction(ctx context.Context, r *v1.DisposeExtractionRequest) (*v1.DisposeExtractionResponse, error) {
+	request := model.ExtractionDisposalRequest{Command: command(r.Command), JobID: r.JobId, Reason: r.Reason}
+	for _, b := range r.Bindings {
+		request.Bindings = append(request.Bindings, model.ExtractionRetentionBinding{Scope: b.Scope, JobPolicyID: b.JobPolicyId, RequestPolicyID: b.RequestPolicyId, ResponsePolicyID: b.ResponsePolicyId, Jurisdiction: b.Jurisdiction})
+	}
+	out, err := s.engine.DisposeExtraction(ctx, callerFrom(ctx), request)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeExtractionResponse{Result: commit(out)}, nil
 }

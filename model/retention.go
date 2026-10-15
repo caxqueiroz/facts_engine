@@ -7,7 +7,8 @@ import (
 
 // RetentionPolicy is immutable and application-owned. Evidence-byte durations
 // start at registration; orphan-evidence durations start at recorded upload time.
-// Snapshot/context durations start at their database creation event time.
+// Snapshot/context and extraction artifact durations start at their database
+// creation event times; each extraction payload class has its own policy.
 // None uses a caller-supplied historical source timestamp.
 type RetentionPolicy struct {
 	ID, Scope, RecordClass, Purpose, Jurisdiction string
