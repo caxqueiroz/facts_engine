@@ -295,6 +295,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 						scopes[b.Scope] = true
 					}
 				}
+				if event.ExtractionDisposal != nil {
+					for _, b := range event.ExtractionDisposal.Bindings {
+						scopes[b.Scope] = true
+					}
+				}
 				if event.Disposal != nil {
 					ids := append([]string{event.Disposal.EvidenceID}, event.Disposal.DerivativeEvidenceIDs...)
 					for _, id := range ids {

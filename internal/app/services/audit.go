@@ -360,6 +360,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 					include = include && b.Scope == r.Scope
 				}
 			}
+			if event.ExtractionDisposal != nil {
+				for _, b := range event.ExtractionDisposal.Bindings {
+					include = include && b.Scope == r.Scope
+				}
+			}
 			if event.Kind == "dispose_evidence" {
 				ids := []string{event.TargetID}
 				if event.Disposal != nil {

@@ -72,10 +72,35 @@ type ContextDisposalRequest struct {
 type ContextDisposalTx interface {
 	DisposeContext(context.Context, ContextDisposalRequest) error
 }
+
+// ExtractionRetentionBinding selects independently governed scheduling, request,
+// and response payload policies for one content scope.
+type ExtractionRetentionBinding struct {
+	Scope, JobPolicyID, RequestPolicyID, ResponsePolicyID, Jurisdiction string
+}
+
+// ExtractionDisposalRequest selects a terminal job and all of its retained
+// attempts/results, including attempts from earlier retries.
+type ExtractionDisposalRequest struct {
+	Command
+	JobID, Reason string
+	Bindings      []ExtractionRetentionBinding
+}
+
+// ExtractionDisposalTx must atomically verify terminal state, complete content
+// scope/input inventories, class-specific policy ages, holds, live derivatives,
+// exports and archive progress before retaining tombstones and deleting payloads.
+// Implementations must serialize with execution, retries and new references.
+// This interface grants no authority to dispose source facts, memories or evidence.
+type ExtractionDisposalTx interface {
+	DisposeExtraction(context.Context, ExtractionDisposalRequest) error
+}
+
 type RetentionEvent struct {
-	ContextDisposal         *ContextDisposalRequest  `json:",omitempty"`
-	SnapshotDisposal        *SnapshotDisposalRequest `json:",omitempty"`
-	AdditionalAuthorization []AuthorizationDecision  `json:",omitempty"`
+	ExtractionDisposal      *ExtractionDisposalRequest `json:",omitempty"`
+	ContextDisposal         *ContextDisposalRequest    `json:",omitempty"`
+	SnapshotDisposal        *SnapshotDisposalRequest   `json:",omitempty"`
+	AdditionalAuthorization []AuthorizationDecision    `json:",omitempty"`
 
 	ID, Tenant, Scope, Kind, TargetID string
 	Caller                            Caller
