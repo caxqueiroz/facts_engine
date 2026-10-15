@@ -106,9 +106,9 @@ func (q *Queries) GetAuditJob(ctx context.Context, arg GetAuditJobParams) (GetAu
 }
 
 const GetCalculationPayload = `-- name: GetCalculationPayload :one
-SELECT payload
-FROM calculation_receipts
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2
 `
 
 type GetCalculationPayloadParams struct {
@@ -124,9 +124,9 @@ func (q *Queries) GetCalculationPayload(ctx context.Context, arg GetCalculationP
 }
 
 const GetCalculationRunPayload = `-- name: GetCalculationRunPayload :one
-SELECT payload
-FROM calculation_receipts
-WHERE tenant_id=$1 AND application_id=$2 AND external_run_id=$3
+SELECT p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+WHERE c.tenant_id=$1 AND c.application_id=$2 AND c.external_run_id=$3
 `
 
 type GetCalculationRunPayloadParams struct {
@@ -284,12 +284,12 @@ func (q *Queries) InsertCalculationArtifact(ctx context.Context, arg InsertCalcu
 	return err
 }
 
-const InsertCalculationPayload = `-- name: InsertCalculationPayload :exec
-INSERT INTO calculation_receipts (tenant_id,id,scope_id,snapshot_id,application_id,external_run_id,request_digest,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+const InsertCalculationHeader = `-- name: InsertCalculationHeader :exec
+INSERT INTO calculation_receipts (tenant_id,id,scope_id,snapshot_id,application_id,external_run_id,request_digest,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 `
 
-type InsertCalculationPayloadParams struct {
+type InsertCalculationHeaderParams struct {
 	TenantID       string
 	ID             string
 	ScopeID        string
@@ -298,11 +298,10 @@ type InsertCalculationPayloadParams struct {
 	ExternalRunID  string
 	RequestDigest  string
 	LedgerRevision int64
-	Payload        []byte
 }
 
-func (q *Queries) InsertCalculationPayload(ctx context.Context, arg InsertCalculationPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertCalculationPayload,
+func (q *Queries) InsertCalculationHeader(ctx context.Context, arg InsertCalculationHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertCalculationHeader,
 		arg.TenantID,
 		arg.ID,
 		arg.ScopeID,
@@ -311,8 +310,22 @@ func (q *Queries) InsertCalculationPayload(ctx context.Context, arg InsertCalcul
 		arg.ExternalRunID,
 		arg.RequestDigest,
 		arg.LedgerRevision,
-		arg.Payload,
 	)
+	return err
+}
+
+const InsertCalculationPayload = `-- name: InsertCalculationPayload :exec
+INSERT INTO calculation_payloads (tenant_id,calculation_id,payload) VALUES ($1,$2,$3)
+`
+
+type InsertCalculationPayloadParams struct {
+	TenantID      string
+	CalculationID string
+	Payload       []byte
+}
+
+func (q *Queries) InsertCalculationPayload(ctx context.Context, arg InsertCalculationPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertCalculationPayload, arg.TenantID, arg.CalculationID, arg.Payload)
 	return err
 }
 

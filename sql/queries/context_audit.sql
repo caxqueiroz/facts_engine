@@ -58,17 +58,17 @@ INSERT INTO decision_artifacts (tenant_id,decision_id,role,evidence_id)
 VALUES ($1,$2,$3,$4);
 
 -- name: GetCalculationPayload :one
-SELECT payload
-FROM calculation_receipts
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: LockCalculationRun :exec
 SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(lock_key)::text,0));
 
 -- name: GetCalculationRunPayload :one
-SELECT payload
-FROM calculation_receipts
-WHERE tenant_id=$1 AND application_id=$2 AND external_run_id=$3;
+SELECT p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+WHERE c.tenant_id=$1 AND c.application_id=$2 AND c.external_run_id=$3;
 
 -- name: GetAuditJob :one
 SELECT r.payload,j.state,j.fence,j.lease_until
@@ -87,9 +87,12 @@ SELECT payload,digest,ledger_revision
 FROM audit_exports
 WHERE tenant_id=$1 AND id=$2;
 
+-- name: InsertCalculationHeader :exec
+INSERT INTO calculation_receipts (tenant_id,id,scope_id,snapshot_id,application_id,external_run_id,request_digest,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+
 -- name: InsertCalculationPayload :exec
-INSERT INTO calculation_receipts (tenant_id,id,scope_id,snapshot_id,application_id,external_run_id,request_digest,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+INSERT INTO calculation_payloads (tenant_id,calculation_id,payload) VALUES ($1,$2,$3);
 
 -- name: InsertCalculationSnapshot :exec
 INSERT INTO calculation_snapshots (tenant_id,calculation_id,snapshot_id)

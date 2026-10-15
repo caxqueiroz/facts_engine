@@ -81,9 +81,9 @@ LEFT JOIN snapshot_disposals d ON d.tenant_id=s.tenant_id AND d.snapshot_id=s.id
 WHERE s.tenant_id=$1 AND s.creation_revision=$2;
 
 -- name: ListArchiveCalculation :many
-SELECT id,payload
-FROM calculation_receipts
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT c.id,p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
+WHERE c.tenant_id=$1 AND c.ledger_revision=$2;
 
 -- name: ListArchiveMemoryAttestation :many
 SELECT a.id,a.payload
@@ -249,8 +249,8 @@ FROM fact_snapshot_items i
 WHERE i.tenant_id=s.tenant_id AND i.snapshot_id=s.id AND i.scope_id=$2) ORDER BY s.id LIMIT 10001;
 
 -- name: ListAuditCalculation :many
-SELECT c.id,c.payload
-FROM calculation_receipts c
+SELECT c.id,p.payload
+FROM calculation_receipts c LEFT JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.id
 WHERE c.tenant_id=$1 AND (c.scope_id=$2 OR EXISTS(SELECT 1
 FROM calculation_snapshots cs
 JOIN fact_snapshot_items i ON i.tenant_id=cs.tenant_id AND i.snapshot_id=cs.snapshot_id

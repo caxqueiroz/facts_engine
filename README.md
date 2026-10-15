@@ -779,6 +779,14 @@ The transaction deletes the encrypted child payload, retains a metadata-only tom
 
 After disposal, direct payload reads fail and signed exports report explicit content gaps. Already signed archive batches retain their original bytes. Source evidence, structural history, archives and backups remain subject to their own policies. **A successful disposal receipt establishes ledger payload removal, not completed index cleanup or full erasure.** Check `ProjectionCleanupStatus` for captured obligations; use `CleanupProjection` for each captured destination or configure the scheduler below.
 
+## Calculation payload storage
+
+Migration `00046_calculation_payloads.sql` moves calculation receipt ciphertext into `calculation_payloads` without decrypting or rewriting it. Immutable run identity, request digest, ledger revision, snapshot links and evidence references remain in their structural tables. Header, payload, references and ledger event still commit in one transaction. Stop writers and upgrade service, audit/archive workers and maintenance readers together, then refresh `scripts/runtime-role.sql`; older readers expect the removed `calculation_receipts.payload` column. The ledger startup check requires the new table. This migration is forward-only; recovery requires a verified backup.
+
+Runtime credentials can insert/read calculation payloads but cannot update, delete or truncate them. The archive role has read access and tenant RLS covers the child table. Reads by receipt ID or external-run identity fail explicitly when a header lacks its payload, rather than treating the run as absent. Audit/archive inventories preserve missing-content rows so incomplete receipts cannot silently disappear from coverage. Integration tests cover byte-preserving migration (including opaque ciphertext), read parity, tenant isolation, runtime immutability, transaction rollback when payload insertion is denied, missing payloads and retained audit/archive rows.
+
+This storage separation prepares calculation retention; it does not enable calculation disposal. Calculation tombstones, serialization with new references, class-specific policies and batch selection remain to implement. Referenced snapshots and evidence continue to block disposal under the existing rules.
+
 ## Atomic disposal of related payloads
 
 `Engine.DisposeBatch` and `RetentionService.DisposeBatch` (Connect/gRPC) remove an explicit selection of fact/memory versions, terminal extraction jobs, snapshots and contexts in one PostgreSQL transaction. This resolves the mutual retention cycle in which a model response retains a proposed version while that live version blocks removal of the model artifacts. A batch may also select derived memories together with their source facts. It does not implicitly select related content or override blockers for copies outside the selection.

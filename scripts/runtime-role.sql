@@ -165,3 +165,8 @@ GRANT UPDATE(epoch) ON projection_retention_guards TO facts_retention;
 
 -- Only successful governed destination execution may acknowledge cleanup.
 GRANT INSERT ON projection_cleanup_acknowledgements TO facts_retention;
+
+-- Calculation ciphertext is independent of immutable run identity and lineage.
+GRANT SELECT,INSERT ON calculation_payloads TO facts_runtime;
+REVOKE UPDATE,DELETE,TRUNCATE ON calculation_payloads,calculation_receipts FROM facts_runtime;
+GRANT SELECT ON calculation_payloads TO facts_archiver;

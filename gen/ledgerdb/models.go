@@ -107,6 +107,12 @@ type CalculationArtifact struct {
 	Role          string
 }
 
+type CalculationPayload struct {
+	TenantID      string
+	CalculationID string
+	Payload       []byte
+}
+
 type CalculationReceipt struct {
 	TenantID       string
 	ID             string
@@ -116,7 +122,6 @@ type CalculationReceipt struct {
 	ExternalRunID  string
 	RequestDigest  string
 	LedgerRevision int64
-	Payload        []byte
 }
 
 type CalculationSnapshot struct {

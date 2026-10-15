@@ -31,6 +31,9 @@ func (t *transaction) Calculation(ctx context.Context, id string) (model.Calcula
 	if err != nil {
 		return r, translate(err)
 	}
+	if len(payload) == 0 {
+		return r, model.ErrPrecondition
+	}
 	err = t.decode(payload, &r)
 	return r, err
 }
@@ -43,6 +46,9 @@ func (t *transaction) CalculationRun(ctx context.Context, application, run strin
 	payload, err := ledgerdb.New(t.tx).GetCalculationRunPayload(ctx, ledgerdb.GetCalculationRunPayloadParams{TenantID: t.tenant, ApplicationID: application, ExternalRunID: run})
 	if err != nil {
 		return r, translate(err)
+	}
+	if len(payload) == 0 {
+		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
 	return r, err
@@ -130,7 +136,10 @@ func (t *transaction) flushAudit(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if err := ledgerdb.New(t.tx).InsertCalculationPayload(ctx, ledgerdb.InsertCalculationPayloadParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Receipt.Scope, SnapshotID: r.Receipt.SnapshotID, ApplicationID: r.Receipt.ApplicationID, ExternalRunID: r.Receipt.ExternalRunID, RequestDigest: r.Digest, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+		if err := ledgerdb.New(t.tx).InsertCalculationHeader(ctx, ledgerdb.InsertCalculationHeaderParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Receipt.Scope, SnapshotID: r.Receipt.SnapshotID, ApplicationID: r.Receipt.ApplicationID, ExternalRunID: r.Receipt.ExternalRunID, RequestDigest: r.Digest, LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err := ledgerdb.New(t.tx).InsertCalculationPayload(ctx, ledgerdb.InsertCalculationPayloadParams{TenantID: t.tenant, CalculationID: r.ID, Payload: b}); err != nil {
 			return err
 		}
 		for _, snap := range t.calculationSnapshots {
