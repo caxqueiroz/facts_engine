@@ -66,6 +66,9 @@ func (t *transaction) MemoryVersion(ctx context.Context, record, version string)
 	if err != nil {
 		return v, translate(err)
 	}
+	if len(payload) == 0 {
+		return v, model.ErrPrecondition
+	}
 	err = t.decode(payload, &v)
 	return v, err
 }
@@ -93,7 +96,11 @@ func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		err = ledgerdb.New(t.tx).InsertMemoryVersionPayload(ctx, ledgerdb.InsertMemoryVersionPayloadParams{TenantID: t.tenant, ID: v.ID, RecordID: v.RecordID, ScopeID: v.Proposal.Key.Scope, Subtype: v.Proposal.Subtype, SchemaVersion: v.Proposal.SchemaVersion, LedgerRevision: e.LedgerRevision, Payload: payload})
+		err = ledgerdb.New(t.tx).InsertMemoryVersionHeader(ctx, ledgerdb.InsertMemoryVersionHeaderParams{TenantID: t.tenant, ID: v.ID, RecordID: v.RecordID, ScopeID: v.Proposal.Key.Scope, Subtype: v.Proposal.Subtype, SchemaVersion: v.Proposal.SchemaVersion, LedgerRevision: e.LedgerRevision})
+		if err != nil {
+			return err
+		}
+		err = ledgerdb.New(t.tx).InsertMemoryVersionPayload(ctx, ledgerdb.InsertMemoryVersionPayloadParams{TenantID: t.tenant, VersionID: v.ID, Payload: payload})
 		if err != nil {
 			return err
 		}
@@ -134,6 +141,9 @@ func (t *transaction) MemoryVersions(ctx context.Context, record string, revisio
 		}
 		size += len(payload)
 		if len(out) >= 10000 || size > 64<<20 {
+			return nil, model.ErrPrecondition
+		}
+		if len(payload) == 0 {
 			return nil, model.ErrPrecondition
 		}
 		var version model.MemoryVersion

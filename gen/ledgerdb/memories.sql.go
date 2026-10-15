@@ -97,9 +97,10 @@ func (q *Queries) GetMemoryTypePayload(ctx context.Context, arg GetMemoryTypePay
 }
 
 const GetMemoryVersionPayload = `-- name: GetMemoryVersionPayload :one
-SELECT payload
-FROM memory_versions
-WHERE tenant_id=$1 AND record_id=$2 AND id=$3
+SELECT p.payload
+FROM memory_versions v
+LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.id=$3
 `
 
 type GetMemoryVersionPayloadParams struct {
@@ -237,12 +238,12 @@ func (q *Queries) InsertMemoryTypePayload(ctx context.Context, arg InsertMemoryT
 	return err
 }
 
-const InsertMemoryVersionPayload = `-- name: InsertMemoryVersionPayload :exec
-INSERT INTO memory_versions(tenant_id,id,record_id,scope_id,subtype,schema_version,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+const InsertMemoryVersionHeader = `-- name: InsertMemoryVersionHeader :exec
+INSERT INTO memory_versions(tenant_id,id,record_id,scope_id,subtype,schema_version,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
 `
 
-type InsertMemoryVersionPayloadParams struct {
+type InsertMemoryVersionHeaderParams struct {
 	TenantID       string
 	ID             string
 	RecordID       string
@@ -250,11 +251,10 @@ type InsertMemoryVersionPayloadParams struct {
 	Subtype        string
 	SchemaVersion  string
 	LedgerRevision int64
-	Payload        []byte
 }
 
-func (q *Queries) InsertMemoryVersionPayload(ctx context.Context, arg InsertMemoryVersionPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertMemoryVersionPayload,
+func (q *Queries) InsertMemoryVersionHeader(ctx context.Context, arg InsertMemoryVersionHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertMemoryVersionHeader,
 		arg.TenantID,
 		arg.ID,
 		arg.RecordID,
@@ -262,8 +262,22 @@ func (q *Queries) InsertMemoryVersionPayload(ctx context.Context, arg InsertMemo
 		arg.Subtype,
 		arg.SchemaVersion,
 		arg.LedgerRevision,
-		arg.Payload,
 	)
+	return err
+}
+
+const InsertMemoryVersionPayload = `-- name: InsertMemoryVersionPayload :exec
+INSERT INTO memory_version_payloads(tenant_id,version_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertMemoryVersionPayloadParams struct {
+	TenantID  string
+	VersionID string
+	Payload   []byte
+}
+
+func (q *Queries) InsertMemoryVersionPayload(ctx context.Context, arg InsertMemoryVersionPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertMemoryVersionPayload, arg.TenantID, arg.VersionID, arg.Payload)
 	return err
 }
 
@@ -324,9 +338,10 @@ func (q *Queries) ListMemoryAttestationPayloads(ctx context.Context, arg ListMem
 }
 
 const ListMemoryVersionPayloads = `-- name: ListMemoryVersionPayloads :many
-SELECT payload
-FROM memory_versions
-WHERE tenant_id=$1 AND record_id=$2 AND ledger_revision<=$3 ORDER BY ledger_revision,id LIMIT 10001
+SELECT p.payload
+FROM memory_versions v
+LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.ledger_revision<=$3 ORDER BY v.ledger_revision,v.id LIMIT 10001
 `
 
 type ListMemoryVersionPayloadsParams struct {

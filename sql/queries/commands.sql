@@ -70,13 +70,17 @@ VALUES ($1,$2,$3,$4,$5,$6,0)
 ON CONFLICT DO NOTHING;
 
 -- name: GetVersionPayload :one
-SELECT payload
-FROM record_versions
-WHERE tenant_id=$1 AND record_id=$2 AND id=$3;
+SELECT p.payload
+FROM record_versions v
+LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.id=$3;
+
+-- name: InsertVersionHeader :exec
+INSERT INTO record_versions (tenant_id,record_id,id,scope_id,predicate,schema_version,digest)
+VALUES ($1,$2,$3,$4,$5,$6,$7);
 
 -- name: InsertVersionPayload :exec
-INSERT INTO record_versions (tenant_id,record_id,id,scope_id,predicate,schema_version,digest,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+INSERT INTO fact_version_payloads(tenant_id,version_id,payload) VALUES($1,$2,$3);
 
 -- name: InsertVersionEvidence :exec
 INSERT INTO version_evidence (tenant_id,version_id,evidence_id,scope_id)

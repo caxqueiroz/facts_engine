@@ -305,6 +305,9 @@ func (t *transaction) Version(ctx context.Context, record, id string) (model.Ver
 	if err != nil {
 		return v, translate(err)
 	}
+	if len(b) == 0 {
+		return v, model.ErrPrecondition
+	}
 	err = t.decode(b, &v)
 	return v, err
 }
@@ -318,7 +321,11 @@ func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error 
 	if err != nil {
 		return err
 	}
-	err = ledgerdb.New(t.tx).InsertVersionPayload(ctx, ledgerdb.InsertVersionPayloadParams{TenantID: t.tenant, RecordID: v.RecordID, ID: v.ID, ScopeID: v.Proposal.Key.Scope, Predicate: v.Proposal.Key.Predicate, SchemaVersion: v.Proposal.SchemaVersion, Digest: v.Digest, Payload: b})
+	err = ledgerdb.New(t.tx).InsertVersionHeader(ctx, ledgerdb.InsertVersionHeaderParams{TenantID: t.tenant, RecordID: v.RecordID, ID: v.ID, ScopeID: v.Proposal.Key.Scope, Predicate: v.Proposal.Key.Predicate, SchemaVersion: v.Proposal.SchemaVersion, Digest: v.Digest})
+	if err != nil {
+		return err
+	}
+	err = ledgerdb.New(t.tx).InsertVersionPayload(ctx, ledgerdb.InsertVersionPayloadParams{TenantID: t.tenant, VersionID: v.ID, Payload: b})
 	if err != nil {
 		return err
 	}

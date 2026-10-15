@@ -160,6 +160,9 @@ func (t *transaction) Versions(ctx context.Context, record string, revision int6
 		if err := rows.Scan(&b); err != nil {
 			return nil, err
 		}
+		if len(b) == 0 {
+			return nil, model.ErrPrecondition
+		}
 		var v model.Version
 		if err := t.decode(b, &v); err != nil {
 			return nil, err

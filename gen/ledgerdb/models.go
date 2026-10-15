@@ -451,6 +451,12 @@ type FactSnapshotPayload struct {
 	Payload    []byte
 }
 
+type FactVersionPayload struct {
+	TenantID  string
+	VersionID string
+	Payload   []byte
+}
+
 type LedgerEvent struct {
 	TenantID       string
 	ID             string
@@ -558,8 +564,13 @@ type MemoryVersion struct {
 	Subtype        string
 	SchemaVersion  string
 	LedgerRevision int64
-	Payload        []byte
 	Kind           string
+}
+
+type MemoryVersionPayload struct {
+	TenantID  string
+	VersionID string
+	Payload   []byte
 }
 
 type Outbox struct {
@@ -653,7 +664,6 @@ type RecordVersion struct {
 	Predicate     string
 	SchemaVersion string
 	Digest        string
-	Payload       []byte
 	Kind          string
 }
 

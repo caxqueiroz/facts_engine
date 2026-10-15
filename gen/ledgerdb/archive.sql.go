@@ -508,9 +508,10 @@ func (q *Queries) ListArchiveMemoryType(ctx context.Context, arg ListArchiveMemo
 }
 
 const ListArchiveMemoryVersion = `-- name: ListArchiveMemoryVersion :many
-SELECT id,payload
-FROM memory_versions
-WHERE tenant_id=$1 AND ledger_revision=$2
+SELECT v.id,p.payload
+FROM memory_versions v
+LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.ledger_revision=$2
 `
 
 type ListArchiveMemoryVersionParams struct {
@@ -1343,9 +1344,10 @@ func (q *Queries) ListAuditMemoryType(ctx context.Context, arg ListAuditMemoryTy
 }
 
 const ListAuditMemoryVersion = `-- name: ListAuditMemoryVersion :many
-SELECT id,payload
-FROM memory_versions
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001
+SELECT v.id,p.payload
+FROM memory_versions v
+LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.scope_id=$2 ORDER BY v.ledger_revision LIMIT 10001
 `
 
 type ListAuditMemoryVersionParams struct {
@@ -1646,9 +1648,10 @@ func (q *Queries) ListAuditSubjectIdentity(ctx context.Context, arg ListAuditSub
 }
 
 const ListAuditVersion = `-- name: ListAuditVersion :many
-SELECT id,payload
-FROM record_versions
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001
+SELECT v.id,p.payload
+FROM record_versions v
+LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.scope_id=$2 ORDER BY v.id LIMIT 10001
 `
 
 type ListAuditVersionParams struct {

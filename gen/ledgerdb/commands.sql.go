@@ -207,9 +207,10 @@ func (q *Queries) GetRecord(ctx context.Context, arg GetRecordParams) (GetRecord
 }
 
 const GetVersionPayload = `-- name: GetVersionPayload :one
-SELECT payload
-FROM record_versions
-WHERE tenant_id=$1 AND record_id=$2 AND id=$3
+SELECT p.payload
+FROM record_versions v
+LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.id=$3
 `
 
 type GetVersionPayloadParams struct {
@@ -526,12 +527,12 @@ func (q *Queries) InsertVersionEvidence(ctx context.Context, arg InsertVersionEv
 	return err
 }
 
-const InsertVersionPayload = `-- name: InsertVersionPayload :exec
-INSERT INTO record_versions (tenant_id,record_id,id,scope_id,predicate,schema_version,digest,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+const InsertVersionHeader = `-- name: InsertVersionHeader :exec
+INSERT INTO record_versions (tenant_id,record_id,id,scope_id,predicate,schema_version,digest)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
 `
 
-type InsertVersionPayloadParams struct {
+type InsertVersionHeaderParams struct {
 	TenantID      string
 	RecordID      string
 	ID            string
@@ -539,11 +540,10 @@ type InsertVersionPayloadParams struct {
 	Predicate     string
 	SchemaVersion string
 	Digest        string
-	Payload       []byte
 }
 
-func (q *Queries) InsertVersionPayload(ctx context.Context, arg InsertVersionPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertVersionPayload,
+func (q *Queries) InsertVersionHeader(ctx context.Context, arg InsertVersionHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertVersionHeader,
 		arg.TenantID,
 		arg.RecordID,
 		arg.ID,
@@ -551,8 +551,22 @@ func (q *Queries) InsertVersionPayload(ctx context.Context, arg InsertVersionPay
 		arg.Predicate,
 		arg.SchemaVersion,
 		arg.Digest,
-		arg.Payload,
 	)
+	return err
+}
+
+const InsertVersionPayload = `-- name: InsertVersionPayload :exec
+INSERT INTO fact_version_payloads(tenant_id,version_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertVersionPayloadParams struct {
+	TenantID  string
+	VersionID string
+	Payload   []byte
+}
+
+func (q *Queries) InsertVersionPayload(ctx context.Context, arg InsertVersionPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertVersionPayload, arg.TenantID, arg.VersionID, arg.Payload)
 	return err
 }
 
