@@ -30,6 +30,20 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 			scopes[b.Scope] = true
 		}
 	}
+	for _, item := range r.Evidence {
+		if !model.ValidID(item.Scope) || !model.ValidID(item.EvidenceID) || !model.ValidID(item.PolicyID) || !model.ValidID(item.Jurisdiction) || r.Purpose == "" || len(r.Purpose) > 256 || item.Command != r.Command || item.Reason != r.Reason || len(item.DerivativeEvidenceIDs) > 31 {
+			return model.DisposalBatchResult{}, model.ErrInvalid
+		}
+		ids := append([]string{item.EvidenceID}, item.DerivativeEvidenceIDs...)
+		for _, id := range ids {
+			key := "evidence/" + id
+			if !model.ValidID(id) || seen[key] {
+				return model.DisposalBatchResult{}, model.ErrInvalid
+			}
+			seen[key] = true
+		}
+		scopes[item.Scope] = true
+	}
 	for _, e := range r.Extractions {
 		key := "extraction/" + e.JobID
 		if !model.ValidID(e.JobID) || seen[key] || e.Command != r.Command || e.Reason != r.Reason {
@@ -190,6 +204,15 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 				return model.DisposalBatchResult{}, err
 			}
 			revisions[i] = revision
+		}
+	}
+	for _, item := range r.Evidence {
+		if len(item.DerivativeEvidenceIDs) > 0 {
+			if err := t.DisposeEvidenceLineage(ctx, item); err != nil {
+				return model.DisposalBatchResult{}, err
+			}
+		} else if err := t.DisposeEvidence(ctx, item); err != nil {
+			return model.DisposalBatchResult{}, err
 		}
 	}
 	return model.DisposalBatchResult{VersionRevisions: revisions, AttestationRevisions: attestationRevisions}, nil

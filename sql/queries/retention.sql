@@ -38,8 +38,8 @@ WHERE r.tenant_id=h.tenant_id AND r.scope_id=h.scope_id AND r.id=h.id) ORDER BY 
 
 -- name: HasExtractionRedactionReference :one
 SELECT EXISTS(SELECT 1
-FROM extraction_redactions
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM extraction_redactions r JOIN extraction_job_payloads p ON p.tenant_id=r.tenant_id AND p.job_id=r.job_id
+WHERE r.tenant_id=$1 AND r.evidence_id=$2);
 
 -- name: HasEvidenceDerivative :one
 SELECT EXISTS(SELECT 1
@@ -53,28 +53,30 @@ WHERE m.tenant_id=$1 AND m.evidence_id=$2);
 
 -- name: HasMemoryEvidenceReference :one
 SELECT EXISTS(SELECT 1
-FROM memory_evidence
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM memory_evidence e JOIN memory_version_payloads p ON p.tenant_id=e.tenant_id AND p.version_id=e.version_id
+WHERE e.tenant_id=$1 AND e.evidence_id=$2);
 
 -- name: HasFactEvidenceReference :one
 SELECT EXISTS(SELECT 1
-FROM version_evidence
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM version_evidence e JOIN fact_version_payloads p ON p.tenant_id=e.tenant_id AND p.version_id=e.version_id
+WHERE e.tenant_id=$1 AND e.evidence_id=$2);
 
 -- name: HasConfirmationReference :one
 SELECT EXISTS(SELECT 1
-FROM confirmation_artifacts
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM confirmation_artifacts c JOIN fact_attestation_payloads p ON p.tenant_id=c.tenant_id AND p.attestation_id=c.attestation_id
+WHERE c.tenant_id=$1 AND c.evidence_id=$2)
+OR EXISTS(SELECT 1 FROM confirmation_artifacts c JOIN memory_attestation_payloads p ON p.tenant_id=c.tenant_id AND p.attestation_id=c.attestation_id
+WHERE c.tenant_id=$1 AND c.evidence_id=$2);
 
 -- name: HasMemoryAttestationReference :one
 SELECT EXISTS(SELECT 1
-FROM memory_attestations
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM memory_attestations a JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.evidence_id=$2);
 
 -- name: HasFactAttestationReference :one
 SELECT EXISTS(SELECT 1
-FROM attestations
-WHERE tenant_id=$1 AND evidence_id=$2);
+FROM attestations a JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.evidence_id=$2);
 
 -- name: HasCalculationArtifactReference :one
 SELECT EXISTS(SELECT 1

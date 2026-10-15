@@ -14,10 +14,34 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 	}
 	r.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
 	r.Extractions = append([]model.ExtractionDisposalRequest(nil), r.Extractions...)
+	r.Evidence = append([]model.EvidenceDisposalRequest(nil), r.Evidence...)
 	r.Conversations = append([]model.ConversationDisposalRequest(nil), r.Conversations...)
 	r.Attestations = append([]model.AttestationDisposalRequest(nil), r.Attestations...)
 	selected := map[string]bool{}
 	scopes := map[string]bool{}
+	for i := range r.Evidence {
+		item := &r.Evidence[i]
+		if !model.ValidID(item.Scope) || !model.ValidID(item.EvidenceID) || !model.ValidID(item.PolicyID) || !model.ValidID(item.Jurisdiction) || r.Purpose == "" || len(r.Purpose) > 256 || (item.Command != (model.Command{}) && item.Command != r.Command) || (item.Reason != "" && item.Reason != r.Reason) || len(item.DerivativeEvidenceIDs) > 31 {
+			return r, model.ErrInvalid
+		}
+		item.DerivativeEvidenceIDs = append([]string(nil), item.DerivativeEvidenceIDs...)
+		key := "evidence/" + item.EvidenceID
+		if selected[key] {
+			return r, model.ErrInvalid
+		}
+		selected[key] = true
+		item.Command, item.Reason = r.Command, r.Reason
+		for _, id := range item.DerivativeEvidenceIDs {
+			key = "evidence/" + id
+			if !model.ValidID(id) || selected[key] {
+				return r, model.ErrInvalid
+			}
+			selected[key] = true
+		}
+		sort.Strings(item.DerivativeEvidenceIDs)
+		scopes[item.Scope] = true
+	}
+	sort.Slice(r.Evidence, func(i, j int) bool { return r.Evidence[i].EvidenceID < r.Evidence[j].EvidenceID })
 	for i := range r.Versions {
 		v := &r.Versions[i]
 		key := v.Kind + "/" + v.VersionID
@@ -206,6 +230,11 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 	if err = check(); err != nil {
 		return model.CommitResult{}, err
 	}
+	if len(r.Evidence) > 0 {
+		if err = s.checkDisposalDomain(ctx); err != nil {
+			return model.CommitResult{}, err
+		}
+	}
 	return s.mutate(ctx, c, r.Scope, "dispose_batch", "can_dispose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
 		batch, ok := tx.(model.DisposalBatchTx)
 		if !ok {
@@ -312,6 +341,13 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 			}
 			event := model.RetentionEvent{Scope: v.Scope, Kind: "dispose_" + v.Kind + "_payload", TargetID: v.VersionID, VersionDisposal: &v, AdditionalAuthorization: receipts, Limitations: []string{"structural_metadata_retained", "projection_cleanup_requires_acknowledgements", "source_evidence_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
 			if err = appendChild(event, v.Kind, v.RecordID, v.VersionID, batchResult.VersionRevisions[i]); err != nil {
+				return err
+			}
+		}
+		for _, item := range r.Evidence {
+			d := decisions[item.Scope]
+			event := model.RetentionEvent{Scope: item.Scope, Kind: "dispose_evidence", TargetID: item.EvidenceID, Disposal: &item, AdditionalAuthorization: []model.AuthorizationDecision{d}, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy", "external_copies_require_separate_disposal"}}
+			if err = appendChild(event, "", "", "", 0); err != nil {
 				return err
 			}
 		}

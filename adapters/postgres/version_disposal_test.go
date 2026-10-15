@@ -45,6 +45,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "retention"} }
 	now := time.Now().UTC().Add(-time.Hour)
 	secret := "private retained value"
+	var sourceRef model.ObjectRef
 	for _, scope := range []string{"a", "z"} {
 		registerTestIdentities(t, ctx, normal, c.Tenant, scope, []string{"subject"})
 		policy := model.AcceptancePolicy{Scope: scope, ID: "manual", Mode: "manual", SourceClasses: []string{"customer"}}
@@ -62,6 +63,12 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 			t.Fatal(err)
 		}
 		if _, err = normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd(scope + "-evidence"), Evidence: model.Evidence{ID: scope + "-source", Scope: scope, SourceSystem: "test", SourceObject: scope, SourceRevision: "v1", Speaker: "customer", SourceClass: "customer", SourceTime: now, MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "source-policy", Object: ref}}); err != nil {
+			t.Fatal(err)
+		}
+		if scope == "a" {
+			sourceRef = ref
+		}
+		if _, err = engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(scope + "-source-policy"), Policy: model.RetentionPolicy{ID: "source-policy", Scope: scope, RecordClass: "evidence_bytes", Purpose: "retention", Jurisdiction: "SG"}}); err != nil {
 			t.Fatal(err)
 		}
 		for _, kind := range []string{"fact", "memory", "snapshot", "attestation"} {
@@ -231,7 +238,15 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	batchVersion := f
 	batchVersion.Command = model.Command{}
 	batchVersion.Reason = ""
-	batchRequest := model.DisposalBatchRequest{Command: cmd("dispose-fact-batch"), Scope: "a", Reason: "expired", Attestations: []model.AttestationDisposalRequest{attestation}, Versions: []model.VersionDisposalRequest{batchVersion}}
+	batchCommand := cmd("dispose-fact-batch")
+	batchRequest := model.DisposalBatchRequest{Command: batchCommand, Scope: "a", Reason: "expired", Attestations: []model.AttestationDisposalRequest{attestation}, Versions: []model.VersionDisposalRequest{batchVersion}, Evidence: []model.EvidenceDisposalRequest{{Command: batchCommand, Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "SG"}}}
+	evidenceOnly := model.DisposalBatchRequest{Command: cmd("dispose-evidence-alone"), Scope: "a", Reason: "expired", Evidence: []model.EvidenceDisposalRequest{{Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "SG"}}}
+	if _, err = engine.DisposeBatch(ctx, c, evidenceOnly); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("evidence references did not block partial batch", err)
+	}
+	if _, err = store.Read(ctx, c.Tenant, sourceRef); err != nil {
+		t.Fatal("blocked evidence batch deleted source bytes", err)
+	}
 	disposedFact, err := engine.DisposeBatch(ctx, c, batchRequest)
 	var finalStreamRevision int64
 	if err == nil {
@@ -239,6 +254,9 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	}
 	if err != nil || finalStreamRevision != accepted.StreamRevision+2 {
 		t.Fatal(disposedFact, err)
+	}
+	if _, err = store.Read(ctx, c.Tenant, sourceRef); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("coordinated batch retained source bytes", err)
 	}
 	testDisposalBatchRemote(t, ctx, engine, c, batchRequest, disposedFact)
 	replayArchives()

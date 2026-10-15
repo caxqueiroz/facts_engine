@@ -68,6 +68,9 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 	for _, item := range r.Attestations {
 		request.Attestations = append(request.Attestations, &v1.BatchAttestationSelection{Kind: item.Kind, Scope: item.Scope, RecordId: item.RecordID, VersionId: item.VersionID, AttestationId: item.AttestationID, PolicyId: item.PolicyID, Jurisdiction: item.Jurisdiction, Purpose: item.Purpose})
 	}
+	for _, item := range r.Evidence {
+		request.Evidence = append(request.Evidence, &v1.BatchEvidenceSelection{Scope: item.Scope, EvidenceId: item.EvidenceID, PolicyId: item.PolicyID, Jurisdiction: item.Jurisdiction, DerivativeEvidenceIds: append([]string(nil), item.DerivativeEvidenceIDs...)})
+	}
 	grpc := v1.NewRetentionServiceClient(governanceGRPC(t, engine, c))
 	first, err := grpc.DisposeBatch(ctx, request)
 	if err != nil || !proto.Equal(first.Result, &v1.CommitResult{Id: want.ID, RecordId: want.RecordID, VersionId: want.VersionID, RecordKind: want.RecordKind, ContentDigest: want.ContentDigest, StreamRevision: want.StreamRevision, LedgerRevision: want.LedgerRevision}) {
@@ -98,6 +101,7 @@ func testDisposalBatchRemote(t *testing.T, ctx context.Context, engine *facts.En
 	bad.Decisions = nil
 	bad.Conversations = nil
 	bad.Attestations = nil
+	bad.Evidence = nil
 	if out, err := grpc.DisposeBatch(ctx, bad); out != nil || grpcstatus.Code(err) != codes.InvalidArgument {
 		t.Fatal("batch selection missing", out, err)
 	}

@@ -348,6 +348,19 @@ message DisposeBatchRequest {
   repeated BatchDecisionSelection decisions = 10 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchConversationSelection conversations = 11 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchAttestationSelection attestations = 12 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchEvidenceSelection evidence = 13 [(buf.validate.field).repeated.max_items = 32];
+}
+message BatchEvidenceSelection {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string evidence_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated string derivative_evidence_ids = 5 [(buf.validate.field).repeated = {
+    max_items: 31
+    items: {
+      string: {pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"}
+    }
+  }];
 }
 message BatchAttestationSelection {
   string kind = 1 [

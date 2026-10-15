@@ -5,13 +5,15 @@ import (
 	"sort"
 )
 
-// DisposalBatchRequest explicitly selects related version, extraction,
-// snapshot, context, calculation and decision payloads. Child commands/reasons may be empty or equal to the parent; the
-// service normalizes them to the parent before authorization and replay checks.
-// Other retained copies remain blockers. Index removal remains asynchronous.
+// DisposalBatchRequest explicitly selects related evidence lineages, versions,
+// extraction artifacts and other retained payloads. Child commands/reasons may
+// be empty or equal to the parent; the service normalizes them to the parent
+// before authorization and replay checks. Other retained copies remain
+// blockers. Index removal remains asynchronous.
 type DisposalBatchRequest struct {
 	Command
 	Scope, Reason string
+	Evidence      []EvidenceDisposalRequest     `json:",omitempty"`
 	Conversations []ConversationDisposalRequest `json:",omitempty"`
 	Attestations  []AttestationDisposalRequest  `json:",omitempty"`
 	Decisions     []DecisionDisposalRequest     `json:",omitempty"`
@@ -39,6 +41,9 @@ type DisposalBatchResult struct {
 func (r DisposalBatchRequest) Scopes() []string {
 	scopes := map[string]bool{r.Scope: true}
 	for _, item := range r.Conversations {
+		scopes[item.Scope] = true
+	}
+	for _, item := range r.Evidence {
 		scopes[item.Scope] = true
 	}
 	for _, item := range r.Attestations {
@@ -85,5 +90,9 @@ func (r DisposalBatchRequest) Scopes() []string {
 
 // SelectionCount bounds the complete transaction across all artifact classes.
 func (r DisposalBatchRequest) SelectionCount() int {
-	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions) + len(r.Conversations) + len(r.Attestations)
+	count := len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions) + len(r.Conversations) + len(r.Attestations)
+	for _, item := range r.Evidence {
+		count += 1 + len(item.DerivativeEvidenceIDs)
+	}
+	return count
 }

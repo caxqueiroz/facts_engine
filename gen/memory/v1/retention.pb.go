@@ -2301,6 +2301,7 @@ type DisposeBatchRequest struct {
 	Decisions     []*BatchDecisionSelection     `protobuf:"bytes,10,rep,name=decisions,proto3" json:"decisions,omitempty"`
 	Conversations []*BatchConversationSelection `protobuf:"bytes,11,rep,name=conversations,proto3" json:"conversations,omitempty"`
 	Attestations  []*BatchAttestationSelection  `protobuf:"bytes,12,rep,name=attestations,proto3" json:"attestations,omitempty"`
+	Evidence      []*BatchEvidenceSelection     `protobuf:"bytes,13,rep,name=evidence,proto3" json:"evidence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2419,6 +2420,89 @@ func (x *DisposeBatchRequest) GetAttestations() []*BatchAttestationSelection {
 	return nil
 }
 
+func (x *DisposeBatchRequest) GetEvidence() []*BatchEvidenceSelection {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+type BatchEvidenceSelection struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Scope                 string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	EvidenceId            string                 `protobuf:"bytes,2,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
+	PolicyId              string                 `protobuf:"bytes,3,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Jurisdiction          string                 `protobuf:"bytes,4,opt,name=jurisdiction,proto3" json:"jurisdiction,omitempty"`
+	DerivativeEvidenceIds []string               `protobuf:"bytes,5,rep,name=derivative_evidence_ids,json=derivativeEvidenceIds,proto3" json:"derivative_evidence_ids,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *BatchEvidenceSelection) Reset() {
+	*x = BatchEvidenceSelection{}
+	mi := &file_memory_v1_retention_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchEvidenceSelection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchEvidenceSelection) ProtoMessage() {}
+
+func (x *BatchEvidenceSelection) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchEvidenceSelection.ProtoReflect.Descriptor instead.
+func (*BatchEvidenceSelection) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *BatchEvidenceSelection) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *BatchEvidenceSelection) GetEvidenceId() string {
+	if x != nil {
+		return x.EvidenceId
+	}
+	return ""
+}
+
+func (x *BatchEvidenceSelection) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *BatchEvidenceSelection) GetJurisdiction() string {
+	if x != nil {
+		return x.Jurisdiction
+	}
+	return ""
+}
+
+func (x *BatchEvidenceSelection) GetDerivativeEvidenceIds() []string {
+	if x != nil {
+		return x.DerivativeEvidenceIds
+	}
+	return nil
+}
+
 type BatchAttestationSelection struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
@@ -2435,7 +2519,7 @@ type BatchAttestationSelection struct {
 
 func (x *BatchAttestationSelection) Reset() {
 	*x = BatchAttestationSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[35]
+	mi := &file_memory_v1_retention_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2447,7 +2531,7 @@ func (x *BatchAttestationSelection) String() string {
 func (*BatchAttestationSelection) ProtoMessage() {}
 
 func (x *BatchAttestationSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[35]
+	mi := &file_memory_v1_retention_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2460,7 +2544,7 @@ func (x *BatchAttestationSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchAttestationSelection.ProtoReflect.Descriptor instead.
 func (*BatchAttestationSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{35}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *BatchAttestationSelection) GetKind() string {
@@ -2532,7 +2616,7 @@ type BatchConversationSelection struct {
 
 func (x *BatchConversationSelection) Reset() {
 	*x = BatchConversationSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[36]
+	mi := &file_memory_v1_retention_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2544,7 +2628,7 @@ func (x *BatchConversationSelection) String() string {
 func (*BatchConversationSelection) ProtoMessage() {}
 
 func (x *BatchConversationSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[36]
+	mi := &file_memory_v1_retention_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2557,7 +2641,7 @@ func (x *BatchConversationSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchConversationSelection.ProtoReflect.Descriptor instead.
 func (*BatchConversationSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{36}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *BatchConversationSelection) GetConversationId() string {
@@ -2604,7 +2688,7 @@ type DisposeBatchResponse struct {
 
 func (x *DisposeBatchResponse) Reset() {
 	*x = DisposeBatchResponse{}
-	mi := &file_memory_v1_retention_proto_msgTypes[37]
+	mi := &file_memory_v1_retention_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2616,7 +2700,7 @@ func (x *DisposeBatchResponse) String() string {
 func (*DisposeBatchResponse) ProtoMessage() {}
 
 func (x *DisposeBatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[37]
+	mi := &file_memory_v1_retention_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2629,7 +2713,7 @@ func (x *DisposeBatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisposeBatchResponse.ProtoReflect.Descriptor instead.
 func (*DisposeBatchResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{37}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *DisposeBatchResponse) GetResult() *CommitResult {
@@ -2649,7 +2733,7 @@ type BatchSnapshotSelection struct {
 
 func (x *BatchSnapshotSelection) Reset() {
 	*x = BatchSnapshotSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[38]
+	mi := &file_memory_v1_retention_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2661,7 +2745,7 @@ func (x *BatchSnapshotSelection) String() string {
 func (*BatchSnapshotSelection) ProtoMessage() {}
 
 func (x *BatchSnapshotSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[38]
+	mi := &file_memory_v1_retention_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2674,7 +2758,7 @@ func (x *BatchSnapshotSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchSnapshotSelection.ProtoReflect.Descriptor instead.
 func (*BatchSnapshotSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{38}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *BatchSnapshotSelection) GetSnapshotId() string {
@@ -2701,7 +2785,7 @@ type BatchContextSelection struct {
 
 func (x *BatchContextSelection) Reset() {
 	*x = BatchContextSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[39]
+	mi := &file_memory_v1_retention_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2713,7 +2797,7 @@ func (x *BatchContextSelection) String() string {
 func (*BatchContextSelection) ProtoMessage() {}
 
 func (x *BatchContextSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[39]
+	mi := &file_memory_v1_retention_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2726,7 +2810,7 @@ func (x *BatchContextSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchContextSelection.ProtoReflect.Descriptor instead.
 func (*BatchContextSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{39}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *BatchContextSelection) GetContextId() string {
@@ -2753,7 +2837,7 @@ type BatchCalculationSelection struct {
 
 func (x *BatchCalculationSelection) Reset() {
 	*x = BatchCalculationSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[40]
+	mi := &file_memory_v1_retention_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2765,7 +2849,7 @@ func (x *BatchCalculationSelection) String() string {
 func (*BatchCalculationSelection) ProtoMessage() {}
 
 func (x *BatchCalculationSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[40]
+	mi := &file_memory_v1_retention_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2778,7 +2862,7 @@ func (x *BatchCalculationSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchCalculationSelection.ProtoReflect.Descriptor instead.
 func (*BatchCalculationSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{40}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *BatchCalculationSelection) GetCalculationId() string {
@@ -2806,7 +2890,7 @@ type CalculationRetentionBinding struct {
 
 func (x *CalculationRetentionBinding) Reset() {
 	*x = CalculationRetentionBinding{}
-	mi := &file_memory_v1_retention_proto_msgTypes[41]
+	mi := &file_memory_v1_retention_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2818,7 +2902,7 @@ func (x *CalculationRetentionBinding) String() string {
 func (*CalculationRetentionBinding) ProtoMessage() {}
 
 func (x *CalculationRetentionBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[41]
+	mi := &file_memory_v1_retention_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2831,7 +2915,7 @@ func (x *CalculationRetentionBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculationRetentionBinding.ProtoReflect.Descriptor instead.
 func (*CalculationRetentionBinding) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{41}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CalculationRetentionBinding) GetScope() string {
@@ -2865,7 +2949,7 @@ type BatchDecisionSelection struct {
 
 func (x *BatchDecisionSelection) Reset() {
 	*x = BatchDecisionSelection{}
-	mi := &file_memory_v1_retention_proto_msgTypes[42]
+	mi := &file_memory_v1_retention_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2877,7 +2961,7 @@ func (x *BatchDecisionSelection) String() string {
 func (*BatchDecisionSelection) ProtoMessage() {}
 
 func (x *BatchDecisionSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[42]
+	mi := &file_memory_v1_retention_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2890,7 +2974,7 @@ func (x *BatchDecisionSelection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchDecisionSelection.ProtoReflect.Descriptor instead.
 func (*BatchDecisionSelection) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{42}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *BatchDecisionSelection) GetDecisionId() string {
@@ -2918,7 +3002,7 @@ type DecisionRetentionBinding struct {
 
 func (x *DecisionRetentionBinding) Reset() {
 	*x = DecisionRetentionBinding{}
-	mi := &file_memory_v1_retention_proto_msgTypes[43]
+	mi := &file_memory_v1_retention_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2930,7 +3014,7 @@ func (x *DecisionRetentionBinding) String() string {
 func (*DecisionRetentionBinding) ProtoMessage() {}
 
 func (x *DecisionRetentionBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_retention_proto_msgTypes[43]
+	mi := &file_memory_v1_retention_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2943,7 +3027,7 @@ func (x *DecisionRetentionBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecisionRetentionBinding.ProtoReflect.Descriptor instead.
 func (*DecisionRetentionBinding) Descriptor() ([]byte, []int) {
-	return file_memory_v1_retention_proto_rawDescGZIP(), []int{43}
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DecisionRetentionBinding) GetScope() string {
@@ -3164,7 +3248,7 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\bbindings\x18\x05 \x03(\v2\".memory.v1.VersionRetentionBindingB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\bbindings\"\xac\x01\n" +
 	"\x18BatchExtractionSelection\x12@\n" +
 	"\x06job_id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05jobId\x12N\n" +
-	"\bbindings\x18\x02 \x03(\v2%.memory.v1.ExtractionRetentionBindingB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\bbindings\"\xe9\x06\n" +
+	"\bbindings\x18\x02 \x03(\v2%.memory.v1.ExtractionRetentionBindingB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\bbindings\"\xb2\a\n" +
 	"\x13DisposeBatchRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
@@ -3179,7 +3263,15 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\tdecisions\x18\n" +
 	" \x03(\v2!.memory.v1.BatchDecisionSelectionB\b\xbaH\x05\x92\x01\x02\x10 R\tdecisions\x12U\n" +
 	"\rconversations\x18\v \x03(\v2%.memory.v1.BatchConversationSelectionB\b\xbaH\x05\x92\x01\x02\x10 R\rconversations\x12R\n" +
-	"\fattestations\x18\f \x03(\v2$.memory.v1.BatchAttestationSelectionB\b\xbaH\x05\x92\x01\x02\x10 R\fattestations\"\xa6\x04\n" +
+	"\fattestations\x18\f \x03(\v2$.memory.v1.BatchAttestationSelectionB\b\xbaH\x05\x92\x01\x02\x10 R\fattestations\x12G\n" +
+	"\bevidence\x18\r \x03(\v2!.memory.v1.BatchEvidenceSelectionB\b\xbaH\x05\x92\x01\x02\x10 R\bevidence\"\xa6\x03\n" +
+	"\x16BatchEvidenceSelection\x12?\n" +
+	"\x05scope\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12J\n" +
+	"\vevidence_id\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\n" +
+	"evidenceId\x12F\n" +
+	"\tpolicy_id\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\bpolicyId\x12M\n" +
+	"\fjurisdiction\x18\x04 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\fjurisdiction\x12h\n" +
+	"\x17derivative_evidence_ids\x18\x05 \x03(\tB0\xbaH-\x92\x01*\x10\x1f\"&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x15derivativeEvidenceIds\"\xa6\x04\n" +
 	"\x19BatchAttestationSelection\x12'\n" +
 	"\x04kind\x18\x01 \x01(\tB\x13\xbaH\x10r\x0eR\x04factR\x06memoryR\x04kind\x12?\n" +
 	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12F\n" +
@@ -3252,7 +3344,7 @@ func file_memory_v1_retention_proto_rawDescGZIP() []byte {
 	return file_memory_v1_retention_proto_rawDescData
 }
 
-var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_memory_v1_retention_proto_goTypes = []any{
 	(*RetentionPolicy)(nil),                 // 0: memory.v1.RetentionPolicy
 	(*DisposeAttestationRequest)(nil),       // 1: memory.v1.DisposeAttestationRequest
@@ -3289,103 +3381,105 @@ var file_memory_v1_retention_proto_goTypes = []any{
 	(*BatchVersionSelection)(nil),           // 32: memory.v1.BatchVersionSelection
 	(*BatchExtractionSelection)(nil),        // 33: memory.v1.BatchExtractionSelection
 	(*DisposeBatchRequest)(nil),             // 34: memory.v1.DisposeBatchRequest
-	(*BatchAttestationSelection)(nil),       // 35: memory.v1.BatchAttestationSelection
-	(*BatchConversationSelection)(nil),      // 36: memory.v1.BatchConversationSelection
-	(*DisposeBatchResponse)(nil),            // 37: memory.v1.DisposeBatchResponse
-	(*BatchSnapshotSelection)(nil),          // 38: memory.v1.BatchSnapshotSelection
-	(*BatchContextSelection)(nil),           // 39: memory.v1.BatchContextSelection
-	(*BatchCalculationSelection)(nil),       // 40: memory.v1.BatchCalculationSelection
-	(*CalculationRetentionBinding)(nil),     // 41: memory.v1.CalculationRetentionBinding
-	(*BatchDecisionSelection)(nil),          // 42: memory.v1.BatchDecisionSelection
-	(*DecisionRetentionBinding)(nil),        // 43: memory.v1.DecisionRetentionBinding
-	(*Command)(nil),                         // 44: memory.v1.Command
-	(*CommitResult)(nil),                    // 45: memory.v1.CommitResult
-	(*timestamppb.Timestamp)(nil),           // 46: google.protobuf.Timestamp
-	(*ObjectRef)(nil),                       // 47: memory.v1.ObjectRef
+	(*BatchEvidenceSelection)(nil),          // 35: memory.v1.BatchEvidenceSelection
+	(*BatchAttestationSelection)(nil),       // 36: memory.v1.BatchAttestationSelection
+	(*BatchConversationSelection)(nil),      // 37: memory.v1.BatchConversationSelection
+	(*DisposeBatchResponse)(nil),            // 38: memory.v1.DisposeBatchResponse
+	(*BatchSnapshotSelection)(nil),          // 39: memory.v1.BatchSnapshotSelection
+	(*BatchContextSelection)(nil),           // 40: memory.v1.BatchContextSelection
+	(*BatchCalculationSelection)(nil),       // 41: memory.v1.BatchCalculationSelection
+	(*CalculationRetentionBinding)(nil),     // 42: memory.v1.CalculationRetentionBinding
+	(*BatchDecisionSelection)(nil),          // 43: memory.v1.BatchDecisionSelection
+	(*DecisionRetentionBinding)(nil),        // 44: memory.v1.DecisionRetentionBinding
+	(*Command)(nil),                         // 45: memory.v1.Command
+	(*CommitResult)(nil),                    // 46: memory.v1.CommitResult
+	(*timestamppb.Timestamp)(nil),           // 47: google.protobuf.Timestamp
+	(*ObjectRef)(nil),                       // 48: memory.v1.ObjectRef
 }
 var file_memory_v1_retention_proto_depIdxs = []int32{
-	44, // 0: memory.v1.DisposeAttestationRequest.command:type_name -> memory.v1.Command
-	45, // 1: memory.v1.DisposeAttestationResponse.result:type_name -> memory.v1.CommitResult
-	44, // 2: memory.v1.DisposeConversationRequest.command:type_name -> memory.v1.Command
-	45, // 3: memory.v1.DisposeConversationResponse.result:type_name -> memory.v1.CommitResult
-	44, // 4: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
+	45, // 0: memory.v1.DisposeAttestationRequest.command:type_name -> memory.v1.Command
+	46, // 1: memory.v1.DisposeAttestationResponse.result:type_name -> memory.v1.CommitResult
+	45, // 2: memory.v1.DisposeConversationRequest.command:type_name -> memory.v1.Command
+	46, // 3: memory.v1.DisposeConversationResponse.result:type_name -> memory.v1.CommitResult
+	45, // 4: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
 	0,  // 5: memory.v1.RegisterRetentionPolicyRequest.policy:type_name -> memory.v1.RetentionPolicy
-	45, // 6: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
-	44, // 7: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
-	45, // 8: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	44, // 9: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
-	45, // 10: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	44, // 11: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
-	45, // 12: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	46, // 6: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
+	45, // 7: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
+	46, // 8: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	45, // 9: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
+	46, // 10: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	45, // 11: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
+	46, // 12: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
 	15, // 13: memory.v1.GetRetentionStatusResponse.status:type_name -> memory.v1.RetentionStatus
-	46, // 14: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
-	44, // 15: memory.v1.DisposeOrphanEvidenceRequest.command:type_name -> memory.v1.Command
-	47, // 16: memory.v1.DisposeOrphanEvidenceRequest.object:type_name -> memory.v1.ObjectRef
-	45, // 17: memory.v1.DisposeOrphanEvidenceResponse.result:type_name -> memory.v1.CommitResult
-	44, // 18: memory.v1.DisposeSnapshotRequest.command:type_name -> memory.v1.Command
+	47, // 14: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
+	45, // 15: memory.v1.DisposeOrphanEvidenceRequest.command:type_name -> memory.v1.Command
+	48, // 16: memory.v1.DisposeOrphanEvidenceRequest.object:type_name -> memory.v1.ObjectRef
+	46, // 17: memory.v1.DisposeOrphanEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	45, // 18: memory.v1.DisposeSnapshotRequest.command:type_name -> memory.v1.Command
 	18, // 19: memory.v1.DisposeSnapshotRequest.bindings:type_name -> memory.v1.SnapshotRetentionBinding
-	45, // 20: memory.v1.DisposeSnapshotResponse.result:type_name -> memory.v1.CommitResult
-	44, // 21: memory.v1.DisposeContextRequest.command:type_name -> memory.v1.Command
+	46, // 20: memory.v1.DisposeSnapshotResponse.result:type_name -> memory.v1.CommitResult
+	45, // 21: memory.v1.DisposeContextRequest.command:type_name -> memory.v1.Command
 	21, // 22: memory.v1.DisposeContextRequest.bindings:type_name -> memory.v1.ContextRetentionBinding
-	45, // 23: memory.v1.DisposeContextResponse.result:type_name -> memory.v1.CommitResult
-	44, // 24: memory.v1.DisposeExtractionRequest.command:type_name -> memory.v1.Command
+	46, // 23: memory.v1.DisposeContextResponse.result:type_name -> memory.v1.CommitResult
+	45, // 24: memory.v1.DisposeExtractionRequest.command:type_name -> memory.v1.Command
 	24, // 25: memory.v1.DisposeExtractionRequest.bindings:type_name -> memory.v1.ExtractionRetentionBinding
-	45, // 26: memory.v1.DisposeExtractionResponse.result:type_name -> memory.v1.CommitResult
-	44, // 27: memory.v1.DisposeVersionRequest.command:type_name -> memory.v1.Command
+	46, // 26: memory.v1.DisposeExtractionResponse.result:type_name -> memory.v1.CommitResult
+	45, // 27: memory.v1.DisposeVersionRequest.command:type_name -> memory.v1.Command
 	27, // 28: memory.v1.DisposeVersionRequest.bindings:type_name -> memory.v1.VersionRetentionBinding
-	45, // 29: memory.v1.DisposeVersionResponse.result:type_name -> memory.v1.CommitResult
-	44, // 30: memory.v1.CleanupProjectionRequest.command:type_name -> memory.v1.Command
+	46, // 29: memory.v1.DisposeVersionResponse.result:type_name -> memory.v1.CommitResult
+	45, // 30: memory.v1.CleanupProjectionRequest.command:type_name -> memory.v1.Command
 	27, // 31: memory.v1.CleanupProjectionRequest.bindings:type_name -> memory.v1.VersionRetentionBinding
-	45, // 32: memory.v1.CleanupProjectionResponse.result:type_name -> memory.v1.CommitResult
+	46, // 32: memory.v1.CleanupProjectionResponse.result:type_name -> memory.v1.CommitResult
 	27, // 33: memory.v1.BatchVersionSelection.bindings:type_name -> memory.v1.VersionRetentionBinding
 	24, // 34: memory.v1.BatchExtractionSelection.bindings:type_name -> memory.v1.ExtractionRetentionBinding
-	44, // 35: memory.v1.DisposeBatchRequest.command:type_name -> memory.v1.Command
+	45, // 35: memory.v1.DisposeBatchRequest.command:type_name -> memory.v1.Command
 	32, // 36: memory.v1.DisposeBatchRequest.versions:type_name -> memory.v1.BatchVersionSelection
 	33, // 37: memory.v1.DisposeBatchRequest.extractions:type_name -> memory.v1.BatchExtractionSelection
-	38, // 38: memory.v1.DisposeBatchRequest.snapshots:type_name -> memory.v1.BatchSnapshotSelection
-	39, // 39: memory.v1.DisposeBatchRequest.contexts:type_name -> memory.v1.BatchContextSelection
-	40, // 40: memory.v1.DisposeBatchRequest.calculations:type_name -> memory.v1.BatchCalculationSelection
-	42, // 41: memory.v1.DisposeBatchRequest.decisions:type_name -> memory.v1.BatchDecisionSelection
-	36, // 42: memory.v1.DisposeBatchRequest.conversations:type_name -> memory.v1.BatchConversationSelection
-	35, // 43: memory.v1.DisposeBatchRequest.attestations:type_name -> memory.v1.BatchAttestationSelection
-	45, // 44: memory.v1.DisposeBatchResponse.result:type_name -> memory.v1.CommitResult
-	18, // 45: memory.v1.BatchSnapshotSelection.bindings:type_name -> memory.v1.SnapshotRetentionBinding
-	21, // 46: memory.v1.BatchContextSelection.bindings:type_name -> memory.v1.ContextRetentionBinding
-	41, // 47: memory.v1.BatchCalculationSelection.bindings:type_name -> memory.v1.CalculationRetentionBinding
-	43, // 48: memory.v1.BatchDecisionSelection.bindings:type_name -> memory.v1.DecisionRetentionBinding
-	34, // 49: memory.v1.RetentionService.DisposeBatch:input_type -> memory.v1.DisposeBatchRequest
-	1,  // 50: memory.v1.RetentionService.DisposeAttestation:input_type -> memory.v1.DisposeAttestationRequest
-	3,  // 51: memory.v1.RetentionService.DisposeConversation:input_type -> memory.v1.DisposeConversationRequest
-	5,  // 52: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
-	7,  // 53: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
-	9,  // 54: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
-	11, // 55: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
-	30, // 56: memory.v1.RetentionService.CleanupProjection:input_type -> memory.v1.CleanupProjectionRequest
-	28, // 57: memory.v1.RetentionService.DisposeVersion:input_type -> memory.v1.DisposeVersionRequest
-	25, // 58: memory.v1.RetentionService.DisposeExtraction:input_type -> memory.v1.DisposeExtractionRequest
-	22, // 59: memory.v1.RetentionService.DisposeContext:input_type -> memory.v1.DisposeContextRequest
-	19, // 60: memory.v1.RetentionService.DisposeSnapshot:input_type -> memory.v1.DisposeSnapshotRequest
-	16, // 61: memory.v1.RetentionService.DisposeOrphanEvidence:input_type -> memory.v1.DisposeOrphanEvidenceRequest
-	13, // 62: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
-	37, // 63: memory.v1.RetentionService.DisposeBatch:output_type -> memory.v1.DisposeBatchResponse
-	2,  // 64: memory.v1.RetentionService.DisposeAttestation:output_type -> memory.v1.DisposeAttestationResponse
-	4,  // 65: memory.v1.RetentionService.DisposeConversation:output_type -> memory.v1.DisposeConversationResponse
-	6,  // 66: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
-	8,  // 67: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
-	10, // 68: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
-	12, // 69: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
-	31, // 70: memory.v1.RetentionService.CleanupProjection:output_type -> memory.v1.CleanupProjectionResponse
-	29, // 71: memory.v1.RetentionService.DisposeVersion:output_type -> memory.v1.DisposeVersionResponse
-	26, // 72: memory.v1.RetentionService.DisposeExtraction:output_type -> memory.v1.DisposeExtractionResponse
-	23, // 73: memory.v1.RetentionService.DisposeContext:output_type -> memory.v1.DisposeContextResponse
-	20, // 74: memory.v1.RetentionService.DisposeSnapshot:output_type -> memory.v1.DisposeSnapshotResponse
-	17, // 75: memory.v1.RetentionService.DisposeOrphanEvidence:output_type -> memory.v1.DisposeOrphanEvidenceResponse
-	14, // 76: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
-	63, // [63:77] is the sub-list for method output_type
-	49, // [49:63] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	39, // 38: memory.v1.DisposeBatchRequest.snapshots:type_name -> memory.v1.BatchSnapshotSelection
+	40, // 39: memory.v1.DisposeBatchRequest.contexts:type_name -> memory.v1.BatchContextSelection
+	41, // 40: memory.v1.DisposeBatchRequest.calculations:type_name -> memory.v1.BatchCalculationSelection
+	43, // 41: memory.v1.DisposeBatchRequest.decisions:type_name -> memory.v1.BatchDecisionSelection
+	37, // 42: memory.v1.DisposeBatchRequest.conversations:type_name -> memory.v1.BatchConversationSelection
+	36, // 43: memory.v1.DisposeBatchRequest.attestations:type_name -> memory.v1.BatchAttestationSelection
+	35, // 44: memory.v1.DisposeBatchRequest.evidence:type_name -> memory.v1.BatchEvidenceSelection
+	46, // 45: memory.v1.DisposeBatchResponse.result:type_name -> memory.v1.CommitResult
+	18, // 46: memory.v1.BatchSnapshotSelection.bindings:type_name -> memory.v1.SnapshotRetentionBinding
+	21, // 47: memory.v1.BatchContextSelection.bindings:type_name -> memory.v1.ContextRetentionBinding
+	42, // 48: memory.v1.BatchCalculationSelection.bindings:type_name -> memory.v1.CalculationRetentionBinding
+	44, // 49: memory.v1.BatchDecisionSelection.bindings:type_name -> memory.v1.DecisionRetentionBinding
+	34, // 50: memory.v1.RetentionService.DisposeBatch:input_type -> memory.v1.DisposeBatchRequest
+	1,  // 51: memory.v1.RetentionService.DisposeAttestation:input_type -> memory.v1.DisposeAttestationRequest
+	3,  // 52: memory.v1.RetentionService.DisposeConversation:input_type -> memory.v1.DisposeConversationRequest
+	5,  // 53: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
+	7,  // 54: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
+	9,  // 55: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
+	11, // 56: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
+	30, // 57: memory.v1.RetentionService.CleanupProjection:input_type -> memory.v1.CleanupProjectionRequest
+	28, // 58: memory.v1.RetentionService.DisposeVersion:input_type -> memory.v1.DisposeVersionRequest
+	25, // 59: memory.v1.RetentionService.DisposeExtraction:input_type -> memory.v1.DisposeExtractionRequest
+	22, // 60: memory.v1.RetentionService.DisposeContext:input_type -> memory.v1.DisposeContextRequest
+	19, // 61: memory.v1.RetentionService.DisposeSnapshot:input_type -> memory.v1.DisposeSnapshotRequest
+	16, // 62: memory.v1.RetentionService.DisposeOrphanEvidence:input_type -> memory.v1.DisposeOrphanEvidenceRequest
+	13, // 63: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
+	38, // 64: memory.v1.RetentionService.DisposeBatch:output_type -> memory.v1.DisposeBatchResponse
+	2,  // 65: memory.v1.RetentionService.DisposeAttestation:output_type -> memory.v1.DisposeAttestationResponse
+	4,  // 66: memory.v1.RetentionService.DisposeConversation:output_type -> memory.v1.DisposeConversationResponse
+	6,  // 67: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
+	8,  // 68: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
+	10, // 69: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
+	12, // 70: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
+	31, // 71: memory.v1.RetentionService.CleanupProjection:output_type -> memory.v1.CleanupProjectionResponse
+	29, // 72: memory.v1.RetentionService.DisposeVersion:output_type -> memory.v1.DisposeVersionResponse
+	26, // 73: memory.v1.RetentionService.DisposeExtraction:output_type -> memory.v1.DisposeExtractionResponse
+	23, // 74: memory.v1.RetentionService.DisposeContext:output_type -> memory.v1.DisposeContextResponse
+	20, // 75: memory.v1.RetentionService.DisposeSnapshot:output_type -> memory.v1.DisposeSnapshotResponse
+	17, // 76: memory.v1.RetentionService.DisposeOrphanEvidence:output_type -> memory.v1.DisposeOrphanEvidenceResponse
+	14, // 77: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
+	64, // [64:78] is the sub-list for method output_type
+	50, // [50:64] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_retention_proto_init() }
@@ -3401,7 +3495,7 @@ func file_memory_v1_retention_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_retention_proto_rawDesc), len(file_memory_v1_retention_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   44,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

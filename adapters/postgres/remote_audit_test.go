@@ -137,7 +137,7 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	}
 	for _, expected := range []model.AuditGap{
 		{Kind: "independent_archive_chain", Reason: "archive_coverage_not_configured"},
-		{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"},
+		{Kind: "coordinated_derivative_disposal", Reason: "external_and_unselected_copy_disposal_not_implemented"},
 	} {
 		if !slices.Contains(manifest.Gaps, expected) {
 			t.Fatal("signed export omitted coverage limit", expected)

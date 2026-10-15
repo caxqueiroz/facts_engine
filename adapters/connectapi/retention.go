@@ -197,6 +197,9 @@ func (s *retentionService) DisposeBatch(ctx context.Context, r *v1.DisposeBatchR
 	for _, item := range r.Attestations {
 		request.Attestations = append(request.Attestations, model.AttestationDisposalRequest{Command: request.Command, Reason: request.Reason, Kind: item.Kind, Scope: item.Scope, RecordID: item.RecordId, VersionID: item.VersionId, AttestationID: item.AttestationId, PolicyID: item.PolicyId, Jurisdiction: item.Jurisdiction, Purpose: item.Purpose})
 	}
+	for _, item := range r.Evidence {
+		request.Evidence = append(request.Evidence, model.EvidenceDisposalRequest{Command: request.Command, Reason: request.Reason, Scope: item.Scope, EvidenceID: item.EvidenceId, PolicyID: item.PolicyId, Jurisdiction: item.Jurisdiction, DerivativeEvidenceIDs: append([]string(nil), item.DerivativeEvidenceIds...)})
+	}
 	result, err := s.engine.DisposeBatch(ctx, callerFrom(ctx), request)
 	if err != nil {
 		return nil, err

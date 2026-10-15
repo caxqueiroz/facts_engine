@@ -154,7 +154,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 	gaps = append(gaps, extra...)
 	// Preserve the gap kind while distinguishing supported unreferenced lineage
 	// disposal from the remaining copies embedded in referenced artifacts.
-	gaps = append(gaps, model.AuditGap{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"})
+	gaps = append(gaps, model.AuditGap{Kind: "coordinated_derivative_disposal", Reason: "external_and_unselected_copy_disposal_not_implemented"})
 	var archiveCoverage *model.ArchiveCoverageReceipt
 	if s.audit.ArchiveCoverage == nil {
 		gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_configured"})
