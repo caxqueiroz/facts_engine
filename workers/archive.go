@@ -103,7 +103,7 @@ func (a *Archive) Handle(ctx context.Context, d model.Delivery) (err error) {
 		if int64(len(retained)) != m.Payload.Size || model.BytesDigest(retained) != m.Payload.Digest {
 			return model.ErrPrecondition
 		}
-		if m.Payload.Digest != model.BytesDigest(raw) && !archiveSnapshotRetentionReplay(retained, payload) {
+		if m.Payload.Digest != model.BytesDigest(raw) && !archiveRetentionReplay(retained, payload) {
 			return model.ErrConflict
 		}
 		for _, check := range checks {

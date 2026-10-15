@@ -37,6 +37,7 @@ type ContextArchiveReceipt struct {
 }
 
 type ContextManifest struct {
+	PayloadDisposed                                      bool                   `json:",omitempty"`
 	Archive                                              *ContextArchiveReceipt `json:",omitempty"`
 	ID, Tenant, Scope                                    string
 	Caller                                               Caller
@@ -55,6 +56,7 @@ type ContextManifest struct {
 type ContextQuery struct{ ID, Purpose string }
 
 func ContextDigest(m ContextManifest) string {
+	m.PayloadDisposed = false
 	m.ID = ""
 	m.Digest = ""
 	m.CreationRevision = 0
@@ -128,4 +130,28 @@ func ContextScopes(m ContextManifest) []string {
 	}
 	slices.Sort(scopes)
 	return slices.Compact(scopes)
+}
+
+// ContextTombstone removes copied content while retaining the original digests,
+// version inventory, scope boundaries and authorization provenance. It does not
+// authorize disposal or validate its input. The returned metadata cannot be used
+// to reconstruct or verify the original context content. Input is not mutated.
+func ContextTombstone(m ContextManifest) ContextManifest {
+	m.PayloadDisposed = true
+	m.Rendered = nil
+	m.Request.Query.Query = ""
+	m.Items = slices.Clone(m.Items)
+	for i := range m.Items {
+		m.Items[i].Fact.Value = nil
+	}
+	m.Memories = slices.Clone(m.Memories)
+	for i := range m.Memories {
+		memory := &m.Memories[i].Memory
+		memory.Body = ""
+		memory.Dependencies = slices.Clone(memory.Dependencies)
+		for j := range memory.Dependencies {
+			memory.Dependencies[j].Label = ""
+		}
+	}
+	return m
 }

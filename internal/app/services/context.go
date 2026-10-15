@@ -186,6 +186,12 @@ func (s *Service) GetContextManifest(ctx context.Context, c model.Caller, q mode
 	if _, err = s.contextAuthorization(ctx, c, request, false); err != nil {
 		return model.ContextManifest{}, err
 	}
+	if m.PayloadDisposed {
+		if _, err := s.contextMemoryAuthorization(ctx, c, m, q.Purpose, false); err != nil {
+			return model.ContextManifest{}, err
+		}
+		return model.ContextManifest{}, model.ErrPrecondition
+	}
 	if m.Tenant != c.Tenant || !slices.Contains([]string{"context-manifest-v1", "context-manifest-v2"}, m.CanonicalVersion) || model.ContextDigest(m) != m.Digest || model.BytesDigest(m.Rendered) != m.RenderedDigest {
 		return model.ContextManifest{}, model.ErrPrecondition
 	}

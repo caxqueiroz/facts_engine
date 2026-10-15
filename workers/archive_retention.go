@@ -1,14 +1,16 @@
 package workers
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/caxqueiroz/facts_engine/model"
+	"io"
 )
 
-// archiveSnapshotRetentionReplay permits only a full snapshot's transition to
+// archiveRetentionReplay permits only a full snapshot or context transition to
 // its exact metadata-only tombstone. All other entries, event fields, scopes
 // and coverage gaps must still match the previously signed payload.
-func archiveSnapshotRetentionReplay(retained []byte, current model.ArchivePayload) bool {
+func archiveRetentionReplay(retained []byte, current model.ArchivePayload) bool {
 	var prior model.ArchivePayload
 	if json.Unmarshal(retained, &prior) != nil || len(prior.Entries) != len(current.Entries) {
 		return false
@@ -24,25 +26,23 @@ func archiveSnapshotRetentionReplay(retained []byte, current model.ArchivePayloa
 		if model.BytesDigest(entry.Payload) == model.BytesDigest(old.Payload) {
 			continue
 		}
-		if entry.Kind != "snapshot" || transitions[entry.ID] {
+		key := entry.Kind + "_content:" + entry.ID
+		if transitions[key] {
 			return false
 		}
-		var from, to model.FactSnapshot
-		if json.Unmarshal(old.Payload, &from) != nil || json.Unmarshal(entry.Payload, &to) != nil {
+		switch entry.Kind {
+		case "snapshot":
+			if !snapshotRetentionTransition(old, entry, current.Event) {
+				return false
+			}
+		case "context":
+			if !contextRetentionTransition(old, entry, current.Event) {
+				return false
+			}
+		default:
 			return false
 		}
-		if from.PayloadDisposed || !to.PayloadDisposed || from.ID != entry.ID || from.Tenant != current.Event.Caller.Tenant || from.CreationRevision != current.Event.LedgerRevision || model.SnapshotDigest(from) != from.Digest {
-			return false
-		}
-		from.PayloadDisposed = true
-		from.Items = append([]model.SnapshotItem(nil), from.Items...)
-		for j := range from.Items {
-			from.Items[j].Resolution.Value = nil
-		}
-		if model.Digest(from) != model.Digest(to) {
-			return false
-		}
-		transitions[entry.ID] = true
+		transitions[key] = true
 		normalized.Entries[i].Payload = old.Payload
 	}
 	if len(transitions) == 0 {
@@ -51,11 +51,12 @@ func archiveSnapshotRetentionReplay(retained []byte, current model.ArchivePayloa
 	normalized.Gaps = nil
 	removed := map[string]bool{}
 	for _, gap := range current.Gaps {
-		if gap.Kind == "snapshot_content" && gap.Reason == "disposed_under_retention_policy" && transitions[gap.ID] {
-			if removed[gap.ID] {
+		key := gap.Kind + ":" + gap.ID
+		if gap.Reason == "disposed_under_retention_policy" && transitions[key] {
+			if removed[key] {
 				return false
 			}
-			removed[gap.ID] = true
+			removed[key] = true
 			continue
 		}
 		normalized.Gaps = append(normalized.Gaps, gap)
@@ -67,4 +68,44 @@ func archiveSnapshotRetentionReplay(retained []byte, current model.ArchivePayloa
 		normalized.Gaps = prior.Gaps
 	}
 	return model.Digest(normalized) == model.Digest(prior)
+}
+
+func snapshotRetentionTransition(old, entry model.AuditEntry, event model.Event) bool {
+	var from, to model.FactSnapshot
+	if !decodeRetentionPayload(old.Payload, &from) || !decodeRetentionPayload(entry.Payload, &to) {
+		return false
+	}
+	if from.PayloadDisposed || !to.PayloadDisposed || from.ID != entry.ID || from.Tenant != event.Caller.Tenant || from.CreationRevision != event.LedgerRevision || model.SnapshotDigest(from) != from.Digest {
+		return false
+	}
+	from.PayloadDisposed = true
+	from.Items = append([]model.SnapshotItem(nil), from.Items...)
+	for j := range from.Items {
+		from.Items[j].Resolution.Value = nil
+	}
+	return model.Digest(from) == model.Digest(to)
+}
+
+func contextRetentionTransition(old, entry model.AuditEntry, event model.Event) bool {
+	var from, to model.ContextManifest
+	if !decodeRetentionPayload(old.Payload, &from) || !decodeRetentionPayload(entry.Payload, &to) {
+		return false
+	}
+	if from.PayloadDisposed || !to.PayloadDisposed || from.ID != entry.ID || from.Tenant != event.Caller.Tenant || from.CreationRevision != event.LedgerRevision || model.ContextDigest(from) != from.Digest || model.BytesDigest(from.Rendered) != from.RenderedDigest {
+		return false
+	}
+	if from.CanonicalVersion != "context-manifest-v1" && from.CanonicalVersion != "context-manifest-v2" {
+		return false
+	}
+	return model.Digest(model.ContextTombstone(from)) == model.Digest(to)
+}
+
+// Unknown fields cannot be silently discarded when comparing content removal.
+func decodeRetentionPayload(raw []byte, target any) bool {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(target) != nil {
+		return false
+	}
+	return decoder.Decode(new(any)) == io.EOF
 }

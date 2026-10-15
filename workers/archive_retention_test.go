@@ -63,7 +63,7 @@ func cloneArchivePayload(t *testing.T, p model.ArchivePayload) model.ArchivePayl
 func TestArchiveRetentionTransitionBoundaries(t *testing.T) {
 	before, after := archiveRetentionFixture(t)
 	raw, _ := json.Marshal(before)
-	if !archiveSnapshotRetentionReplay(raw, after) {
+	if !archiveRetentionReplay(raw, after) {
 		t.Fatal("valid disposal transition rejected")
 	}
 	changeSnapshot := func(p *model.ArchivePayload, change func(*model.FactSnapshot)) {
@@ -102,7 +102,7 @@ func TestArchiveRetentionTransitionBoundaries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			current := cloneArchivePayload(t, after)
 			change(&current)
-			if archiveSnapshotRetentionReplay(raw, current) {
+			if archiveRetentionReplay(raw, current) {
 				t.Fatal("unrelated change accepted")
 			}
 		})
@@ -110,16 +110,24 @@ func TestArchiveRetentionTransitionBoundaries(t *testing.T) {
 	bad := cloneArchivePayload(t, before)
 	changeSnapshot(&bad, func(s *model.FactSnapshot) { s.Items[0].Resolution.Value = &model.Value{Kind: model.Boolean} })
 	badRaw, _ := json.Marshal(bad)
-	if archiveSnapshotRetentionReplay(badRaw, after) {
+	if archiveRetentionReplay(badRaw, after) {
 		t.Fatal("original canonical digest not verified")
 	}
-	if archiveSnapshotRetentionReplay(raw, before) {
+	if archiveRetentionReplay(raw, before) {
 		t.Fatal("non-retention difference accepted")
 	}
 }
 func TestArchiveRetryAfterSnapshotDisposal(t *testing.T) {
-	ctx := context.Background()
 	before, after := archiveRetentionFixture(t)
+	testArchiveRetentionRetry(t, before, after)
+}
+func TestArchiveRetryAfterContextDisposal(t *testing.T) {
+	before, after := contextRetentionFixture(t)
+	testArchiveRetentionRetry(t, before, after)
+}
+func testArchiveRetentionRetry(t *testing.T, before, after model.ArchivePayload) {
+	t.Helper()
+	ctx := context.Background()
 	source := &mutableArchiveSource{payload: before}
 	cipher, _ := postgres.NewAESGCM(bytes.Repeat([]byte{7}, 32))
 	store, err := archive.NewFiles(t.TempDir(), cipher)
