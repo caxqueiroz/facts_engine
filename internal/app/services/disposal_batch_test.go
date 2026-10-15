@@ -9,13 +9,13 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 )
 
-func (t *extractionDisposalTestTx) DisposeBatch(ctx context.Context, r model.DisposalBatchRequest) ([]int64, error) {
+func (t *extractionDisposalTestTx) DisposeBatch(ctx context.Context, r model.DisposalBatchRequest) (model.DisposalBatchResult, error) {
 	err := t.DisposeExtraction(ctx, model.ExtractionDisposalRequest{})
 	revisions := make([]int64, len(r.Versions))
 	for i := range revisions {
 		revisions[i] = int64(i + 2)
 	}
-	return revisions, err
+	return model.DisposalBatchResult{VersionRevisions: revisions, AttestationRevisions: make([]int64, len(r.Attestations))}, err
 }
 func TestDisposalBatchReauthorizesAndNormalizesSelection(t *testing.T) {
 	for _, phase := range []string{"success", "before", "after-disposal", "after-child"} {

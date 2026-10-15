@@ -140,7 +140,12 @@ func testVersionBatch(t *testing.T, ctx context.Context, normal, engine *facts.E
 		t.Fatal(err)
 	}
 	reviewer := c
-	reviewer.Principal = "batch-reviewer"
+	reviewer.Principal = "reviewer"
+	attestationExpiry := time.Now().UTC().Add(time.Hour)
+	attestationID := "version-batch-review"
+	if _, err = normal.RecordAttestation(ctx, reviewer, model.AttestationRequest{Command: cmd("review"), Attestation: model.Attestation{ID: attestationID, Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, ContentDigest: fact.ContentDigest, Kind: "human_review", EvidenceID: "a-source", Attestor: reviewer, ExpiresAt: &attestationExpiry}}); err != nil {
+		t.Fatal("record batch review attestation", err)
+	}
 	if _, err = normal.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("approve"), Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, ExpectedRevision: fact.StreamRevision}); err != nil {
 		t.Fatal(err)
 	}
@@ -152,6 +157,7 @@ func testVersionBatch(t *testing.T, ctx context.Context, normal, engine *facts.E
 		{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "a", PolicyID: "fact", Jurisdiction: "SG"}}},
 		{Kind: "memory", Scope: "z", RecordID: memory.RecordID, VersionID: memory.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "memory", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "memory", Jurisdiction: "SG"}}},
 	}}
+	r.Attestations = []model.AttestationDisposalRequest{{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "SG", Purpose: "retention"}}
 	partial := r
 	partial.Versions = r.Versions[:1]
 	partial.Scope = "a"
@@ -180,7 +186,7 @@ func testVersionBatch(t *testing.T, ctx context.Context, normal, engine *facts.E
 	for _, item := range []struct {
 		record, table string
 		revision      int
-	}{{fact.RecordID, "record_events", 3}, {memory.RecordID, "memory_record_events", 2}} {
+	}{{fact.RecordID, "record_events", 4}, {memory.RecordID, "memory_record_events", 2}} {
 		var revision, count int
 		if err = admin.QueryRow(ctx, "SELECT stream_revision,(SELECT count(*) FROM "+item.table+" e WHERE e.tenant_id=r.tenant_id AND e.record_id=r.id) FROM records r WHERE r.tenant_id=$1 AND r.id=$2", c.Tenant, item.record).Scan(&revision, &count); err != nil || revision != item.revision || count != item.revision {
 			t.Fatal("batch history discontinuity", revision, count, err)

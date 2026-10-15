@@ -15,6 +15,7 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 	r.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
 	r.Extractions = append([]model.ExtractionDisposalRequest(nil), r.Extractions...)
 	r.Conversations = append([]model.ConversationDisposalRequest(nil), r.Conversations...)
+	r.Attestations = append([]model.AttestationDisposalRequest(nil), r.Attestations...)
 	selected := map[string]bool{}
 	scopes := map[string]bool{}
 	for i := range r.Versions {
@@ -70,6 +71,23 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 		scopes[item.Scope] = true
 	}
 	sort.Slice(r.Conversations, func(i, j int) bool { return r.Conversations[i].ConversationID < r.Conversations[j].ConversationID })
+	for i := range r.Attestations {
+		item := &r.Attestations[i]
+		key := "attestation/" + item.Kind + "/" + item.AttestationID
+		if (item.Kind != "fact" && item.Kind != "memory") || !model.ValidID(item.Scope) || !model.ValidID(item.RecordID) || !model.ValidID(item.VersionID) || !model.ValidID(item.AttestationID) || !model.ValidID(item.PolicyID) || !model.ValidID(item.Jurisdiction) || item.Purpose == "" || len(item.Purpose) > 256 || selected[key] || (item.Command != (model.Command{}) && item.Command != r.Command) || (item.Reason != "" && item.Reason != r.Reason) {
+			return r, model.ErrInvalid
+		}
+		selected[key] = true
+		item.Command = r.Command
+		item.Reason = r.Reason
+		scopes[item.Scope] = true
+	}
+	sort.Slice(r.Attestations, func(i, j int) bool {
+		if r.Attestations[i].Kind != r.Attestations[j].Kind {
+			return r.Attestations[i].Kind < r.Attestations[j].Kind
+		}
+		return r.Attestations[i].AttestationID < r.Attestations[j].AttestationID
+	})
 	r.Snapshots = append([]model.SnapshotDisposalRequest(nil), r.Snapshots...)
 	for i := range r.Snapshots {
 		item := &r.Snapshots[i]
@@ -197,11 +215,11 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 		if err != nil {
 			return err
 		}
-		revisions, err := batch.DisposeBatch(ctx, r)
+		batchResult, err := batch.DisposeBatch(ctx, r)
 		if err != nil {
 			return err
 		}
-		if len(revisions) != len(r.Versions) {
+		if len(batchResult.VersionRevisions) != len(r.Versions) || len(batchResult.AttestationRevisions) != len(r.Attestations) {
 			return model.ErrPrecondition
 		}
 		if err = check(); err != nil {
@@ -219,6 +237,13 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 			}
 			_, err := tx.Append(ctx, model.Event{ID: id(), EntityID: event.ID, Type: event.Kind, Scope: event.Scope, RecordKind: recordKind, RecordID: recordID, VersionID: versionID, StreamRevision: revision, Caller: c, Command: r.Command, Authorization: decisions[event.Scope]})
 			return err
+		}
+		for i, item := range r.Attestations {
+			d := decisions[item.Scope]
+			event := model.RetentionEvent{Scope: item.Scope, Kind: "dispose_" + item.Kind + "_attestation", TargetID: item.AttestationID, AttestationDisposal: &item, AdditionalAuthorization: []model.AuthorizationDecision{d}, Limitations: []string{"attestation_identity_retained", "confirmation_evidence_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
+			if err = appendChild(event, item.Kind, item.RecordID, item.VersionID, batchResult.AttestationRevisions[i]); err != nil {
+				return err
+			}
 		}
 		for _, item := range r.Snapshots {
 			receipts := []model.AuthorizationDecision{}
@@ -278,7 +303,7 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 			}
 		}
 		for i, v := range r.Versions {
-			if revisions[i] < 1 {
+			if batchResult.VersionRevisions[i] < 1 {
 				return model.ErrPrecondition
 			}
 			receipts := []model.AuthorizationDecision{}
@@ -286,7 +311,7 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 				receipts = append(receipts, decisions[b.Scope])
 			}
 			event := model.RetentionEvent{Scope: v.Scope, Kind: "dispose_" + v.Kind + "_payload", TargetID: v.VersionID, VersionDisposal: &v, AdditionalAuthorization: receipts, Limitations: []string{"structural_metadata_retained", "projection_cleanup_requires_acknowledgements", "source_evidence_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
-			if err = appendChild(event, v.Kind, v.RecordID, v.VersionID, revisions[i]); err != nil {
+			if err = appendChild(event, v.Kind, v.RecordID, v.VersionID, batchResult.VersionRevisions[i]); err != nil {
 				return err
 			}
 		}

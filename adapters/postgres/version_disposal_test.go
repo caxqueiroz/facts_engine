@@ -47,7 +47,11 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	secret := "private retained value"
 	for _, scope := range []string{"a", "z"} {
 		registerTestIdentities(t, ctx, normal, c.Tenant, scope, []string{"subject"})
-		if _, err = normal.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: cmd(scope + "-manual"), Policy: model.AcceptancePolicy{Scope: scope, ID: "manual", Mode: "manual", SourceClasses: []string{"customer"}}}); err != nil {
+		policy := model.AcceptancePolicy{Scope: scope, ID: "manual", Mode: "manual", SourceClasses: []string{"customer"}}
+		if scope == "a" {
+			policy.Required = []model.AttestationRequirement{{Kind: "human_review", Principals: []string{"reviewer"}}}
+		}
+		if _, err = normal.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: cmd(scope + "-manual"), Policy: policy}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err = normal.RegisterPredicateVersion(ctx, c, model.PredicateRequest{Command: cmd(scope + "-predicate"), Definition: model.PredicateVersion{Scope: scope, Predicate: "value", Version: "v1", PolicyID: "manual", Kind: model.Text, Classification: "confidential"}}); err != nil {
@@ -60,7 +64,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		if _, err = normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd(scope + "-evidence"), Evidence: model.Evidence{ID: scope + "-source", Scope: scope, SourceSystem: "test", SourceObject: scope, SourceRevision: "v1", Speaker: "customer", SourceClass: "customer", SourceTime: now, MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "source-policy", Object: ref}}); err != nil {
 			t.Fatal(err)
 		}
-		for _, kind := range []string{"fact", "memory", "snapshot"} {
+		for _, kind := range []string{"fact", "memory", "snapshot", "attestation"} {
 			for _, young := range []bool{false, true} {
 				p := model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: kind + "_payload", Purpose: "retention", Jurisdiction: "SG"}
 				if young {
@@ -76,6 +80,11 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	fact, err := normal.ProposeFact(ctx, c, model.FactProposal{Command: cmd("fact"), Key: model.FactKey{Scope: "a", Subject: "subject", Predicate: "value"}, SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &secret}, Valid: model.Interval{From: &now}, Sources: []model.SourceSpan{{EvidenceID: "a-source", Start: 0, End: len(secret), Quote: secret}}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	attestationID := "review-fact"
+	attestationExpiry := time.Now().UTC().Add(time.Hour)
+	if _, err = normal.RecordAttestation(ctx, reviewer, model.AttestationRequest{Command: cmd("fact-review"), Attestation: model.Attestation{ID: attestationID, Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, ContentDigest: fact.ContentDigest, Kind: "human_review", EvidenceID: "a-source", Attestor: reviewer, ExpiresAt: &attestationExpiry}}); err != nil {
+		t.Fatal("record review attestation", err)
 	}
 	accepted, err := normal.ApproveFact(ctx, reviewer, model.Approval{Command: cmd("approve"), Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, ExpectedRevision: fact.StreamRevision})
 	if err != nil {
@@ -215,11 +224,23 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	if _, err = engine.DisposeSnapshot(ctx, c, model.SnapshotDisposalRequest{Command: cmd("dispose-snapshot"), SnapshotID: snapshot.ID, Reason: "expired", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshot", Jurisdiction: "SG"}}}); err != nil {
 		t.Fatal(err)
 	}
-	disposedFact, err := engine.DisposeVersion(ctx, c, f)
-	if err != nil || disposedFact.StreamRevision != accepted.StreamRevision+1 {
+	if _, err = engine.DisposeVersion(ctx, c, f); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("live attestation did not block version disposal", err)
+	}
+	attestation := model.AttestationDisposalRequest{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "SG", Purpose: "retention"}
+	batchVersion := f
+	batchVersion.Command = model.Command{}
+	batchVersion.Reason = ""
+	batchRequest := model.DisposalBatchRequest{Command: cmd("dispose-fact-batch"), Scope: "a", Reason: "expired", Attestations: []model.AttestationDisposalRequest{attestation}, Versions: []model.VersionDisposalRequest{batchVersion}}
+	disposedFact, err := engine.DisposeBatch(ctx, c, batchRequest)
+	var finalStreamRevision int64
+	if err == nil {
+		err = admin.QueryRow(ctx, `SELECT stream_revision FROM records WHERE tenant_id=$1 AND id=$2`, c.Tenant, fact.RecordID).Scan(&finalStreamRevision)
+	}
+	if err != nil || finalStreamRevision != accepted.StreamRevision+2 {
 		t.Fatal(disposedFact, err)
 	}
-	testVersionDisposalRemote(t, ctx, engine, c, f, disposedFact)
+	testDisposalBatchRemote(t, ctx, engine, c, batchRequest, disposedFact)
 	replayArchives()
 	for _, r := range []model.VersionDisposalRequest{f, m} {
 		s, err := ledger.ProjectionCleanupStatus(ctx, model.ProjectionCleanupKey{Tenant: c.Tenant, Kind: r.Kind, VersionID: r.VersionID})

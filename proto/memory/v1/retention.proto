@@ -347,6 +347,23 @@ message DisposeBatchRequest {
   repeated BatchCalculationSelection calculations = 9 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchDecisionSelection decisions = 10 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchConversationSelection conversations = 11 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchAttestationSelection attestations = 12 [(buf.validate.field).repeated.max_items = 32];
+}
+message BatchAttestationSelection {
+  string kind = 1 [
+    (buf.validate.field).string.in = "fact",
+    (buf.validate.field).string.in = "memory"
+  ];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string attestation_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 8 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
 }
 message BatchConversationSelection {
   string conversation_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];

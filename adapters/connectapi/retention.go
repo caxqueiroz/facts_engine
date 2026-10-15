@@ -194,6 +194,9 @@ func (s *retentionService) DisposeBatch(ctx context.Context, r *v1.DisposeBatchR
 		}
 		request.Decisions = append(request.Decisions, selection)
 	}
+	for _, item := range r.Attestations {
+		request.Attestations = append(request.Attestations, model.AttestationDisposalRequest{Command: request.Command, Reason: request.Reason, Kind: item.Kind, Scope: item.Scope, RecordID: item.RecordId, VersionID: item.VersionId, AttestationID: item.AttestationId, PolicyID: item.PolicyId, Jurisdiction: item.Jurisdiction, Purpose: item.Purpose})
+	}
 	result, err := s.engine.DisposeBatch(ctx, callerFrom(ctx), request)
 	if err != nil {
 		return nil, err

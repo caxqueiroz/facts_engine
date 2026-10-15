@@ -13,6 +13,7 @@ type DisposalBatchRequest struct {
 	Command
 	Scope, Reason string
 	Conversations []ConversationDisposalRequest `json:",omitempty"`
+	Attestations  []AttestationDisposalRequest  `json:",omitempty"`
 	Decisions     []DecisionDisposalRequest     `json:",omitempty"`
 	Calculations  []CalculationDisposalRequest  `json:",omitempty"`
 	Snapshots     []SnapshotDisposalRequest     `json:",omitempty"`
@@ -22,16 +23,25 @@ type DisposalBatchRequest struct {
 }
 
 // DisposalBatchTx must remove the complete authorized selection atomically,
-// including all individual policy/age/hold/reference checks. Returned revisions
-// correspond to Versions in input order. Any error must abort the transaction.
+// including all individual policy/age/hold/reference checks. Returned version
+// and attestation revisions correspond to their selections in input order. Any
+// error must abort the transaction.
 type DisposalBatchTx interface {
-	DisposeBatch(context.Context, DisposalBatchRequest) ([]int64, error)
+	DisposeBatch(context.Context, DisposalBatchRequest) (DisposalBatchResult, error)
+}
+
+type DisposalBatchResult struct {
+	VersionRevisions     []int64
+	AttestationRevisions []int64
 }
 
 // Scopes includes every scope carried by a batch for audit/archive disclosure.
 func (r DisposalBatchRequest) Scopes() []string {
 	scopes := map[string]bool{r.Scope: true}
 	for _, item := range r.Conversations {
+		scopes[item.Scope] = true
+	}
+	for _, item := range r.Attestations {
 		scopes[item.Scope] = true
 	}
 	for _, v := range r.Versions {
@@ -75,5 +85,5 @@ func (r DisposalBatchRequest) Scopes() []string {
 
 // SelectionCount bounds the complete transaction across all artifact classes.
 func (r DisposalBatchRequest) SelectionCount() int {
-	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions) + len(r.Conversations)
+	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations) + len(r.Decisions) + len(r.Conversations) + len(r.Attestations)
 }
