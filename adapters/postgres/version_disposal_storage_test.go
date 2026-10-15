@@ -17,6 +17,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -124,6 +125,18 @@ func testVersionDisposalStorage(t *testing.T, ctx context.Context, normal *facts
 			if err := admin.QueryRow(ctx, fmt.Sprintf("SELECT count(*) FROM %s WHERE tenant_id=$1 AND version_id=$2", table), c.Tenant, item.id).Scan(&count); err != nil || count != 0 {
 				t.Fatal("rollback left tombstone", err)
 			}
+			// Establish a repeatable-read reference writer before disposal commits.
+			stale, err := runtime.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stale.Rollback(ctx)
+			if err := ledgerdb.New(stale).BindTenant(ctx, c.Tenant); err != nil {
+				t.Fatal(err)
+			}
+			if err := stale.QueryRow(ctx, fmt.Sprintf("SELECT count(*) FROM %s WHERE tenant_id=$1 AND version_id=$2", payloads), c.Tenant, item.id).Scan(&count); err != nil || count != 1 {
+				t.Fatal("stale writer lacks original content", count, err)
+			}
 			tx, err = admin.Begin(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -137,6 +150,19 @@ func testVersionDisposalStorage(t *testing.T, ctx context.Context, normal *facts
 			if err := tx.Commit(ctx); err != nil {
 				t.Fatal(err)
 			}
+			referenceTable := "fact_snapshot_items"
+			if item.kind == "memory" {
+				referenceTable = "context_memory_items"
+			}
+			_, err = stale.Exec(ctx, "INSERT INTO "+referenceTable+"(tenant_id,version_id) VALUES($1,$2)", c.Tenant, item.id)
+			var staleError *pgconn.PgError
+			if !errors.As(err, &staleError) || staleError.Code != "40001" {
+				t.Fatal("stale snapshot bypassed disposal", err)
+			}
+			if err := stale.Rollback(ctx); err != nil {
+				t.Fatal(err)
+			}
+			testDisposedVersionReferences(t, ctx, runtime, c.Tenant, item.kind, item.id)
 			original, _ := json.Marshal(item.original)
 			oldBytes, err := cipher.Seal(c.Tenant, original)
 			if err != nil {
