@@ -47,6 +47,11 @@ func (t *transaction) DecisionRun(ctx context.Context, application, run string) 
 	return r, err
 }
 func (t *transaction) StageDecision(ctx context.Context, r model.DecisionRecord, scopes map[model.VersionReference]string) error {
+	if r.Receipt.SnapshotID != "" {
+		if err := t.guardSnapshotContent(ctx, r.Receipt.SnapshotID); err != nil {
+			return err
+		}
+	}
 	for _, ref := range model.DecisionArtifacts(r.Receipt) {
 		if err := t.guardEvidenceReference(ctx, ref.EvidenceID); err != nil {
 			return err

@@ -14,6 +14,7 @@ service RetentionService {
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc DisposeSnapshot(DisposeSnapshotRequest) returns (DisposeSnapshotResponse);
   rpc DisposeOrphanEvidence(DisposeOrphanEvidenceRequest) returns (DisposeOrphanEvidenceResponse);
   rpc GetRetentionStatus(GetRetentionStatusRequest) returns (GetRetentionStatusResponse);
 }
@@ -22,7 +23,8 @@ message RetentionPolicy {
   string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   string record_class = 3 [
     (buf.validate.field).string.in = "evidence_bytes",
-    (buf.validate.field).string.in = "orphan_evidence_bytes"
+    (buf.validate.field).string.in = "orphan_evidence_bytes",
+    (buf.validate.field).string.in = "snapshot_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -124,5 +126,27 @@ message DisposeOrphanEvidenceRequest {
   }];
 }
 message DisposeOrphanEvidenceResponse {
+  CommitResult result = 1;
+}
+
+message SnapshotRetentionBinding {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeSnapshotRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string snapshot_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated SnapshotRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+message DisposeSnapshotResponse {
   CommitResult result = 1;
 }

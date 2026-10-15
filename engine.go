@@ -416,3 +416,8 @@ func (e *Engine) DisposeOrphanEvidence(ctx context.Context, c Caller, r model.Or
 func (e *Engine) ScanOrphanEvidence(ctx context.Context, c Caller, q model.OrphanEvidenceQuery) ([]model.ObjectRef, error) {
 	return e.service.ScanOrphanEvidence(ctx, c, q)
 }
+
+// DisposeSnapshot removes eligible snapshot content while retaining its manifest.
+func (e *Engine) DisposeSnapshot(ctx context.Context, c Caller, r model.SnapshotDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeSnapshot(ctx, c, r)
+}

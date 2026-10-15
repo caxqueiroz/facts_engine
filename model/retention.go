@@ -47,7 +47,22 @@ type OrphanEvidenceDisposalRequest struct {
 type OrphanEvidenceDisposalTx interface {
 	DisposeOrphanEvidence(context.Context, OrphanEvidenceDisposalRequest) error
 }
+type SnapshotRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }
+type SnapshotDisposalRequest struct {
+	Command
+	SnapshotID, Reason string
+	Bindings           []SnapshotRetentionBinding
+}
+
+// SnapshotDisposalTx adapters must serialize disposal with new references,
+// scope holds, exports and archive reads, and retain an immutable tombstone.
+type SnapshotDisposalTx interface {
+	DisposeSnapshot(context.Context, SnapshotDisposalRequest) error
+}
 type RetentionEvent struct {
+	SnapshotDisposal        *SnapshotDisposalRequest `json:",omitempty"`
+	AdditionalAuthorization []AuthorizationDecision  `json:",omitempty"`
+
 	ID, Tenant, Scope, Kind, TargetID string
 	Caller                            Caller
 	Command                           Command

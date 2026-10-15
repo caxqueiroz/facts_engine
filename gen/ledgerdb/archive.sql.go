@@ -614,9 +614,10 @@ func (q *Queries) ListArchiveScopeIdentity(ctx context.Context, arg ListArchiveS
 }
 
 const ListArchiveSnapshot = `-- name: ListArchiveSnapshot :many
-SELECT s.id,p.payload
+SELECT s.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM fact_snapshots s
 LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+LEFT JOIN snapshot_disposals d ON d.tenant_id=s.tenant_id AND d.snapshot_id=s.id
 WHERE s.tenant_id=$1 AND s.creation_revision=$2
 `
 
@@ -1565,9 +1566,10 @@ func (q *Queries) ListAuditScopeIdentity(ctx context.Context, arg ListAuditScope
 }
 
 const ListAuditSnapshot = `-- name: ListAuditSnapshot :many
-SELECT s.id,p.payload
+SELECT s.id,coalesce(p.payload,d.payload)::bytea AS payload
 FROM fact_snapshots s
 LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+LEFT JOIN snapshot_disposals d ON d.tenant_id=s.tenant_id AND d.snapshot_id=s.id
 WHERE s.tenant_id=$1 AND EXISTS(SELECT 1
 FROM fact_snapshot_items i
 WHERE i.tenant_id=s.tenant_id AND i.snapshot_id=s.id AND i.scope_id=$2) ORDER BY s.id LIMIT 10001

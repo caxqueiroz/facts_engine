@@ -31,6 +31,23 @@ func (q *Queries) DeleteEvidenceObject(ctx context.Context, arg DeleteEvidenceOb
 	return result.RowsAffected(), nil
 }
 
+const DeleteSnapshotPayload = `-- name: DeleteSnapshotPayload :execrows
+DELETE FROM fact_snapshot_payloads WHERE tenant_id=$1 AND snapshot_id=$2
+`
+
+type DeleteSnapshotPayloadParams struct {
+	TenantID   string
+	SnapshotID string
+}
+
+func (q *Queries) DeleteSnapshotPayload(ctx context.Context, arg DeleteSnapshotPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteSnapshotPayload, arg.TenantID, arg.SnapshotID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const EvidenceAgeMature = `-- name: EvidenceAgeMature :one
 SELECT clock_timestamp()>=$1::timestamptz+($2::bigint*interval '1 second')
 `
@@ -523,6 +540,21 @@ func (q *Queries) InsertRetentionPolicyPayload(ctx context.Context, arg InsertRe
 	return result.RowsAffected(), nil
 }
 
+const InsertSnapshotDisposal = `-- name: InsertSnapshotDisposal :exec
+INSERT INTO snapshot_disposals(tenant_id,snapshot_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertSnapshotDisposalParams struct {
+	TenantID   string
+	SnapshotID string
+	Payload    []byte
+}
+
+func (q *Queries) InsertSnapshotDisposal(ctx context.Context, arg InsertSnapshotDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertSnapshotDisposal, arg.TenantID, arg.SnapshotID, arg.Payload)
+	return err
+}
+
 const ListActiveLegalHolds = `-- name: ListActiveLegalHolds :many
 SELECT h.id
 FROM legal_holds h
@@ -592,6 +624,21 @@ func (q *Queries) LockRetentionScope(ctx context.Context, arg LockRetentionScope
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const LockSnapshotGuard = `-- name: LockSnapshotGuard :exec
+INSERT INTO snapshot_guards(tenant_id,snapshot_id,epoch) VALUES($1,$2,1)
+ON CONFLICT(tenant_id,snapshot_id) DO UPDATE SET epoch=snapshot_guards.epoch+1
+`
+
+type LockSnapshotGuardParams struct {
+	TenantID   string
+	SnapshotID string
+}
+
+func (q *Queries) LockSnapshotGuard(ctx context.Context, arg LockSnapshotGuardParams) error {
+	_, err := q.db.Exec(ctx, LockSnapshotGuard, arg.TenantID, arg.SnapshotID)
+	return err
 }
 
 const MarkEvidenceObjectDisposed = `-- name: MarkEvidenceObjectDisposed :execrows
@@ -664,6 +711,88 @@ func (q *Queries) ScanOrphanEvidence(ctx context.Context, arg ScanOrphanEvidence
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const SnapshotContentAvailable = `-- name: SnapshotContentAvailable :one
+SELECT EXISTS(SELECT 1 FROM fact_snapshot_payloads p WHERE p.tenant_id=$1 AND p.snapshot_id=$2)
+AND NOT EXISTS(SELECT 1 FROM snapshot_disposals d WHERE d.tenant_id=$1 AND d.snapshot_id=$2)
+`
+
+type SnapshotContentAvailableParams struct {
+	TenantID   string
+	SnapshotID string
+}
+
+func (q *Queries) SnapshotContentAvailable(ctx context.Context, arg SnapshotContentAvailableParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, SnapshotContentAvailable, arg.TenantID, arg.SnapshotID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const SnapshotCreationTime = `-- name: SnapshotCreationTime :one
+SELECT e.recorded_at FROM fact_snapshots s JOIN ledger_events e ON e.tenant_id=s.tenant_id AND e.ledger_revision=s.creation_revision
+WHERE s.tenant_id=$1 AND s.id=$2
+`
+
+type SnapshotCreationTimeParams struct {
+	TenantID string
+	ID       string
+}
+
+func (q *Queries) SnapshotCreationTime(ctx context.Context, arg SnapshotCreationTimeParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, SnapshotCreationTime, arg.TenantID, arg.ID)
+	var recorded_at pgtype.Timestamptz
+	err := row.Scan(&recorded_at)
+	return recorded_at, err
+}
+
+const SnapshotDisposalBlocked = `-- name: SnapshotDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM calculation_snapshots c WHERE c.tenant_id=$1 AND c.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM audit_export_requests a JOIN fact_snapshot_items i ON i.tenant_id=a.tenant_id AND i.scope_id=a.scope_id WHERE i.tenant_id=$1 AND i.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM consumer_offsets co JOIN fact_snapshots s ON s.tenant_id=co.tenant_id WHERE s.tenant_id=$1 AND s.id=$2 AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<s.creation_revision)
+`
+
+type SnapshotDisposalBlockedParams struct {
+	TenantID   string
+	SnapshotID string
+}
+
+func (q *Queries) SnapshotDisposalBlocked(ctx context.Context, arg SnapshotDisposalBlockedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, SnapshotDisposalBlocked, arg.TenantID, arg.SnapshotID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const SnapshotScopes = `-- name: SnapshotScopes :many
+SELECT DISTINCT scope_id FROM fact_snapshot_items WHERE tenant_id=$1 AND snapshot_id=$2 ORDER BY scope_id
+`
+
+type SnapshotScopesParams struct {
+	TenantID   string
+	SnapshotID string
+}
+
+func (q *Queries) SnapshotScopes(ctx context.Context, arg SnapshotScopesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, SnapshotScopes, arg.TenantID, arg.SnapshotID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var scope_id string
+		if err := rows.Scan(&scope_id); err != nil {
+			return nil, err
+		}
+		items = append(items, scope_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

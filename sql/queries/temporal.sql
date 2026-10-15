@@ -94,9 +94,10 @@ JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id
 WHERE r.tenant_id=$1 AND r.record_id=$2 AND e.ledger_revision<=$3;
 
 -- name: GetSnapshotPayload :one
-SELECT p.payload
+SELECT coalesce(p.payload,d.payload)::bytea AS payload
 FROM fact_snapshots s
 LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+LEFT JOIN snapshot_disposals d ON d.tenant_id=s.tenant_id AND d.snapshot_id=s.id
 WHERE s.tenant_id=$1 AND s.id=$2;
 
 -- name: ListFactHistoryPayloads :many

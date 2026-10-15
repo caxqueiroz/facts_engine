@@ -136,7 +136,7 @@ func (s *Service) GetFactSnapshot(ctx context.Context, c model.Caller, q model.S
 	if _, err := s.snapshotAuthorization(ctx, c, keys, model.Command{Purpose: q.Purpose}, false, false); err != nil {
 		return model.FactSnapshot{}, err
 	}
-	if snapshot.Tenant != c.Tenant || model.SnapshotDigest(snapshot) != snapshot.Digest {
+	if snapshot.PayloadDisposed || snapshot.Tenant != c.Tenant || model.SnapshotDigest(snapshot) != snapshot.Digest {
 		return model.FactSnapshot{}, model.ErrPrecondition
 	}
 	return snapshot, nil

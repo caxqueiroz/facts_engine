@@ -164,3 +164,30 @@ LIMIT sqlc.arg(page_limit);
 -- name: HasIncompleteEvidenceInventory :one
 SELECT EXISTS(SELECT 1 FROM evidence e WHERE e.tenant_id=$1
 AND NOT EXISTS(SELECT 1 FROM evidence_retention b WHERE b.tenant_id=e.tenant_id AND b.evidence_id=e.id));
+
+-- name: LockSnapshotGuard :exec
+INSERT INTO snapshot_guards(tenant_id,snapshot_id,epoch) VALUES($1,$2,1)
+ON CONFLICT(tenant_id,snapshot_id) DO UPDATE SET epoch=snapshot_guards.epoch+1;
+
+-- name: SnapshotContentAvailable :one
+SELECT EXISTS(SELECT 1 FROM fact_snapshot_payloads p WHERE p.tenant_id=$1 AND p.snapshot_id=$2)
+AND NOT EXISTS(SELECT 1 FROM snapshot_disposals d WHERE d.tenant_id=$1 AND d.snapshot_id=$2);
+
+-- name: SnapshotCreationTime :one
+SELECT e.recorded_at FROM fact_snapshots s JOIN ledger_events e ON e.tenant_id=s.tenant_id AND e.ledger_revision=s.creation_revision
+WHERE s.tenant_id=$1 AND s.id=$2;
+
+-- name: SnapshotDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM calculation_snapshots c WHERE c.tenant_id=$1 AND c.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM audit_export_requests a JOIN fact_snapshot_items i ON i.tenant_id=a.tenant_id AND i.scope_id=a.scope_id WHERE i.tenant_id=$1 AND i.snapshot_id=$2)
+OR EXISTS(SELECT 1 FROM consumer_offsets co JOIN fact_snapshots s ON s.tenant_id=co.tenant_id WHERE s.tenant_id=$1 AND s.id=$2 AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<s.creation_revision);
+
+-- name: DeleteSnapshotPayload :execrows
+DELETE FROM fact_snapshot_payloads WHERE tenant_id=$1 AND snapshot_id=$2;
+
+-- name: InsertSnapshotDisposal :exec
+INSERT INTO snapshot_disposals(tenant_id,snapshot_id,payload) VALUES($1,$2,$3);
+
+-- name: SnapshotScopes :many
+SELECT DISTINCT scope_id FROM fact_snapshot_items WHERE tenant_id=$1 AND snapshot_id=$2 ORDER BY scope_id;

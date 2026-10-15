@@ -130,9 +130,10 @@ func (q *Queries) GetRevisionTime(ctx context.Context, arg GetRevisionTimeParams
 }
 
 const GetSnapshotPayload = `-- name: GetSnapshotPayload :one
-SELECT p.payload
+SELECT coalesce(p.payload,d.payload)::bytea AS payload
 FROM fact_snapshots s
 LEFT JOIN fact_snapshot_payloads p ON p.tenant_id=s.tenant_id AND p.snapshot_id=s.id
+LEFT JOIN snapshot_disposals d ON d.tenant_id=s.tenant_id AND d.snapshot_id=s.id
 WHERE s.tenant_id=$1 AND s.id=$2
 `
 

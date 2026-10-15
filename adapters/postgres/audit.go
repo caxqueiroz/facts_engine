@@ -11,6 +11,11 @@ import (
 )
 
 func (t *transaction) StageCalculation(ctx context.Context, r model.CalculationRecord, snapshots []model.FactSnapshot) error {
+	for _, snapshot := range snapshots {
+		if err := t.guardSnapshotContent(ctx, snapshot.ID); err != nil {
+			return err
+		}
+	}
 	for _, ref := range []model.ArtifactReference{r.Receipt.Input, r.Receipt.Output} {
 		if err := t.guardEvidenceReference(ctx, ref.EvidenceID); err != nil {
 			return err

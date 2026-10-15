@@ -35,6 +35,7 @@ type SnapshotItem struct {
 	EvidenceIDs, AttestationIDs []string
 }
 type FactSnapshot struct {
+	PayloadDisposed                     bool `json:",omitempty"`
 	ID                                  string
 	Tenant                              string
 	Caller                              Caller

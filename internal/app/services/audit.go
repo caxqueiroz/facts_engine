@@ -228,6 +228,7 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 }
 func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r model.AuditExportRequest, entries []model.AuditEntry) ([]model.AuditEntry, []model.AuditGap, error) {
 	snapshots := map[string]bool{}
+	disposedSnapshots := map[string]bool{}
 	evidence := map[string]model.Evidence{}
 	gaps := []model.AuditGap{}
 	disposedEvidence := map[string]bool{}
@@ -246,6 +247,7 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				}
 			}
 			snapshots[snap.ID] = allowed
+			disposedSnapshots[snap.ID] = snap.PayloadDisposed
 		case "evidence":
 			var e model.Evidence
 			if err := json.Unmarshal(entry.Payload, &e); err != nil {
@@ -321,6 +323,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &event); err != nil {
 				return nil, nil, err
 			}
+			if event.SnapshotDisposal != nil {
+				for _, b := range event.SnapshotDisposal.Bindings {
+					include = include && b.Scope == r.Scope
+				}
+			}
 			if event.Kind == "dispose_evidence" {
 				ids := []string{event.TargetID}
 				if event.Disposal != nil {
@@ -356,6 +363,9 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 
 		case "snapshot":
 			include = snapshots[entry.ID]
+			if include && disposedSnapshots[entry.ID] {
+				gaps = append(gaps, model.AuditGap{Kind: "snapshot_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
+			}
 		case "calculation":
 			var calc model.CalculationRecord
 			if err := json.Unmarshal(entry.Payload, &calc); err != nil {

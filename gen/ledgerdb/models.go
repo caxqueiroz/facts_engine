@@ -696,6 +696,19 @@ type ScopeVersion struct {
 	Payload        []byte
 }
 
+type SnapshotDisposal struct {
+	TenantID   string
+	SnapshotID string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
+type SnapshotGuard struct {
+	TenantID   string
+	SnapshotID string
+	Epoch      int64
+}
+
 type Subject struct {
 	TenantID        string
 	ScopeID         string

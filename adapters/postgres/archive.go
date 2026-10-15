@@ -241,6 +241,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				if err := json.Unmarshal(entry.Payload, &event); err != nil {
 					return err
 				}
+				if event.SnapshotDisposal != nil {
+					for _, b := range event.SnapshotDisposal.Bindings {
+						scopes[b.Scope] = true
+					}
+				}
 				if event.Disposal != nil {
 					ids := append([]string{event.Disposal.EvidenceID}, event.Disposal.DerivativeEvidenceIDs...)
 					for _, id := range ids {
@@ -325,6 +330,12 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				var snapshot model.FactSnapshot
 				if err := json.Unmarshal(entry.Payload, &snapshot); err != nil {
 					return err
+				}
+				if err := ledgerdb.New(t.tx).LockSnapshotGuard(ctx, ledgerdb.LockSnapshotGuardParams{TenantID: t.tenant, SnapshotID: snapshot.ID}); err != nil {
+					return err
+				}
+				if snapshot.PayloadDisposed {
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "snapshot_content", ID: snapshot.ID, Reason: "disposed_under_retention_policy"})
 				}
 				for _, item := range snapshot.Items {
 					scopes[item.Selector.Scope] = true
