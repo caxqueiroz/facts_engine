@@ -53,6 +53,9 @@ func (l *Ledger) rebuild(ctx context.Context, k model.GenerationKey, a model.Reb
 		if err := ledgerdb.New(t.tx).LockProjectionManagement(ctx, model.Digest([]string{k.Tenant, "projection-management"})); err != nil {
 			return err
 		}
+		if err := ledgerdb.New(t.tx).LockProjectionRetentionGuard(ctx, k.Tenant); err != nil {
+			return err
+		}
 		if err := validateRebuildAuthorization(k, a); err != nil {
 			return err
 		}

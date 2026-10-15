@@ -282,6 +282,11 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if err := ledger.RegisterConsumer(startup, consumer, c.MaxAttempts); err != nil {
 		return errors.New("cannot register configured consumer")
 	}
+	if c.Mode == "projection" {
+		if err := ledger.RegisterProjectionDestination(startup, model.GenerationKey{Tenant: consumer.Tenant, Generation: c.Projection.Generation}); err != nil {
+			return errors.New("cannot register projection destination")
+		}
+	}
 	if telemetry.Metrics != nil {
 		monitor, err := workers.NewProgressMonitor(ledger, []workers.ProgressTarget{{Key: consumer, Kind: c.Mode}}, telemetry.Metrics, 2*time.Second)
 		if err != nil {

@@ -713,6 +713,13 @@ type PredicateVersion struct {
 	Payload   []byte
 }
 
+type ProjectionDestination struct {
+	TenantID     string
+	Generation   string
+	ConsumerID   string
+	RegisteredAt pgtype.Timestamptz
+}
+
 type ProjectionGeneration struct {
 	TenantID            string
 	Generation          string
@@ -733,6 +740,11 @@ type ProjectionRebuildEvent struct {
 	Operation  string
 	Payload    []byte
 	RecordedAt pgtype.Timestamptz
+}
+
+type ProjectionRetentionGuard struct {
+	TenantID string
+	Epoch    int64
 }
 
 type Record struct {

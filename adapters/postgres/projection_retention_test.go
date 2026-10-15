@@ -25,6 +25,9 @@ func testDisposedProjectionReads(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal(err)
 	}
 	key := model.GenerationKey{Tenant: tenant, Generation: "retention-rebuild"}
+	if err = ledger.RegisterConsumer(ctx, model.ConsumerKey{Tenant: tenant, Consumer: model.ProjectionConsumer(key.Generation)}, 3); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = admin.Exec(ctx, "INSERT INTO projection_generations(tenant_id,generation,state,fence,through_revision) VALUES($1,$2,'paused',1,$3)", tenant, key.Generation, memoryRevision); err != nil {
 		t.Fatal(err)
 	}

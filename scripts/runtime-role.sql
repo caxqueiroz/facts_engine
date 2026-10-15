@@ -144,3 +144,10 @@ GRANT UPDATE(epoch) ON extraction_content_guards TO facts_runtime,facts_archiver
 
 GRANT INSERT ON extraction_job_disposals,extraction_attempt_disposals,extraction_result_disposals TO facts_retention;
 GRANT DELETE ON extraction_job_payloads,extraction_attempt_payloads,extraction_result_payloads TO facts_retention;
+
+-- Durable destination inventory and the shared rebuild/retention epoch.
+GRANT SELECT,INSERT ON projection_destinations,projection_retention_guards TO facts_worker;
+GRANT UPDATE(epoch) ON projection_retention_guards TO facts_worker;
+GRANT SELECT ON projection_destinations,projection_retention_guards TO facts_runtime;
+REVOKE UPDATE,DELETE,TRUNCATE ON projection_destinations FROM facts_worker;
+REVOKE DELETE,TRUNCATE ON projection_retention_guards FROM facts_worker;
