@@ -152,10 +152,9 @@ func (s *Service) RunAuditExport(ctx context.Context, c model.Caller, q model.Au
 		return model.AuditExportResult{}, err
 	}
 	gaps = append(gaps, extra...)
-	// Explicitly report coverage that this delivery slice does not implement.
-	for _, kind := range []string{"coordinated_derivative_disposal"} {
-		gaps = append(gaps, model.AuditGap{Kind: kind, Reason: "not_implemented"})
-	}
+	// Preserve the gap kind while distinguishing supported unreferenced lineage
+	// disposal from the remaining copies embedded in referenced artifacts.
+	gaps = append(gaps, model.AuditGap{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"})
 	gaps = append(gaps, model.AuditGap{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"})
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Kind == entries[j].Kind {

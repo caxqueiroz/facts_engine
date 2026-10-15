@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -77,6 +80,11 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	if err != nil || pending.Result.State != "pending" || pending.Result.Bundle != nil || pending.Result.Artifact != nil {
 		t.Fatalf("pending audit: %v, %v", pending, err)
 	}
+	grpcClient := v1.NewAuditServiceClient(governanceGRPC(t, engine, caller))
+	grpcPending, err := grpcClient.StartAuditExport(ctx, request)
+	if err != nil || !proto.Equal(pending, grpcPending) {
+		t.Fatal("gRPC pending export replay", grpcPending, err)
+	}
 	duplicate, err := engine.StartAuditExport(ctx, caller, model.AuditExportRequest{Command: model.Command{Key: "remote-audit", Purpose: "audit"}, Scope: "case1", IncludeEvidence: true})
 	if err != nil || duplicate.ID != pending.Result.Id {
 		t.Fatalf("audit start retry: %+v, %v", duplicate, err)
@@ -90,7 +98,13 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	if err != nil || fetched.Result.State != "completed" || fetched.Result.CompletedRevision != completed.CompletedRevision {
 		t.Fatalf("completed audit: %v, %v", fetched, err)
 	}
-	bundle := fetched.Result.Bundle
+	grpcFetched, err := grpcClient.GetAuditExport(ctx, query)
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC signed export differs", grpcFetched, err)
+	}
+	// Verify the generated grpc-go response independently, including exact signed
+	// JSON, entry digests and the canonical retained artifact digest.
+	bundle := grpcFetched.Result.Bundle
 	canonical, err := json.Marshal(completed.Bundle.Manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +115,14 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	var manifest model.AuditManifest
 	if err := json.Unmarshal(bundle.ManifestJson, &manifest); err != nil {
 		t.Fatal(err)
+	}
+	for _, expected := range []model.AuditGap{
+		{Kind: "independent_archive_chain", Reason: "archive_coverage_not_attached"},
+		{Kind: "coordinated_derivative_disposal", Reason: "referenced_payload_disposal_not_implemented"},
+	} {
+		if !slices.Contains(manifest.Gaps, expected) {
+			t.Fatal("signed export omitted coverage limit", expected)
+		}
 	}
 	if manifest.ExportID != bundle.Manifest.ExportId || manifest.Tenant != bundle.Manifest.Tenant || manifest.Scope != bundle.Manifest.Scope || manifest.ThroughRevision != bundle.Manifest.ThroughRevision || int64(manifest.EntryCount) != bundle.Manifest.EntryCount || len(manifest.Entries) != len(bundle.Entries) || len(manifest.Entries) != len(bundle.Manifest.Entries) {
 		t.Fatal("typed manifest differs from signed metadata")
@@ -127,14 +149,29 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	if _, err := makeClient(restricted).GetAuditExport(ctx, query); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("evidence permission bypass: %v", err)
 	}
+	if _, err := v1.NewAuditServiceClient(governanceGRPC(t, restricted, caller)).GetAuditExport(ctx, query); status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC evidence permission bypass", err)
+	}
+	forged := proto.Clone(query).(*v1.GetAuditExportRequest)
+	forged.Tenant = "other-tenant"
+	if _, err := grpcClient.GetAuditExport(ctx, forged); status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC tenant binding bypass", err)
+	}
 	query.Scope = "case2"
 	if _, err := client.GetAuditExport(ctx, query); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("audit scope mismatch: %v", err)
+	}
+	if _, err := grpcClient.GetAuditExport(ctx, query); status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC audit scope mismatch", err)
 	}
 	changes := &v1.ListChangesRequest{Tenant: caller.Tenant, Scope: "case1", Purpose: "audit", Limit: 2}
 	first, err := client.ListChanges(ctx, changes)
 	if err != nil || len(first.Events) != 2 || first.NextRevision <= 0 || first.NextRevision > first.ThroughRevision {
 		t.Fatalf("change cursor: %v, %v", first, err)
+	}
+	grpcFirst, err := grpcClient.ListChanges(ctx, changes)
+	if err != nil || !proto.Equal(first, grpcFirst) {
+		t.Fatal("gRPC change page differs", grpcFirst, err)
 	}
 	direct, err := engine.ListChanges(ctx, caller, model.ChangesQuery{Scope: "case1", Purpose: "audit", Limit: 2})
 	if err != nil || direct.Events[0].ID != first.Events[0].Id || direct.Events[1].ID != first.Events[1].Id || direct.NextRevision != first.NextRevision {
@@ -145,8 +182,16 @@ func testRemoteAudit(t *testing.T, ctx context.Context, engine, restricted *fact
 	if err != nil || len(second.Events) != 2 || second.Events[0].LedgerRevision <= first.NextRevision {
 		t.Fatalf("change continuation: %v, %v", second, err)
 	}
+	grpcSecond, err := grpcClient.ListChanges(ctx, changes)
+	if err != nil || !proto.Equal(second, grpcSecond) {
+		t.Fatal("gRPC change continuation differs", grpcSecond, err)
+	}
 	changes.AfterRevision = second.ThroughRevision + 1
 	if _, err := client.ListChanges(ctx, changes); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("future cursor accepted: %v", err)
 	}
+	if _, err := grpcClient.ListChanges(ctx, changes); status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC future cursor accepted", err)
+	}
+
 }
