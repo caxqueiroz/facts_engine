@@ -79,6 +79,7 @@ func TestPostgresLedger(t *testing.T) {
 		t.Fatal(err)
 	}
 	store, _ := evidence.NewPostgres(runtime, cipher)
+	t.Run("database unavailable", func(t *testing.T) { testDatabaseUnavailable(t, ctx, cfg, admin, cipher) })
 	engine, err := facts.New(ledger, allow{}, store)
 	if err != nil {
 		t.Fatal(err)
