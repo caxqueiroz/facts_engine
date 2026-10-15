@@ -14,6 +14,9 @@ func (t *transaction) ContextManifest(ctx context.Context, id string) (model.Con
 	if err != nil {
 		return m, translate(err)
 	}
+	if len(payload) == 0 {
+		return m, model.ErrPrecondition
+	}
 	err = t.decode(payload, &m)
 	return m, err
 }
@@ -72,7 +75,10 @@ func (t *transaction) flushContext(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertContextPayload(ctx, ledgerdb.InsertContextPayloadParams{TenantID: t.tenant, ID: m.ID, ScopeID: m.Scope, SelectionRevision: m.SelectionRevision, LedgerRevision: e.LedgerRevision, Payload: b}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertContextManifest(ctx, ledgerdb.InsertContextManifestParams{TenantID: t.tenant, ID: m.ID, ScopeID: m.Scope, SelectionRevision: m.SelectionRevision, LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertContextPayload(ctx, ledgerdb.InsertContextPayloadParams{TenantID: t.tenant, ContextID: m.ID, Payload: b}); err != nil {
 			return err
 		}
 		for _, scope := range model.ContextScopes(m) {

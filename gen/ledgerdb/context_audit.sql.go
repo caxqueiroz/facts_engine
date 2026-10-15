@@ -143,9 +143,10 @@ func (q *Queries) GetCalculationRunPayload(ctx context.Context, arg GetCalculati
 }
 
 const GetContextPayload = `-- name: GetContextPayload :one
-SELECT payload
-FROM context_manifests
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM context_manifests c
+LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2
 `
 
 type GetContextPayloadParams struct {
@@ -356,6 +357,30 @@ func (q *Queries) InsertContextFactItem(ctx context.Context, arg InsertContextFa
 	return err
 }
 
+const InsertContextManifest = `-- name: InsertContextManifest :exec
+INSERT INTO context_manifests (tenant_id,id,scope_id,selection_revision,ledger_revision)
+VALUES ($1,$2,$3,$4,$5)
+`
+
+type InsertContextManifestParams struct {
+	TenantID          string
+	ID                string
+	ScopeID           string
+	SelectionRevision int64
+	LedgerRevision    int64
+}
+
+func (q *Queries) InsertContextManifest(ctx context.Context, arg InsertContextManifestParams) error {
+	_, err := q.db.Exec(ctx, InsertContextManifest,
+		arg.TenantID,
+		arg.ID,
+		arg.ScopeID,
+		arg.SelectionRevision,
+		arg.LedgerRevision,
+	)
+	return err
+}
+
 const InsertContextMemoryItem = `-- name: InsertContextMemoryItem :exec
 INSERT INTO context_memory_items (tenant_id,context_id,ordinal,record_id,version_id,scope_id)
 VALUES ($1,$2,$3,$4,$5,$6)
@@ -383,28 +408,17 @@ func (q *Queries) InsertContextMemoryItem(ctx context.Context, arg InsertContext
 }
 
 const InsertContextPayload = `-- name: InsertContextPayload :exec
-INSERT INTO context_manifests (tenant_id,id,scope_id,selection_revision,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6)
+INSERT INTO context_payloads(tenant_id,context_id,payload) VALUES ($1,$2,$3)
 `
 
 type InsertContextPayloadParams struct {
-	TenantID          string
-	ID                string
-	ScopeID           string
-	SelectionRevision int64
-	LedgerRevision    int64
-	Payload           []byte
+	TenantID  string
+	ContextID string
+	Payload   []byte
 }
 
 func (q *Queries) InsertContextPayload(ctx context.Context, arg InsertContextPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertContextPayload,
-		arg.TenantID,
-		arg.ID,
-		arg.ScopeID,
-		arg.SelectionRevision,
-		arg.LedgerRevision,
-		arg.Payload,
-	)
+	_, err := q.db.Exec(ctx, InsertContextPayload, arg.TenantID, arg.ContextID, arg.Payload)
 	return err
 }
 

@@ -1,7 +1,8 @@
 -- name: GetContextPayload :one
-SELECT payload
-FROM context_manifests
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM context_manifests c
+LEFT JOIN context_payloads p ON p.tenant_id=c.tenant_id AND p.context_id=c.id
+WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: GetDecisionPayload :one
 SELECT payload
@@ -16,9 +17,12 @@ SELECT payload
 FROM decision_receipts
 WHERE tenant_id=$1 AND application_id=$2 AND external_decision_id=$3;
 
+-- name: InsertContextManifest :exec
+INSERT INTO context_manifests (tenant_id,id,scope_id,selection_revision,ledger_revision)
+VALUES ($1,$2,$3,$4,$5);
+
 -- name: InsertContextPayload :exec
-INSERT INTO context_manifests (tenant_id,id,scope_id,selection_revision,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6);
+INSERT INTO context_payloads(tenant_id,context_id,payload) VALUES ($1,$2,$3);
 
 -- name: InsertContextScope :exec
 INSERT INTO context_scopes (tenant_id,context_id,scope_id)

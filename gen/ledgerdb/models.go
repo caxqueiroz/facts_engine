@@ -181,7 +181,6 @@ type ContextManifest struct {
 	ScopeID           string
 	SelectionRevision int64
 	LedgerRevision    int64
-	Payload           []byte
 }
 
 type ContextMemoryItem struct {
@@ -191,6 +190,12 @@ type ContextMemoryItem struct {
 	RecordID  string
 	VersionID string
 	ScopeID   string
+}
+
+type ContextPayload struct {
+	TenantID  string
+	ContextID string
+	Payload   []byte
 }
 
 type ContextScope struct {
