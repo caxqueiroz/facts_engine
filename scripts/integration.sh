@@ -10,7 +10,7 @@ export TEST_OPENFGA_URL="${TEST_OPENFGA_URL:-http://127.0.0.1:58080}"
 # Cortex tests use fresh dedicated pgvector databases; no existing data is reset.
 : "${TEST_CORTEX_CONTAINER:=facts-engine-cortex}"
 : "${TEST_CORTEX_PORT:=55433}"
-for suffix in a b pipeline rebuild lexical standalone; do
+for suffix in a b pipeline rebuild lexical standalone cleanup cleanupterminal; do
   cortex_database="${test_database}_cortex_${suffix}"
   docker exec "$TEST_CORTEX_CONTAINER" createdb -U postgres "$cortex_database"
   cortex_url="postgres://postgres:development@127.0.0.1:${TEST_CORTEX_PORT}/${cortex_database}?sslmode=disable"
@@ -21,6 +21,8 @@ for suffix in a b pipeline rebuild lexical standalone; do
     lexical) export TEST_LEXICAL_DATABASE_URL="$cortex_url" ;;
     rebuild) export TEST_REBUILD_DATABASE_URL="$cortex_url" ;;
     standalone) export TEST_STANDALONE_DATABASE_URL="$cortex_url" ;;
+    cleanup) export TEST_CLEANUP_DATABASE_URL="$cortex_url" ;;
+    cleanupterminal) export TEST_CLEANUP_TERMINAL_DATABASE_URL="$cortex_url" ;;
   esac
 done
 go test -race ./... -count=1 -timeout 10m

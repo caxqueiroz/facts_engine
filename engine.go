@@ -437,3 +437,10 @@ func (e *Engine) DisposeExtraction(ctx context.Context, c Caller, r model.Extrac
 func (e *Engine) DisposeVersion(ctx context.Context, c Caller, r model.VersionDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeVersion(ctx, c, r)
 }
+
+// CleanupProjection removes one captured index copy under the original version
+// disposal policies and records its acknowledgement. Configure a separately
+// provisioned retention destination through EngineOptions.ProjectionCleanup.
+func (e *Engine) CleanupProjection(ctx context.Context, c Caller, r model.ProjectionCleanupRequest) (CommitResult, error) {
+	return e.service.CleanupProjection(ctx, c, r)
+}

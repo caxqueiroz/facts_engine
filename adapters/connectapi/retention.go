@@ -7,6 +7,7 @@ import (
 )
 
 type RetentionEngine interface {
+	CleanupProjection(context.Context, model.Caller, model.ProjectionCleanupRequest) (model.CommitResult, error)
 	DisposeVersion(context.Context, model.Caller, model.VersionDisposalRequest) (model.CommitResult, error)
 	DisposeExtraction(context.Context, model.Caller, model.ExtractionDisposalRequest) (model.CommitResult, error)
 	DisposeContext(context.Context, model.Caller, model.ContextDisposalRequest) (model.CommitResult, error)
@@ -112,4 +113,16 @@ func (s *retentionService) DisposeVersion(ctx context.Context, r *v1.DisposeVers
 		return nil, err
 	}
 	return &v1.DisposeVersionResponse{Result: commit(out)}, nil
+}
+
+func (s *retentionService) CleanupProjection(ctx context.Context, r *v1.CleanupProjectionRequest) (*v1.CleanupProjectionResponse, error) {
+	request := model.ProjectionCleanupRequest{Command: command(r.Command), VersionID: r.VersionId, Kind: r.Kind, Scope: r.Scope, RecordID: r.RecordId, Reason: r.Reason, DisposalEventID: r.DisposalEventId, Generation: r.Generation}
+	for _, b := range r.Bindings {
+		request.Bindings = append(request.Bindings, model.VersionRetentionBinding{Scope: b.Scope, PolicyID: b.PolicyId, Jurisdiction: b.Jurisdiction})
+	}
+	out, err := s.engine.CleanupProjection(ctx, callerFrom(ctx), request)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.CleanupProjectionResponse{Result: commit(out)}, nil
 }

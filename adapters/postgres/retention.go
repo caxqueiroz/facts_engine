@@ -290,6 +290,10 @@ func (t *transaction) flushRetention(ctx context.Context, event model.Event) err
 		return err
 	}
 	_, err = ledgerdb.New(t.tx).InsertRetentionEvent(ctx, ledgerdb.InsertRetentionEventParams{TenantID: t.tenant, ID: r.ID, ScopeID: r.Scope, Kind: r.Kind, TargetID: r.TargetID, LedgerRevision: event.LedgerRevision, Payload: b})
+	if err == nil && r.ProjectionCleanup != nil {
+		cleanup := r.ProjectionCleanup
+		err = ledgerdb.New(t.tx).InsertProjectionCleanupAcknowledgement(ctx, ledgerdb.InsertProjectionCleanupAcknowledgementParams{TenantID: t.tenant, Kind: cleanup.Kind, VersionID: cleanup.VersionID, Generation: cleanup.Generation, AcknowledgementID: r.ID})
+	}
 	return err
 }
 

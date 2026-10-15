@@ -36,6 +36,9 @@ const (
 	// RetentionServiceDisposeEvidenceProcedure is the procedure name of the RetentionService's
 	// DisposeEvidence RPC.
 	RetentionServiceDisposeEvidenceProcedure = "/memory.v1.RetentionService/DisposeEvidence"
+	// RetentionServiceCleanupProjectionProcedure is the procedure name of the RetentionService's
+	// CleanupProjection RPC.
+	RetentionServiceCleanupProjectionProcedure = "/memory.v1.RetentionService/CleanupProjection"
 	// RetentionServiceDisposeVersionProcedure is the procedure name of the RetentionService's
 	// DisposeVersion RPC.
 	RetentionServiceDisposeVersionProcedure = "/memory.v1.RetentionService/DisposeVersion"
@@ -83,6 +86,13 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_memory_v1_retention_proto.Services().ByName("RetentionService").Methods().ByName("DisposeEvidence"),
 			Procedure:  RetentionServiceDisposeEvidenceProcedure,
+		}
+	})
+	retentionServiceCleanupProjectionSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_retention_proto.Services().ByName("RetentionService").Methods().ByName("CleanupProjection"),
+			Procedure:  RetentionServiceCleanupProjectionProcedure,
 		}
 	})
 	retentionServiceDisposeVersionSpec = sync.OnceValue(func() connect.Spec {
@@ -135,6 +145,7 @@ type RetentionServiceClient interface {
 	PlaceLegalHold(context.Context, *v1.PlaceLegalHoldRequest) (*v1.PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *v1.ReleaseLegalHoldRequest) (*v1.ReleaseLegalHoldResponse, error)
 	DisposeEvidence(context.Context, *v1.DisposeEvidenceRequest) (*v1.DisposeEvidenceResponse, error)
+	CleanupProjection(context.Context, *v1.CleanupProjectionRequest) (*v1.CleanupProjectionResponse, error)
 	DisposeVersion(context.Context, *v1.DisposeVersionRequest) (*v1.DisposeVersionResponse, error)
 	DisposeExtraction(context.Context, *v1.DisposeExtractionRequest) (*v1.DisposeExtractionResponse, error)
 	DisposeContext(context.Context, *v1.DisposeContextRequest) (*v1.DisposeContextResponse, error)
@@ -155,6 +166,7 @@ type RetentionServiceHandler interface {
 	PlaceLegalHold(context.Context, *v1.PlaceLegalHoldRequest) (*v1.PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *v1.ReleaseLegalHoldRequest) (*v1.ReleaseLegalHoldResponse, error)
 	DisposeEvidence(context.Context, *v1.DisposeEvidenceRequest) (*v1.DisposeEvidenceResponse, error)
+	CleanupProjection(context.Context, *v1.CleanupProjectionRequest) (*v1.CleanupProjectionResponse, error)
 	DisposeVersion(context.Context, *v1.DisposeVersionRequest) (*v1.DisposeVersionResponse, error)
 	DisposeExtraction(context.Context, *v1.DisposeExtractionRequest) (*v1.DisposeExtractionResponse, error)
 	DisposeContext(context.Context, *v1.DisposeContextRequest) (*v1.DisposeContextResponse, error)
@@ -172,6 +184,7 @@ func RegisterRetentionServiceHandler(server *connect.Server, svc RetentionServic
 		connect.Method{Spec: retentionServicePlaceLegalHoldSpec(), Handler: adapter.placeLegalHold},
 		connect.Method{Spec: retentionServiceReleaseLegalHoldSpec(), Handler: adapter.releaseLegalHold},
 		connect.Method{Spec: retentionServiceDisposeEvidenceSpec(), Handler: adapter.disposeEvidence},
+		connect.Method{Spec: retentionServiceCleanupProjectionSpec(), Handler: adapter.cleanupProjection},
 		connect.Method{Spec: retentionServiceDisposeVersionSpec(), Handler: adapter.disposeVersion},
 		connect.Method{Spec: retentionServiceDisposeExtractionSpec(), Handler: adapter.disposeExtraction},
 		connect.Method{Spec: retentionServiceDisposeContextSpec(), Handler: adapter.disposeContext},
@@ -198,6 +211,10 @@ func (UnimplementedRetentionServiceHandler) ReleaseLegalHold(context.Context, *v
 
 func (UnimplementedRetentionServiceHandler) DisposeEvidence(context.Context, *v1.DisposeEvidenceRequest) (*v1.DisposeEvidenceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.RetentionService.DisposeEvidence is not implemented")
+}
+
+func (UnimplementedRetentionServiceHandler) CleanupProjection(context.Context, *v1.CleanupProjectionRequest) (*v1.CleanupProjectionResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.RetentionService.CleanupProjection is not implemented")
 }
 
 func (UnimplementedRetentionServiceHandler) DisposeVersion(context.Context, *v1.DisposeVersionRequest) (*v1.DisposeVersionResponse, error) {
@@ -255,6 +272,14 @@ func (c *retentionServiceClient) ReleaseLegalHold(ctx context.Context, req *v1.R
 func (c *retentionServiceClient) DisposeEvidence(ctx context.Context, req *v1.DisposeEvidenceRequest) (*v1.DisposeEvidenceResponse, error) {
 	var res v1.DisposeEvidenceResponse
 	if err := c.client.CallUnary(ctx, retentionServiceDisposeEvidenceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *retentionServiceClient) CleanupProjection(ctx context.Context, req *v1.CleanupProjectionRequest) (*v1.CleanupProjectionResponse, error) {
+	var res v1.CleanupProjectionResponse
+	if err := c.client.CallUnary(ctx, retentionServiceCleanupProjectionSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -352,6 +377,18 @@ func (h retentionServiceHandler) disposeEvidence(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.DisposeEvidence(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h retentionServiceHandler) cleanupProjection(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CleanupProjectionRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CleanupProjection(ctx, &req)
 	if err != nil {
 		return err
 	}

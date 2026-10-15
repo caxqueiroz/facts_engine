@@ -23,6 +23,7 @@ const (
 	RetentionService_PlaceLegalHold_FullMethodName          = "/memory.v1.RetentionService/PlaceLegalHold"
 	RetentionService_ReleaseLegalHold_FullMethodName        = "/memory.v1.RetentionService/ReleaseLegalHold"
 	RetentionService_DisposeEvidence_FullMethodName         = "/memory.v1.RetentionService/DisposeEvidence"
+	RetentionService_CleanupProjection_FullMethodName       = "/memory.v1.RetentionService/CleanupProjection"
 	RetentionService_DisposeVersion_FullMethodName          = "/memory.v1.RetentionService/DisposeVersion"
 	RetentionService_DisposeExtraction_FullMethodName       = "/memory.v1.RetentionService/DisposeExtraction"
 	RetentionService_DisposeContext_FullMethodName          = "/memory.v1.RetentionService/DisposeContext"
@@ -42,6 +43,7 @@ type RetentionServiceClient interface {
 	PlaceLegalHold(ctx context.Context, in *PlaceLegalHoldRequest, opts ...grpc.CallOption) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(ctx context.Context, in *ReleaseLegalHoldRequest, opts ...grpc.CallOption) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(ctx context.Context, in *DisposeEvidenceRequest, opts ...grpc.CallOption) (*DisposeEvidenceResponse, error)
+	CleanupProjection(ctx context.Context, in *CleanupProjectionRequest, opts ...grpc.CallOption) (*CleanupProjectionResponse, error)
 	DisposeVersion(ctx context.Context, in *DisposeVersionRequest, opts ...grpc.CallOption) (*DisposeVersionResponse, error)
 	DisposeExtraction(ctx context.Context, in *DisposeExtractionRequest, opts ...grpc.CallOption) (*DisposeExtractionResponse, error)
 	DisposeContext(ctx context.Context, in *DisposeContextRequest, opts ...grpc.CallOption) (*DisposeContextResponse, error)
@@ -92,6 +94,16 @@ func (c *retentionServiceClient) DisposeEvidence(ctx context.Context, in *Dispos
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DisposeEvidenceResponse)
 	err := c.cc.Invoke(ctx, RetentionService_DisposeEvidence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *retentionServiceClient) CleanupProjection(ctx context.Context, in *CleanupProjectionRequest, opts ...grpc.CallOption) (*CleanupProjectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CleanupProjectionResponse)
+	err := c.cc.Invoke(ctx, RetentionService_CleanupProjection_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +181,7 @@ type RetentionServiceServer interface {
 	PlaceLegalHold(context.Context, *PlaceLegalHoldRequest) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *ReleaseLegalHoldRequest) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error)
+	CleanupProjection(context.Context, *CleanupProjectionRequest) (*CleanupProjectionResponse, error)
 	DisposeVersion(context.Context, *DisposeVersionRequest) (*DisposeVersionResponse, error)
 	DisposeExtraction(context.Context, *DisposeExtractionRequest) (*DisposeExtractionResponse, error)
 	DisposeContext(context.Context, *DisposeContextRequest) (*DisposeContextResponse, error)
@@ -196,6 +209,9 @@ func (UnimplementedRetentionServiceServer) ReleaseLegalHold(context.Context, *Re
 }
 func (UnimplementedRetentionServiceServer) DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisposeEvidence not implemented")
+}
+func (UnimplementedRetentionServiceServer) CleanupProjection(context.Context, *CleanupProjectionRequest) (*CleanupProjectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CleanupProjection not implemented")
 }
 func (UnimplementedRetentionServiceServer) DisposeVersion(context.Context, *DisposeVersionRequest) (*DisposeVersionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisposeVersion not implemented")
@@ -304,6 +320,24 @@ func _RetentionService_DisposeEvidence_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RetentionServiceServer).DisposeEvidence(ctx, req.(*DisposeEvidenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RetentionService_CleanupProjection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CleanupProjectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RetentionServiceServer).CleanupProjection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RetentionService_CleanupProjection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RetentionServiceServer).CleanupProjection(ctx, req.(*CleanupProjectionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -438,6 +472,10 @@ var RetentionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DisposeEvidence",
 			Handler:    _RetentionService_DisposeEvidence_Handler,
+		},
+		{
+			MethodName: "CleanupProjection",
+			Handler:    _RetentionService_CleanupProjection_Handler,
 		},
 		{
 			MethodName: "DisposeVersion",

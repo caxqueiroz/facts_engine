@@ -14,6 +14,7 @@ service RetentionService {
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc CleanupProjection(CleanupProjectionRequest) returns (CleanupProjectionResponse);
   rpc DisposeVersion(DisposeVersionRequest) returns (DisposeVersionResponse);
   rpc DisposeExtraction(DisposeExtractionRequest) returns (DisposeExtractionResponse);
   rpc DisposeContext(DisposeContextRequest) returns (DisposeContextResponse);
@@ -231,5 +232,30 @@ message DisposeVersionRequest {
   string record_id = 8 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
 }
 message DisposeVersionResponse {
+  CommitResult result = 1;
+}
+
+message CleanupProjectionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string version_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated VersionRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+  string kind = 6 [
+    (buf.validate.field).string.in = "fact",
+    (buf.validate.field).string.in = "memory"
+  ];
+  string scope = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 8 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string disposal_event_id = 9 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string generation = 10 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message CleanupProjectionResponse {
   CommitResult result = 1;
 }

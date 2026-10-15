@@ -115,6 +115,7 @@ type VersionDisposalTx interface {
 }
 
 type RetentionEvent struct {
+	ProjectionCleanup       *ProjectionCleanupRequest  `json:",omitempty"`
 	VersionDisposal         *VersionDisposalRequest    `json:",omitempty"`
 	ExtractionDisposal      *ExtractionDisposalRequest `json:",omitempty"`
 	ContextDisposal         *ContextDisposalRequest    `json:",omitempty"`

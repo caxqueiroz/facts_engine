@@ -13,6 +13,7 @@ import (
 )
 
 type Service struct {
+	projectionCleanup   model.ProjectionCleanupOptions
 	contextArchive      *model.ContextArchiveOptions
 	telemetry           *telemetry.Observer
 	operations          model.OperationsOptions

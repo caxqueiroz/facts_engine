@@ -37,6 +37,7 @@ func NewWithOptions(l model.Ledger, a model.Authorizer, e model.EvidenceStore, o
 		}
 		s.contextArchive = &policy
 	}
+	s.projectionCleanup = o.ProjectionCleanup
 	s.audit = o.Audit
 	if o.Retrieval.Index != nil || o.Retrieval.Progress != nil || o.Retrieval.Registry != nil || o.Retrieval.Generation != "" {
 		retrieval, err := NewWithRetrieval(l, a, e, o.Retrieval)

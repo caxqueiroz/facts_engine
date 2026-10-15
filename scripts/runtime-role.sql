@@ -162,3 +162,6 @@ GRANT DELETE ON fact_version_payloads,memory_version_payloads TO facts_retention
 GRANT SELECT ON projection_generations TO facts_retention;
 GRANT INSERT ON projection_retention_guards TO facts_retention;
 GRANT UPDATE(epoch) ON projection_retention_guards TO facts_retention;
+
+-- Only successful governed destination execution may acknowledge cleanup.
+GRANT INSERT ON projection_cleanup_acknowledgements TO facts_retention;

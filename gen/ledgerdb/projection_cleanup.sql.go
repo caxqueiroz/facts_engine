@@ -11,6 +11,47 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const CanAcknowledgeProjectionCleanup = `-- name: CanAcknowledgeProjectionCleanup :one
+SELECT has_table_privilege(current_user,'public.projection_cleanup_acknowledgements','INSERT')
+`
+
+func (q *Queries) CanAcknowledgeProjectionCleanup(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, CanAcknowledgeProjectionCleanup)
+	var has_table_privilege bool
+	err := row.Scan(&has_table_privilege)
+	return has_table_privilege, err
+}
+
+const GetCleanupDisposalEvent = `-- name: GetCleanupDisposalEvent :one
+SELECT scope_id,kind,target_id,ledger_revision,payload FROM retention_events WHERE tenant_id=$1 AND id=$2
+`
+
+type GetCleanupDisposalEventParams struct {
+	TenantID string
+	ID       string
+}
+
+type GetCleanupDisposalEventRow struct {
+	ScopeID        string
+	Kind           string
+	TargetID       string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+func (q *Queries) GetCleanupDisposalEvent(ctx context.Context, arg GetCleanupDisposalEventParams) (GetCleanupDisposalEventRow, error) {
+	row := q.db.QueryRow(ctx, GetCleanupDisposalEvent, arg.TenantID, arg.ID)
+	var i GetCleanupDisposalEventRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.Kind,
+		&i.TargetID,
+		&i.LedgerRevision,
+		&i.Payload,
+	)
+	return i, err
+}
+
 const GetProjectionCleanupJob = `-- name: GetProjectionCleanupJob :one
 SELECT inventory_epoch,target_count,created_at FROM projection_cleanup_jobs
 WHERE tenant_id=$1 AND kind=$2 AND version_id=$3
@@ -50,6 +91,30 @@ func (q *Queries) HasPendingProjectionCleanup(ctx context.Context, arg HasPendin
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const InsertProjectionCleanupAcknowledgement = `-- name: InsertProjectionCleanupAcknowledgement :exec
+INSERT INTO projection_cleanup_acknowledgements(tenant_id,kind,version_id,generation,acknowledgement_id)
+VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertProjectionCleanupAcknowledgementParams struct {
+	TenantID          string
+	Kind              string
+	VersionID         string
+	Generation        string
+	AcknowledgementID string
+}
+
+func (q *Queries) InsertProjectionCleanupAcknowledgement(ctx context.Context, arg InsertProjectionCleanupAcknowledgementParams) error {
+	_, err := q.db.Exec(ctx, InsertProjectionCleanupAcknowledgement,
+		arg.TenantID,
+		arg.Kind,
+		arg.VersionID,
+		arg.Generation,
+		arg.AcknowledgementID,
+	)
+	return err
 }
 
 const ListProjectionCleanupTargets = `-- name: ListProjectionCleanupTargets :many

@@ -287,7 +287,7 @@ func testProjectionCleanup(t *testing.T, ctx context.Context, admin, runtime *pg
 		}
 		for _, table := range []string{"projection_cleanup_jobs", "projection_cleanup_targets", "projection_cleanup_acknowledgements"} {
 			for _, query := range []string{"INSERT INTO " + table + "(tenant_id) VALUES('forged')", "UPDATE " + table + " SET tenant_id='forged'", "DELETE FROM " + table, "TRUNCATE " + table} {
-				if role == "facts_retention" && table != "projection_cleanup_acknowledgements" && strings.HasPrefix(query, "INSERT") {
+				if role == "facts_retention" && strings.HasPrefix(query, "INSERT") {
 					continue
 				}
 				_, err = pool.Exec(ctx, query)

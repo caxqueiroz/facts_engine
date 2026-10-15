@@ -96,6 +96,11 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		return r
 	}
 	f, m := request("fact", "a", fact), request("memory", "z", memory)
+	cleanupIndex := setupVersionCleanup(t, ctx, admin, c, fact, memory, secret)
+	expectedTargets := 1
+	if cleanupIndex != nil {
+		expectedTargets = 2
+	}
 	snapshot, err := normal.CreateFactSnapshot(ctx, c, model.FactSnapshotRequest{Command: cmd("snapshot"), Selectors: []model.FactKey{{Scope: "a", Subject: "subject", Predicate: "value"}}, ValidAt: now})
 	if err != nil || snapshot.Items[0].Resolution.Value == nil {
 		t.Fatal("snapshot must retain the fact value", snapshot, err)
@@ -217,7 +222,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	replayArchives()
 	for _, r := range []model.VersionDisposalRequest{f, m} {
 		s, err := ledger.ProjectionCleanupStatus(ctx, model.ProjectionCleanupKey{Tenant: c.Tenant, Kind: r.Kind, VersionID: r.VersionID})
-		if err != nil || s.Complete || len(s.Targets) != 1 || s.Targets[0].Generation != "static" {
+		if err != nil || s.Complete || len(s.Targets) != expectedTargets || s.Targets[0].Generation != "static" {
 			t.Fatal("cleanup incorrectly complete", s, err)
 		}
 		r.Key = "new-" + r.Kind
@@ -246,5 +251,8 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	}
 	if err = audit.Verify(*bundle.Bundle, map[string]ed25519.PublicKey{"version-disposal": private.Public().(ed25519.PublicKey)}); err != nil {
 		t.Fatal(err)
+	}
+	if cleanupIndex != nil {
+		testVersionCleanupExecution(t, ctx, ledger, store, admin, c, cleanupIndex, f, m, disposedFact, first)
 	}
 }
