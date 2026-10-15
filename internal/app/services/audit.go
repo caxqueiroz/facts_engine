@@ -417,10 +417,16 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &d); err != nil {
 				return nil, nil, err
 			}
+			if d.PayloadDisposed && !model.ValidDecisionTombstone(d, c.Tenant, entry.ID) {
+				return nil, nil, model.ErrPrecondition
+			}
 			for _, scope := range d.Scopes {
 				include = include && scope == r.Scope
 			}
 
+			if include && d.PayloadDisposed {
+				gaps = append(gaps, model.AuditGap{Kind: "decision_content", ID: d.ID, Reason: "disposed_under_retention_policy"})
+			}
 		case "snapshot":
 			include = snapshots[entry.ID]
 			if include && disposedSnapshots[entry.ID] {

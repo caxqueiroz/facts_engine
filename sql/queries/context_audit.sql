@@ -6,16 +6,18 @@ LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: GetDecisionPayload :one
-SELECT p.payload
+SELECT (CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=d.tenant_id AND disposed.decision_id=d.id
 WHERE d.tenant_id=$1 AND d.id=$2;
 
 -- name: LockDecisionRun :exec
 SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(lock_key)::text,0));
 
 -- name: GetDecisionRunPayload :one
-SELECT p.payload
+SELECT (CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=d.tenant_id AND disposed.decision_id=d.id
 WHERE d.tenant_id=$1 AND d.application_id=$2 AND d.external_decision_id=$3;
 
 -- name: InsertContextManifest :exec

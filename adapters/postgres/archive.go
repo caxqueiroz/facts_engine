@@ -420,6 +420,15 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				if err := json.Unmarshal(entry.Payload, &d); err != nil {
 					return err
 				}
+				if err := ledgerdb.New(t.tx).LockDecisionGuard(ctx, ledgerdb.LockDecisionGuardParams{TenantID: t.tenant, DecisionID: d.ID}); err != nil {
+					return err
+				}
+				if d.PayloadDisposed {
+					if !model.ValidDecisionTombstone(d, t.tenant, entry.ID) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "decision_content", ID: d.ID, Reason: "disposed_under_retention_policy"})
+				}
 				for _, scope := range d.Scopes {
 					scopes[scope] = true
 				}

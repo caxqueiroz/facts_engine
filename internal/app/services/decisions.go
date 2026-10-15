@@ -205,7 +205,7 @@ func (s *Service) GetDecisionReceipt(ctx context.Context, c model.Caller, q mode
 	if err != nil {
 		return model.DecisionRecord{}, err
 	}
-	if record.Tenant != c.Tenant || model.DecisionDigest(record.Receipt) != record.Digest || checked.SourceDigest != record.SourceDigest || checked.CalculationDigest != record.CalculationDigest || !slices.Equal(checked.Scopes, record.Scopes) {
+	if record.PayloadDisposed || record.Tenant != c.Tenant || model.DecisionDigest(record.Receipt) != record.Digest || checked.SourceDigest != record.SourceDigest || checked.CalculationDigest != record.CalculationDigest || !slices.Equal(checked.Scopes, record.Scopes) {
 		return model.DecisionRecord{}, model.ErrPrecondition
 	}
 	return record, nil

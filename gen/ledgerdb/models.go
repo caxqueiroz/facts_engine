@@ -257,6 +257,19 @@ type DecisionArtifact struct {
 	EvidenceID string
 }
 
+type DecisionDisposal struct {
+	TenantID   string
+	DecisionID string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
+type DecisionGuard struct {
+	TenantID   string
+	DecisionID string
+	Epoch      int64
+}
+
 type DecisionItem struct {
 	TenantID   string
 	DecisionID string

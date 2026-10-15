@@ -81,6 +81,7 @@ type DecisionReceipt struct {
 	Outcome                                                    string
 }
 type DecisionRecord struct {
+	PayloadDisposed                                     bool `json:",omitempty"`
 	ID, Tenant, Digest, SourceDigest, CalculationDigest string
 	Caller                                              Caller
 	Receipt                                             DecisionReceipt

@@ -37,6 +37,9 @@ func (t *transaction) Decision(ctx context.Context, id string) (model.DecisionRe
 		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
+	if err == nil && r.PayloadDisposed {
+		return model.DecisionRecord{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) DecisionRun(ctx context.Context, application, run string) (model.DecisionRecord, error) {
@@ -53,6 +56,9 @@ func (t *transaction) DecisionRun(ctx context.Context, application, run string) 
 		return r, model.ErrPrecondition
 	}
 	err = t.decode(payload, &r)
+	if err == nil && r.PayloadDisposed {
+		return model.DecisionRecord{}, model.ErrPrecondition
+	}
 	return r, err
 }
 func (t *transaction) StageDecision(ctx context.Context, r model.DecisionRecord, scopes map[model.VersionReference]string) error {

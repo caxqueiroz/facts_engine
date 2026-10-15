@@ -785,7 +785,15 @@ Migration `00048_decision_payloads.sql` moves encrypted decision receipts into `
 
 Runtime credentials can read/insert decision ciphertext but cannot update, delete or truncate it. The archive role has read access; tenant RLS protects the child table. Receipt-ID and external-decision lookups fail explicitly when a structural record lacks bytes. Audit/archive inventories retain missing-payload rows so unavailable decisions cannot disappear from coverage. Tests cover unchanged ciphertext (including opaque legacy envelopes), read parity, tenant isolation, immutable runtime permissions, missing payloads and rollback when payload insertion fails.
 
-This is a storage prerequisite for governed decision disposal. Decision tombstones, policy/hold checks and batch selection remain to implement; retained decisions still block disposal of their referenced calculations, contexts, snapshots, versions and evidence.
+This is a storage prerequisite for governed decision disposal. Decision tombstones and guarded inventory writes are implemented below; policy/hold checks and batch selection remain to implement; retained decisions still block disposal of their referenced calculations, contexts, snapshots, versions and evidence.
+
+## Decision tombstones and inventory guards
+
+Migration `00049_decision_disposal_storage.sql` adds encrypted `decision_disposals` and per-decision guard epochs. Decision payload writes, disposal markers and scope/fact/memory/artifact inventory writes share the guard. A disposal marker rejects reinsertion, including conflict-ignoring retries, and prevents new inventory entries. Stale repeatable-read writers conflict with the changed epoch instead of accepting their earlier view. Runtime credentials cannot insert/remove tombstones or delete guard rows; the migration does not grant disposal privileges.
+
+Decision tombstones retain identity, context/snapshot/calculation lineage, declared selected/used version references, artifact identities/digests and authorization metadata. They omit method and transformation metadata, execution time and outcome. These retained identifiers remain governed structural history, not anonymous data. Reads by receipt or external decision identity reject tombstones, including invalid states that still retain live bytes. Audit/archive inventories prefer the tombstone, reject marked envelopes containing omitted fields, and include explicit `decision_content` gaps. Scoped exports continue withholding cross-scope decision metadata; archive readers acquire the decision guard.
+
+Upgrade writers and audit/archive readers together, apply the migration and refresh role grants. Tests cover live and stale inventory retries, payload reinsertion attempts, read precedence, runtime restrictions, malformed tombstones and scoped audit gaps. Governed decision disposal still requires complete inventory/policy/hold checks, removal events and batch selection before deletion can be enabled.
 
 ## Calculation payload storage
 

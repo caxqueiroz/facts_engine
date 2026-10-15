@@ -165,8 +165,9 @@ func (q *Queries) GetContextPayload(ctx context.Context, arg GetContextPayloadPa
 }
 
 const GetDecisionPayload = `-- name: GetDecisionPayload :one
-SELECT p.payload
+SELECT (CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=d.tenant_id AND disposed.decision_id=d.id
 WHERE d.tenant_id=$1 AND d.id=$2
 `
 
@@ -183,8 +184,9 @@ func (q *Queries) GetDecisionPayload(ctx context.Context, arg GetDecisionPayload
 }
 
 const GetDecisionRunPayload = `-- name: GetDecisionRunPayload :one
-SELECT p.payload
+SELECT (CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=d.tenant_id AND disposed.decision_id=d.id
 WHERE d.tenant_id=$1 AND d.application_id=$2 AND d.external_decision_id=$3
 `
 

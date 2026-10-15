@@ -69,8 +69,9 @@ LEFT JOIN context_disposals d ON d.tenant_id=c.tenant_id AND d.context_id=c.id
 WHERE c.tenant_id=$1 AND c.ledger_revision=$2;
 
 -- name: ListArchiveDecision :many
-SELECT d.id,p.payload
+SELECT d.id,(CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts d LEFT JOIN decision_payloads p ON p.tenant_id=d.tenant_id AND p.decision_id=d.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=d.tenant_id AND disposed.decision_id=d.id
 WHERE d.tenant_id=$1 AND d.ledger_revision=$2;
 
 -- name: ListArchiveSnapshot :many
@@ -151,8 +152,9 @@ FROM context_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.context_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001;
 
 -- name: ListAuditDecision :many
-SELECT c.id,p.payload
+SELECT c.id,(CASE WHEN disposed.decision_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
 FROM decision_receipts c LEFT JOIN decision_payloads p ON p.tenant_id=c.tenant_id AND p.decision_id=c.id
+LEFT JOIN decision_disposals disposed ON disposed.tenant_id=c.tenant_id AND disposed.decision_id=c.id
 WHERE c.tenant_id=$1 AND EXISTS(SELECT 1
 FROM decision_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001;
