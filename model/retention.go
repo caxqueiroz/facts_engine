@@ -115,14 +115,15 @@ type VersionDisposalTx interface {
 }
 
 type RetentionEvent struct {
-	BatchID                 string                     `json:",omitempty"`
-	DisposalBatch           *DisposalBatchRequest      `json:",omitempty"`
-	ProjectionCleanup       *ProjectionCleanupRequest  `json:",omitempty"`
-	VersionDisposal         *VersionDisposalRequest    `json:",omitempty"`
-	ExtractionDisposal      *ExtractionDisposalRequest `json:",omitempty"`
-	ContextDisposal         *ContextDisposalRequest    `json:",omitempty"`
-	SnapshotDisposal        *SnapshotDisposalRequest   `json:",omitempty"`
-	AdditionalAuthorization []AuthorizationDecision    `json:",omitempty"`
+	CalculationDisposal     *CalculationDisposalRequest `json:",omitempty"`
+	BatchID                 string                      `json:",omitempty"`
+	DisposalBatch           *DisposalBatchRequest       `json:",omitempty"`
+	ProjectionCleanup       *ProjectionCleanupRequest   `json:",omitempty"`
+	VersionDisposal         *VersionDisposalRequest     `json:",omitempty"`
+	ExtractionDisposal      *ExtractionDisposalRequest  `json:",omitempty"`
+	ContextDisposal         *ContextDisposalRequest     `json:",omitempty"`
+	SnapshotDisposal        *SnapshotDisposalRequest    `json:",omitempty"`
+	AdditionalAuthorization []AuthorizationDecision     `json:",omitempty"`
 
 	ID, Tenant, Scope, Kind, TargetID string
 	Caller                            Caller
@@ -177,3 +178,11 @@ type OrphanEvidenceEngine interface {
 	ScanOrphanEvidence(context.Context, Caller, OrphanEvidenceQuery) ([]ObjectRef, error)
 	DisposeOrphanEvidence(context.Context, Caller, OrphanEvidenceDisposalRequest) (CommitResult, error)
 }
+
+// CalculationDisposalRequest selects independently governed scope policies.
+type CalculationDisposalRequest struct {
+	Command
+	CalculationID, Reason string
+	Bindings              []CalculationRetentionBinding
+}
+type CalculationRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }

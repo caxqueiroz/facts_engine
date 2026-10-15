@@ -158,6 +158,13 @@ func (s *retentionService) DisposeBatch(ctx context.Context, r *v1.DisposeBatchR
 		}
 		request.Contexts = append(request.Contexts, selection)
 	}
+	for _, item := range r.Calculations {
+		selection := model.CalculationDisposalRequest{CalculationID: item.CalculationId}
+		for _, b := range item.Bindings {
+			selection.Bindings = append(selection.Bindings, model.CalculationRetentionBinding{Scope: b.Scope, PolicyID: b.PolicyId, Jurisdiction: b.Jurisdiction})
+		}
+		request.Calculations = append(request.Calculations, selection)
+	}
 	result, err := s.engine.DisposeBatch(ctx, callerFrom(ctx), request)
 	if err != nil {
 		return nil, err

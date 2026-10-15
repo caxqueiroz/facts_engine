@@ -29,6 +29,7 @@ func TestDisposalBatchReauthorizesAndNormalizesSelection(t *testing.T) {
 			}
 			r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
 			r.Contexts = []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}}}}
+			r.Calculations = []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
 			revoke := func() { a.denied = "a" }
 			switch phase {
 			case "before":
@@ -129,5 +130,30 @@ func TestDisposalBatchSnapshotContextNormalization(t *testing.T) {
 	scopes := base.Scopes()
 	if len(scopes) != 2 || scopes[0] != "a" || scopes[1] != "z" {
 		t.Fatal("incomplete disclosure scopes", scopes)
+	}
+}
+
+func TestDisposalBatchCalculationNormalization(t *testing.T) {
+	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired", Calculations: []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}}
+	normalized, err := normalizeDisposalBatch(base)
+	if err != nil || normalized.SelectionCount() != 1 || normalized.Calculations[0].Command != base.Command || normalized.Calculations[0].Bindings[0].Scope != "a" || base.Calculations[0].Bindings[0].Scope != "z" {
+		t.Fatal(normalized, err)
+	}
+	for _, change := range []func(*model.DisposalBatchRequest){
+		func(r *model.DisposalBatchRequest) { r.Calculations = append(r.Calculations, r.Calculations[0]) },
+		func(r *model.DisposalBatchRequest) { r.Calculations[0].Bindings = nil },
+		func(r *model.DisposalBatchRequest) { r.Calculations[0].Command = model.Command{Key: "other"} },
+		func(r *model.DisposalBatchRequest) { r.Calculations[0].Reason = "other" },
+	} {
+		r := base
+		r.Calculations = append([]model.CalculationDisposalRequest(nil), base.Calculations...)
+		change(&r)
+		if _, err := normalizeDisposalBatch(r); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal(r, err)
+		}
+	}
+	scopes := base.Scopes()
+	if len(scopes) != 2 || scopes[0] != "a" || scopes[1] != "z" {
+		t.Fatal(scopes)
 	}
 }

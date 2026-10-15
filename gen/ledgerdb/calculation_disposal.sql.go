@@ -28,6 +28,135 @@ func (q *Queries) CalculationContentAvailable(ctx context.Context, arg Calculati
 	return column_1, err
 }
 
+const CalculationDisposalBlocked = `-- name: CalculationDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.calculation_id=$2)
+OR EXISTS(SELECT 1 FROM audit_export_requests a WHERE a.tenant_id=$1 AND a.scope_id=ANY($3::text[]))
+OR EXISTS(SELECT 1 FROM consumer_offsets c WHERE c.tenant_id=$1 AND c.consumer_id LIKE 'archive-%' AND c.acknowledged_revision<$4::bigint)
+`
+
+type CalculationDisposalBlockedParams struct {
+	TenantID         string
+	CalculationID    pgtype.Text
+	Scopes           []string
+	RequiredRevision int64
+}
+
+func (q *Queries) CalculationDisposalBlocked(ctx context.Context, arg CalculationDisposalBlockedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, CalculationDisposalBlocked,
+		arg.TenantID,
+		arg.CalculationID,
+		arg.Scopes,
+		arg.RequiredRevision,
+	)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const CalculationRetentionHeader = `-- name: CalculationRetentionHeader :one
+SELECT c.scope_id,c.snapshot_id,c.application_id,c.external_run_id,c.request_digest,c.ledger_revision,e.recorded_at,
+ARRAY(SELECT s.snapshot_id FROM calculation_snapshots s WHERE s.tenant_id=c.tenant_id AND s.calculation_id=c.id ORDER BY s.snapshot_id)::text[] AS snapshots,
+ARRAY(SELECT a.role||'/'||a.evidence_id FROM calculation_artifacts a WHERE a.tenant_id=c.tenant_id AND a.calculation_id=c.id ORDER BY a.role)::text[] AS artifacts
+FROM calculation_receipts c JOIN ledger_events e ON e.tenant_id=c.tenant_id AND e.ledger_revision=c.ledger_revision WHERE c.tenant_id=$1 AND c.id=$2
+`
+
+type CalculationRetentionHeaderParams struct {
+	TenantID string
+	ID       string
+}
+
+type CalculationRetentionHeaderRow struct {
+	ScopeID        string
+	SnapshotID     string
+	ApplicationID  string
+	ExternalRunID  string
+	RequestDigest  string
+	LedgerRevision int64
+	RecordedAt     pgtype.Timestamptz
+	Snapshots      []string
+	Artifacts      []string
+}
+
+func (q *Queries) CalculationRetentionHeader(ctx context.Context, arg CalculationRetentionHeaderParams) (CalculationRetentionHeaderRow, error) {
+	row := q.db.QueryRow(ctx, CalculationRetentionHeader, arg.TenantID, arg.ID)
+	var i CalculationRetentionHeaderRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.SnapshotID,
+		&i.ApplicationID,
+		&i.ExternalRunID,
+		&i.RequestDigest,
+		&i.LedgerRevision,
+		&i.RecordedAt,
+		&i.Snapshots,
+		&i.Artifacts,
+	)
+	return i, err
+}
+
+const CalculationRetentionScopes = `-- name: CalculationRetentionScopes :many
+SELECT c.scope_id FROM calculation_receipts c WHERE c.tenant_id=$1 AND c.id=$2
+UNION SELECT i.scope_id FROM calculation_snapshots s JOIN fact_snapshot_items i ON i.tenant_id=s.tenant_id AND i.snapshot_id=s.snapshot_id WHERE s.tenant_id=$1 AND s.calculation_id=$2
+UNION SELECT e.scope_id FROM calculation_artifacts a JOIN evidence e ON e.tenant_id=a.tenant_id AND e.id=a.evidence_id WHERE a.tenant_id=$1 AND a.calculation_id=$2
+`
+
+type CalculationRetentionScopesParams struct {
+	TenantID string
+	ID       string
+}
+
+func (q *Queries) CalculationRetentionScopes(ctx context.Context, arg CalculationRetentionScopesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, CalculationRetentionScopes, arg.TenantID, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var scope_id string
+		if err := rows.Scan(&scope_id); err != nil {
+			return nil, err
+		}
+		items = append(items, scope_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DeleteCalculationPayload = `-- name: DeleteCalculationPayload :execrows
+DELETE FROM calculation_payloads WHERE tenant_id=$1 AND calculation_id=$2
+`
+
+type DeleteCalculationPayloadParams struct {
+	TenantID      string
+	CalculationID string
+}
+
+func (q *Queries) DeleteCalculationPayload(ctx context.Context, arg DeleteCalculationPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteCalculationPayload, arg.TenantID, arg.CalculationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const InsertCalculationDisposal = `-- name: InsertCalculationDisposal :exec
+INSERT INTO calculation_disposals(tenant_id,calculation_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertCalculationDisposalParams struct {
+	TenantID      string
+	CalculationID string
+	Payload       []byte
+}
+
+func (q *Queries) InsertCalculationDisposal(ctx context.Context, arg InsertCalculationDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertCalculationDisposal, arg.TenantID, arg.CalculationID, arg.Payload)
+	return err
+}
+
 const LockCalculationGuard = `-- name: LockCalculationGuard :exec
 INSERT INTO calculation_guards(tenant_id,calculation_id,epoch) VALUES($1,$2,1)
 ON CONFLICT(tenant_id,calculation_id) DO UPDATE SET epoch=calculation_guards.epoch+1

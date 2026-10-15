@@ -60,6 +60,16 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 			scopes[b.Scope] = true
 		}
 	}
+	for _, item := range r.Calculations {
+		key := "calculation/" + item.CalculationID
+		if !model.ValidID(item.CalculationID) || seen[key] || item.Command != r.Command || item.Reason != r.Reason {
+			return nil, model.ErrInvalid
+		}
+		seen[key] = true
+		for _, b := range item.Bindings {
+			scopes[b.Scope] = true
+		}
+	}
 	if len(scopes) > 256 || !scopes[r.Scope] {
 		return nil, model.ErrDenied
 	}
@@ -78,6 +88,13 @@ func (t *transaction) DisposeBatch(ctx context.Context, r model.DisposalBatchReq
 	}
 	if err := ledgerdb.New(t.tx).LockProjectionRetentionGuard(ctx, t.tenant); err != nil {
 		return nil, err
+	}
+	itemsCalculations := append([]model.CalculationDisposalRequest(nil), r.Calculations...)
+	sort.Slice(itemsCalculations, func(i, j int) bool { return itemsCalculations[i].CalculationID < itemsCalculations[j].CalculationID })
+	for _, item := range itemsCalculations {
+		if err := t.DisposeCalculation(ctx, item); err != nil {
+			return nil, err
+		}
 	}
 	itemsSnapshots := append([]model.SnapshotDisposalRequest(nil), r.Snapshots...)
 	sort.Slice(itemsSnapshots, func(i, j int) bool { return itemsSnapshots[i].SnapshotID < itemsSnapshots[j].SnapshotID })

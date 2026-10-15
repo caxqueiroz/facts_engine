@@ -136,6 +136,7 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 		t.Fatal(err)
 	}
 	calc := recordCalculationFixture(t, ctx, normal, store, c, calculation)
+	disposedCalculation := testCalculationDisposal(t, ctx, normal, engine, ledger, admin, c, calc.Receipt, []model.FactSnapshot{snapshot("calc-batch-one", keys[:1]), snapshot("calc-batch-multi", keys)})
 	reject(engine, request(calculation), model.ErrPrecondition)
 	used := model.VersionReference{RecordID: decision.Items[0].Resolution.RecordID, VersionID: decision.Items[0].Resolution.VersionID}
 	if _, err := normal.RecordDecision(ctx, c, model.DecisionReceipt{Command: command("decision-record"), Scope: "case1", ApplicationID: "app", ExternalDecisionID: "decision", SnapshotID: decision.ID, SelectedItems: []model.VersionReference{used}, UsedItems: []model.VersionReference{used}, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: calc.Receipt.Input, Output: calc.Receipt.Output, DecidedAt: time.Now().UTC(), Outcome: "succeeded"}); err != nil {
@@ -230,6 +231,15 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 	result, err := engine.RunAuditExport(ctx, c, model.AuditExportQuery{ID: job.ID, Scope: "case1", Purpose: "audit"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	calculationGap := false
+	for _, g := range result.Bundle.Manifest.Gaps {
+		if g.Kind == "calculation_content" && g.ID == disposedCalculation {
+			calculationGap = true
+		}
+	}
+	if !calculationGap {
+		t.Fatal("calculation export gap missing")
 	}
 	gap := false
 	for _, g := range result.Bundle.Manifest.Gaps {

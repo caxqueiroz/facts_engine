@@ -6,14 +6,15 @@ import (
 )
 
 // DisposalBatchRequest explicitly selects related version, extraction,
-// snapshot and context payloads. Child commands/reasons may be empty or equal to the parent; the
+// snapshot, context and calculation payloads. Child commands/reasons may be empty or equal to the parent; the
 // service normalizes them to the parent before authorization and replay checks.
 // Other retained copies remain blockers. Index removal remains asynchronous.
 type DisposalBatchRequest struct {
 	Command
 	Scope, Reason string
-	Snapshots     []SnapshotDisposalRequest `json:",omitempty"`
-	Contexts      []ContextDisposalRequest  `json:",omitempty"`
+	Calculations  []CalculationDisposalRequest `json:",omitempty"`
+	Snapshots     []SnapshotDisposalRequest    `json:",omitempty"`
+	Contexts      []ContextDisposalRequest     `json:",omitempty"`
 	Versions      []VersionDisposalRequest
 	Extractions   []ExtractionDisposalRequest
 }
@@ -49,6 +50,11 @@ func (r DisposalBatchRequest) Scopes() []string {
 			scopes[b.Scope] = true
 		}
 	}
+	for _, item := range r.Calculations {
+		for _, b := range item.Bindings {
+			scopes[b.Scope] = true
+		}
+	}
 	out := make([]string, 0, len(scopes))
 	for s := range scopes {
 		out = append(out, s)
@@ -59,5 +65,5 @@ func (r DisposalBatchRequest) Scopes() []string {
 
 // SelectionCount bounds the complete transaction across all artifact classes.
 func (r DisposalBatchRequest) SelectionCount() int {
-	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts)
+	return len(r.Versions) + len(r.Extractions) + len(r.Snapshots) + len(r.Contexts) + len(r.Calculations)
 }

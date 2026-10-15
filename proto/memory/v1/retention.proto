@@ -31,6 +31,7 @@ message RetentionPolicy {
     (buf.validate.field).string.in = "orphan_evidence_bytes",
     (buf.validate.field).string.in = "snapshot_payload",
     (buf.validate.field).string.in = "context_payload",
+    (buf.validate.field).string.in = "calculation_payload",
     (buf.validate.field).string.in = "extraction_job_payload",
     (buf.validate.field).string.in = "extraction_request_payload",
     (buf.validate.field).string.in = "extraction_response_payload",
@@ -293,6 +294,7 @@ message DisposeBatchRequest {
   repeated BatchExtractionSelection extractions = 6 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchSnapshotSelection snapshots = 7 [(buf.validate.field).repeated.max_items = 32];
   repeated BatchContextSelection contexts = 8 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchCalculationSelection calculations = 9 [(buf.validate.field).repeated.max_items = 32];
 }
 message DisposeBatchResponse {
   CommitResult result = 1;
@@ -312,4 +314,18 @@ message BatchContextSelection {
     min_items: 1
     max_items: 256
   }];
+}
+
+message BatchCalculationSelection {
+  string calculation_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated CalculationRetentionBinding bindings = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+
+message CalculationRetentionBinding {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
 }

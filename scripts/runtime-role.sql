@@ -176,3 +176,6 @@ GRANT SELECT,INSERT ON calculation_guards TO facts_runtime,facts_archiver;
 GRANT UPDATE(epoch) ON calculation_guards TO facts_runtime,facts_archiver;
 REVOKE UPDATE,DELETE,TRUNCATE ON calculation_disposals FROM facts_runtime;
 REVOKE DELETE,TRUNCATE ON calculation_guards FROM facts_runtime;
+
+GRANT INSERT ON calculation_disposals TO facts_retention;
+GRANT DELETE ON calculation_payloads TO facts_retention;

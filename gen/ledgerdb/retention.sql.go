@@ -258,8 +258,8 @@ func (q *Queries) HasAuditExportReference(ctx context.Context, arg HasAuditExpor
 
 const HasCalculationArtifactReference = `-- name: HasCalculationArtifactReference :one
 SELECT EXISTS(SELECT 1
-FROM calculation_artifacts
-WHERE tenant_id=$1 AND evidence_id=$2)
+FROM calculation_artifacts a JOIN calculation_payloads p ON p.tenant_id=a.tenant_id AND p.calculation_id=a.calculation_id
+WHERE a.tenant_id=$1 AND a.evidence_id=$2)
 `
 
 type HasCalculationArtifactReferenceParams struct {
@@ -881,7 +881,7 @@ func (q *Queries) SnapshotCreationTime(ctx context.Context, arg SnapshotCreation
 }
 
 const SnapshotDisposalBlocked = `-- name: SnapshotDisposalBlocked :one
-SELECT EXISTS(SELECT 1 FROM calculation_snapshots c WHERE c.tenant_id=$1 AND c.snapshot_id=$2)
+SELECT EXISTS(SELECT 1 FROM calculation_snapshots c JOIN calculation_payloads p ON p.tenant_id=c.tenant_id AND p.calculation_id=c.calculation_id WHERE c.tenant_id=$1 AND c.snapshot_id=$2)
 OR EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.snapshot_id=$2)
 OR EXISTS(SELECT 1 FROM audit_export_requests a JOIN fact_snapshot_items i ON i.tenant_id=a.tenant_id AND i.scope_id=a.scope_id WHERE i.tenant_id=$1 AND i.snapshot_id=$2)
 OR EXISTS(SELECT 1 FROM consumer_offsets co JOIN fact_snapshots s ON s.tenant_id=co.tenant_id WHERE s.tenant_id=$1 AND s.id=$2 AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<s.creation_revision)

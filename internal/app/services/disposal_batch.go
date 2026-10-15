@@ -97,6 +97,26 @@ func normalizeDisposalBatch(r model.DisposalBatchRequest) (model.DisposalBatchRe
 		}
 	}
 	sort.Slice(r.Contexts, func(i, j int) bool { return r.Contexts[i].ContextID < r.Contexts[j].ContextID })
+	r.Calculations = append([]model.CalculationDisposalRequest(nil), r.Calculations...)
+	for i := range r.Calculations {
+		item := &r.Calculations[i]
+		key := "calculation/" + item.CalculationID
+		if !model.ValidID(item.CalculationID) || selected[key] || len(item.Bindings) < 1 || len(item.Bindings) > 256 || (item.Command != (model.Command{}) && item.Command != r.Command) || (item.Reason != "" && item.Reason != r.Reason) {
+			return r, model.ErrInvalid
+		}
+		selected[key] = true
+		item.Command = r.Command
+		item.Reason = r.Reason
+		item.Bindings = append([]model.CalculationRetentionBinding(nil), item.Bindings...)
+		sort.Slice(item.Bindings, func(a, b int) bool { return item.Bindings[a].Scope < item.Bindings[b].Scope })
+		for j, b := range item.Bindings {
+			if !model.ValidID(b.Scope) || !model.ValidID(b.PolicyID) || !model.ValidID(b.Jurisdiction) || (j > 0 && item.Bindings[j-1].Scope == b.Scope) {
+				return r, model.ErrInvalid
+			}
+			scopes[b.Scope] = true
+		}
+	}
+	sort.Slice(r.Calculations, func(i, j int) bool { return r.Calculations[i].CalculationID < r.Calculations[j].CalculationID })
 	if len(scopes) > 256 || !scopes[r.Scope] {
 		return r, model.ErrInvalid
 	}
@@ -183,6 +203,16 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 				receipts = append(receipts, decisions[b.Scope])
 			}
 			event := model.RetentionEvent{Scope: item.Bindings[0].Scope, Kind: "dispose_context", TargetID: item.ContextID, ContextDisposal: &item, AdditionalAuthorization: receipts, Limitations: []string{"structural_metadata_retained", "unselected_sources_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
+			if err = appendChild(event, "", "", "", 0); err != nil {
+				return err
+			}
+		}
+		for _, item := range r.Calculations {
+			receipts := []model.AuthorizationDecision{}
+			for _, b := range item.Bindings {
+				receipts = append(receipts, decisions[b.Scope])
+			}
+			event := model.RetentionEvent{Scope: item.Bindings[0].Scope, Kind: "dispose_calculation", TargetID: item.CalculationID, CalculationDisposal: &item, AdditionalAuthorization: receipts, Limitations: []string{"structural_metadata_retained", "unselected_sources_retained", "archives_expire_under_separate_policy", "backups_expire_under_separate_policy"}}
 			if err = appendChild(event, "", "", "", 0); err != nil {
 				return err
 			}
