@@ -89,6 +89,8 @@ Extraction parity tests use generated gRPC clients for immutable conversation in
 
 Retrieval tests compare full fact/memory recall responses and projection receipts across Connect and gRPC against the PostgreSQL/CortexDB scenario, including denied reads, unavailable generations, stale candidates and deadline-bounded waits. The rebuild scenario executes start, verify, resume, activate and abandon requests through generated grpc-go clients, compares returned state with PostgreSQL, and compares projection status with Connect. It retains corruption/count checks, stale-fence rejection, cutover handling and operator-permission tests; this verifies the exercised transition scenarios rather than every possible concurrent workload.
 
+Scope/subject tests exercise gRPC writes and immutable historical reads, compare full receipts and definitions with Connect, and enforce expected revisions, unique lookup identifiers, replacement of lookup mappings, immutable subject kinds and administration/read/history permissions. Evidence tests compare original/derivative registration receipts, exact redacted bytes and provenance across transports; metadata-only callers remain unable to read content, and mismatched scopes or caller-supplied derivation metadata are rejected.
+
 
 [connectapi.NewHandler](adapters/connectapi/server.go) accepts the existing engine, an injected `IdentityVerifier`, and mandatory `Limits` (timeout, concurrent requests, request bytes and response bytes). It returns an `http.Handler` without opening a listener or starting background workers. The host mounts it on its HTTP server, configures TLS and read/write/idle deadlines, and enables HTTP/2 for gRPC. Connect and gRPC-Web use the same handler. A generated Connect client is composed as follows:
 

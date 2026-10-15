@@ -13,6 +13,9 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -28,6 +31,8 @@ func testRemoteEvidence(t *testing.T, ctx context.Context, engine, metadataOnly 
 		return memoryv1connect.NewEvidenceServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
 	}
 	client := clientFor(engine)
+	grpcClient := v1.NewEvidenceServiceClient(governanceGRPC(t, engine, caller))
+	grpcLimited := v1.NewEvidenceServiceClient(governanceGRPC(t, metadataOnly, caller))
 	object := func(r model.ObjectRef) *v1.ObjectRef {
 		return &v1.ObjectRef{Locator: r.Locator, Version: r.Version, Digest: r.Digest, Size: r.Size}
 	}
@@ -41,6 +46,10 @@ func testRemoteEvidence(t *testing.T, ctx context.Context, engine, metadataOnly 
 	if err != nil || registered.Result.Id != source.ID {
 		t.Fatalf("remote registration: %v, %v", registered, err)
 	}
+	grpcRegistered, err := grpcClient.RegisterEvidence(ctx, request)
+	if err != nil || !proto.Equal(registered, grpcRegistered) {
+		t.Fatal("gRPC evidence replay", grpcRegistered, err)
+	}
 	replay, err := engine.RegisterEvidence(ctx, caller, model.EvidenceRequest{Command: command, Evidence: source})
 	if err != nil || replay.ID != registered.Result.Id || replay.LedgerRevision != registered.Result.LedgerRevision {
 		t.Fatalf("embedded evidence replay: %+v, %v", replay, err)
@@ -52,9 +61,13 @@ func testRemoteEvidence(t *testing.T, ctx context.Context, engine, metadataOnly 
 	for _, r := range redaction.Ranges {
 		derived.Ranges = append(derived.Ranges, &v1.EvidenceCopyRange{OriginalStart: int64(r.OriginalStart), OriginalEnd: int64(r.OriginalEnd), DerivedStart: int64(r.DerivedStart)})
 	}
-	result, err := client.RegisterRedactedEvidence(ctx, derived)
+	result, err := grpcClient.RegisterRedactedEvidence(ctx, derived)
 	if err != nil {
 		t.Fatal(err)
+	}
+	connectDerived, err := client.RegisterRedactedEvidence(ctx, derived)
+	if err != nil || !proto.Equal(result, connectDerived) {
+		t.Fatal("Connect/gRPC derivative replay", connectDerived, err)
 	}
 	repeated, err := engine.RegisterRedactedEvidence(ctx, caller, redaction)
 	if err != nil || repeated.ID != result.Result.Id || repeated.ContentDigest != result.Result.ContentDigest || repeated.LedgerRevision != result.Result.LedgerRevision {
@@ -67,20 +80,37 @@ func testRemoteEvidence(t *testing.T, ctx context.Context, engine, metadataOnly 
 	if string(content.Content) != "I prefer tea." || model.BytesDigest(content.Content) != content.Metadata.Object.Digest || content.Metadata.Derivation.ParentEvidenceId != source.ID || len(content.Metadata.Derivation.Ranges) != 2 || content.Metadata.Derivation.Ranges[1].OriginalStart != 9 || content.Metadata.Classification != source.Classification || content.Metadata.SourceClass != source.SourceClass {
 		t.Fatalf("derivative content/provenance: %v", content)
 	}
+	grpcContent, err := grpcClient.GetEvidenceContent(ctx, &v1.GetEvidenceContentRequest{Tenant: caller.Tenant, Scope: source.Scope, Id: redaction.ID, Purpose: command.Purpose})
+	if err != nil || !proto.Equal(content, grpcContent) {
+		t.Fatal("gRPC evidence bytes and provenance", grpcContent, err)
+	}
 	limited := clientFor(metadataOnly)
 	metadata, err := limited.GetEvidenceMetadata(ctx, &v1.GetEvidenceMetadataRequest{Tenant: caller.Tenant, Scope: source.Scope, Id: redaction.ID, Purpose: command.Purpose})
 	if err != nil || metadata.Metadata.Object.Digest != content.Metadata.Object.Digest {
 		t.Fatalf("metadata-only read: %v, %v", metadata, err)
 	}
+	grpcMetadata, err := grpcLimited.GetEvidenceMetadata(ctx, &v1.GetEvidenceMetadataRequest{Tenant: caller.Tenant, Scope: source.Scope, Id: redaction.ID, Purpose: command.Purpose})
+	if err != nil || !proto.Equal(metadata, grpcMetadata) {
+		t.Fatal("gRPC metadata-only read", grpcMetadata, err)
+	}
 	if _, err := limited.GetEvidenceContent(ctx, &v1.GetEvidenceContentRequest{Tenant: caller.Tenant, Scope: source.Scope, Id: redaction.ID, Purpose: command.Purpose}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("content permission bypass: %v", err)
 	}
+	if result, err := grpcLimited.GetEvidenceContent(ctx, &v1.GetEvidenceContentRequest{Tenant: caller.Tenant, Scope: source.Scope, Id: redaction.ID, Purpose: command.Purpose}); result != nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC content permission bypass", result, err)
+	}
 	if _, err := client.GetEvidenceMetadata(ctx, &v1.GetEvidenceMetadataRequest{Tenant: caller.Tenant, Scope: "other", Id: redaction.ID, Purpose: command.Purpose}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("scope mismatch: %v", err)
+	}
+	if result, err := grpcClient.GetEvidenceMetadata(ctx, &v1.GetEvidenceMetadataRequest{Tenant: caller.Tenant, Scope: "other", Id: redaction.ID, Purpose: command.Purpose}); result != nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC scope mismatch", result, err)
 	}
 	request.Command.Key = "remote-spoof"
 	request.Evidence = content.Metadata
 	if _, err := client.RegisterEvidence(ctx, request); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("forged derivative accepted: %v", err)
+	}
+	if result, err := grpcClient.RegisterEvidence(ctx, request); result != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC forged derivative accepted", result, err)
 	}
 }
