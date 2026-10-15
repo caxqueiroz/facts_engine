@@ -14,6 +14,8 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -58,10 +60,17 @@ func testRemoteExtraction(t *testing.T, ctx context.Context, ledger model.Ledger
 	rpc := governanceClient(t, engine, caller)
 	ingestion := memoryv1connect.NewIngestionServiceClient(rpc)
 	extraction := memoryv1connect.NewExtractionServiceClient(rpc)
+	conn := governanceGRPC(t, engine, caller)
+	grpcIngestion := v1.NewIngestionServiceClient(conn)
+	grpcExtraction := v1.NewExtractionServiceClient(conn)
 	request := &v1.IngestConversationRequest{Tenant: caller.Tenant, Conversation: &v1.ConversationInput{Command: &v1.Command{Key: "conversation", Purpose: "extract"}, Scope: "case", SourceSystem: "chat", ConversationId: "conversation", Revision: "v1", Timezone: "UTC", Messages: []*v1.ConversationMessage{{Id: "message", Revision: "v1", Speaker: "customer", SpeakerRole: "customer", SourceClass: "customer", SourceTime: timestamppb.New(at), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "retain", Object: &v1.ObjectRef{Locator: object.Locator, Version: object.Version, Digest: object.Digest, Size: object.Size}}}}}
 	ingested, err := ingestion.IngestConversation(ctx, request)
 	if err != nil {
 		t.Fatal(err)
+	}
+	grpcIngested, err := grpcIngestion.IngestConversation(ctx, request)
+	if err != nil || !proto.Equal(ingested, grpcIngested) {
+		t.Fatal("gRPC conversation replay", grpcIngested, err)
 	}
 	embedded := model.ConversationRequest{Command: command("conversation"), Scope: "case", SourceSystem: "chat", ConversationID: "conversation", Revision: "v1", Timezone: "UTC", Messages: []model.ConversationMessage{{ID: "message", Revision: "v1", Speaker: "customer", SpeakerRole: "customer", SourceClass: "customer", SourceTime: at, MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "retain", Object: object}}}
 	again, err := engine.IngestConversation(ctx, caller, embedded)
@@ -72,14 +81,27 @@ func testRemoteExtraction(t *testing.T, ctx context.Context, ledger model.Ledger
 	if err != nil || !proto.Equal(fetched.Conversation, ingested.Conversation) {
 		t.Fatalf("conversation read: %v, %v", fetched, err)
 	}
-	plan, err := extraction.PlanExtractionChunks(ctx, &v1.PlanExtractionChunksRequest{Tenant: caller.Tenant, Scope: "case", ConversationId: again.ID, ProfileId: profile.ID, Purpose: "extract", MaxSourceBytes: 4})
+	grpcFetched, err := grpcIngestion.GetConversation(ctx, &v1.GetConversationRequest{Tenant: caller.Tenant, Scope: "case", Id: again.ID, Purpose: "extract"})
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC conversation read", grpcFetched, err)
+	}
+	planRequest := &v1.PlanExtractionChunksRequest{Tenant: caller.Tenant, Scope: "case", ConversationId: again.ID, ProfileId: profile.ID, Purpose: "extract", MaxSourceBytes: 4}
+	plan, err := extraction.PlanExtractionChunks(ctx, planRequest)
 	if err != nil || len(plan.Plan.Chunks) != 1 || plan.Plan.Chunks[0].SourceBytes != 3 || plan.Plan.ProfileDigest != model.ExtractionProfileDigest(profile) || calls.Load() != 0 {
 		t.Fatalf("chunk planning: %v, %v", plan, err)
 	}
+	grpcPlan, err := grpcExtraction.PlanExtractionChunks(ctx, planRequest)
+	if err != nil || !proto.Equal(plan, grpcPlan) || calls.Load() != 0 {
+		t.Fatal("gRPC chunk planning", grpcPlan, err)
+	}
 	start := &v1.StartExtractionRequest{Tenant: caller.Tenant, Command: &v1.Command{Key: "start", Purpose: "extract"}, Scope: "case", ConversationId: again.ID, ProfileId: profile.ID, Subjects: []string{"subject"}, Predicates: []*v1.PredicateBinding{{Predicate: "preference", SchemaVersion: "v1"}}, InputRanges: plan.Plan.Chunks[0].InputRanges, ExpectedProfileDigest: plan.Plan.ProfileDigest}
-	job, err := extraction.StartExtraction(ctx, start)
+	job, err := grpcExtraction.StartExtraction(ctx, start)
 	if err != nil || job.Job.State != "pending" || calls.Load() != 0 {
 		t.Fatalf("job start invoked provider: %v, %v", job, err)
+	}
+	connectJob, err := extraction.StartExtraction(ctx, start)
+	if err != nil || !proto.Equal(job, connectJob) || calls.Load() != 0 {
+		t.Fatal("Connect/gRPC extraction replay", connectJob, err)
 	}
 	input := model.ExtractionRequest{Command: command("start"), Scope: "case", ConversationID: again.ID, ProfileID: profile.ID, Subjects: []string{"subject"}, Predicates: []model.PredicateBinding{{Predicate: "preference", SchemaVersion: "v1"}}, InputRanges: []model.ExtractionInputRange{{EvidenceID: again.EvidenceIDs[0], Start: 0, End: 3}}, ExpectedProfileDigest: plan.Plan.ProfileDigest}
 	duplicate, err := engine.StartExtraction(ctx, caller, input)
@@ -94,6 +116,10 @@ func testRemoteExtraction(t *testing.T, ctx context.Context, ledger model.Ledger
 	if err != nil || status.Job.State != "failed" || status.Job.LastFailureCode != "provider_unavailable" || status.Job.Fence != failed.Fence {
 		t.Fatalf("job status: %v, %v", status, err)
 	}
+	grpcJob, err := grpcExtraction.GetJob(ctx, &v1.GetJobRequest{Tenant: caller.Tenant, Scope: "case", Id: job.Job.Id, Purpose: "extract"})
+	if err != nil || !proto.Equal(status, grpcJob) {
+		t.Fatal("gRPC failed job status", grpcJob, err)
+	}
 	denied, err := facts.NewWithOptions(ledger, denyPermission{permission: "can_operate"}, store, options)
 	if err != nil {
 		t.Fatal(err)
@@ -103,13 +129,24 @@ func testRemoteExtraction(t *testing.T, ctx context.Context, ledger model.Ledger
 	if _, err := deniedClient.RetryJob(ctx, retryRequest); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("retry authorization: %v", err)
 	}
-	retried, err := extraction.RetryJob(ctx, retryRequest)
+	grpcDenied := v1.NewExtractionServiceClient(governanceGRPC(t, denied, caller))
+	if result, err := grpcDenied.RetryJob(ctx, retryRequest); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC retry authorization", result, err)
+	}
+	retried, err := grpcExtraction.RetryJob(ctx, retryRequest)
 	if err != nil || retried.Job.State != "pending" || retried.Job.Fence <= failed.Fence {
 		t.Fatalf("audited retry: %v, %v", retried, err)
+	}
+	connectRetry, err := extraction.RetryJob(ctx, retryRequest)
+	if err != nil || !proto.Equal(retried, connectRetry) {
+		t.Fatal("Connect/gRPC retry receipt", connectRetry, err)
 	}
 	retryRequest.Command.Key = "stale-retry"
 	if _, err := extraction.RetryJob(ctx, retryRequest); connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("stale retry fence: %v", err)
+	}
+	if result, err := grpcExtraction.RetryJob(ctx, retryRequest); result != nil || grpcstatus.Code(err) != codes.Aborted {
+		t.Fatal("gRPC stale retry fence", result, err)
 	}
 	completed, err := engine.RunExtraction(ctx, worker, model.ExtractionRunRequest{Command: command("run-success"), ID: job.Job.Id, Scope: "case"})
 	if err != nil || completed.State != "completed" || calls.Load() != 2 {
@@ -118,6 +155,10 @@ func testRemoteExtraction(t *testing.T, ctx context.Context, ledger model.Ledger
 	run, err := extraction.GetExtractionRun(ctx, &v1.GetExtractionRunRequest{Tenant: caller.Tenant, Scope: "case", Id: completed.AttemptID, Purpose: "extract"})
 	if err != nil || run.Run.Result == nil || len(run.Run.Result.Proposals) != 1 || !run.Run.Result.ResponseComplete || model.BytesDigest(run.Run.Attempt.RequestBytes) != run.Run.Attempt.RequestDigest || model.BytesDigest(run.Run.Result.ResponseBytes) != run.Run.Result.ResponseDigest {
 		t.Fatalf("retained run: %v, %v", run, err)
+	}
+	grpcRun, err := grpcExtraction.GetExtractionRun(ctx, &v1.GetExtractionRunRequest{Tenant: caller.Tenant, Scope: "case", Id: completed.AttemptID, Purpose: "extract"})
+	if err != nil || !proto.Equal(run, grpcRun) {
+		t.Fatal("gRPC retained extraction bytes and provenance", grpcRun, err)
 	}
 	stored, err := engine.GetExtractionRun(ctx, caller, model.ExtractionRunQuery{ID: completed.AttemptID, Scope: "case", Purpose: "extract"})
 	if err != nil || !bytes.Equal(stored.Attempt.RequestBytes, run.Run.Attempt.RequestBytes) || !bytes.Equal(stored.Result.ResponseBytes, run.Run.Result.ResponseBytes) || stored.Result.Proposals[0].VersionID != run.Run.Result.Proposals[0].VersionId || run.Run.Attempt.Reservation.Tokens != profile.MaxTokensPerAttempt {
@@ -150,6 +191,11 @@ func testRemoteExtractionReplay(t *testing.T, ctx context.Context, engine *facts
 	if err != nil || got.Job.Id != job.ID || got.Job.CreatedRevision != job.CreatedRevision {
 		t.Fatalf("remote extraction replay: %v, %v", got, err)
 	}
+	grpcClient := v1.NewExtractionServiceClient(governanceGRPC(t, engine, caller))
+	grpcGot, err := grpcClient.StartExtraction(ctx, request)
+	if err != nil || !proto.Equal(got, grpcGot) {
+		t.Fatal("gRPC extraction replay", grpcGot, err)
+	}
 }
 func testRemoteRefreshReplay(t *testing.T, ctx context.Context, engine *facts.Engine, ledger model.Ledger, caller model.Caller, status model.JobStatus) {
 	t.Helper()
@@ -174,5 +220,10 @@ func testRemoteRefreshReplay(t *testing.T, ctx context.Context, engine *facts.En
 	got, err := client.StartMemoryRefresh(ctx, request)
 	if err != nil || got.Job.Id != status.ID || got.Job.CreatedRevision != status.CreatedRevision {
 		t.Fatalf("remote refresh replay: %v, %v", got, err)
+	}
+	grpcClient := v1.NewExtractionServiceClient(governanceGRPC(t, engine, job.Caller))
+	grpcGot, err := grpcClient.StartMemoryRefresh(ctx, request)
+	if err != nil || !proto.Equal(got, grpcGot) {
+		t.Fatal("gRPC memory refresh replay", grpcGot, err)
 	}
 }

@@ -85,6 +85,8 @@ Calculation tests compare full Connect/gRPC receipts and reads, external-run ret
 
 Retention tests exercise all five RPCs with real grpc-go clients, compare retained receipts/status with Connect, reject ordinary database roles and forged tenants, enforce legal holds and shared-object blockers, and verify atomic derivative-family disposal replay across gRPC, Connect and embedded calls. Changed family membership under the same command key fails over gRPC as well.
 
+Extraction parity tests use generated gRPC clients for immutable conversation ingestion/readback, chunk planning, fact and memory extraction scheduling, failed-job status, authorized retry/fencing, exact retained model artifacts and memory-refresh replay. Planning and scheduling must not invoke the model provider. Refresh administration tests compare paginated scans and sweep receipts across transports and reject forged triggers/tenants, denied permissions, oversized pages, changed command input, subsecond schedule timestamps and future sweeps. Provider execution remains an explicit worker operation; these synthetic fixtures are not bank-approved model evaluations.
+
 
 [connectapi.NewHandler](adapters/connectapi/server.go) accepts the existing engine, an injected `IdentityVerifier`, and mandatory `Limits` (timeout, concurrent requests, request bytes and response bytes). It returns an `http.Handler` without opening a listener or starting background workers. The host mounts it on its HTTP server, configures TLS and read/write/idle deadlines, and enables HTTP/2 for gRPC. Connect and gRPC-Web use the same handler. A generated Connect client is composed as follows:
 
