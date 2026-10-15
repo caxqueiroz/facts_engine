@@ -444,3 +444,9 @@ func (e *Engine) DisposeVersion(ctx context.Context, c Caller, r model.VersionDi
 func (e *Engine) CleanupProjection(ctx context.Context, c Caller, r model.ProjectionCleanupRequest) (CommitResult, error) {
 	return e.service.CleanupProjection(ctx, c, r)
 }
+
+// DisposeBatch atomically removes an explicit selection of related fact/memory
+// and terminal extraction payloads. Other retained derivatives remain blockers.
+func (e *Engine) DisposeBatch(ctx context.Context, c Caller, r model.DisposalBatchRequest) (CommitResult, error) {
+	return e.service.DisposeBatch(ctx, c, r)
+}

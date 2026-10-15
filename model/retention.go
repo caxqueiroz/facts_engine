@@ -115,6 +115,8 @@ type VersionDisposalTx interface {
 }
 
 type RetentionEvent struct {
+	BatchID                 string                     `json:",omitempty"`
+	DisposalBatch           *DisposalBatchRequest      `json:",omitempty"`
 	ProjectionCleanup       *ProjectionCleanupRequest  `json:",omitempty"`
 	VersionDisposal         *VersionDisposalRequest    `json:",omitempty"`
 	ExtractionDisposal      *ExtractionDisposalRequest `json:",omitempty"`

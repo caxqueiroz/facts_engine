@@ -10,6 +10,7 @@ option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 // Administrative controls retain engine authorization and database-role checks.
 // Disposal covers eligible evidence, orphan uploads, snapshots, contexts and terminal extraction artifacts.
 service RetentionService {
+  rpc DisposeBatch(DisposeBatchRequest) returns (DisposeBatchResponse);
   rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
@@ -257,5 +258,40 @@ message CleanupProjectionRequest {
   string generation = 10 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
 }
 message CleanupProjectionResponse {
+  CommitResult result = 1;
+}
+
+message BatchVersionSelection {
+  string kind = 1 [
+    (buf.validate.field).string.in = "fact",
+    (buf.validate.field).string.in = "memory"
+  ];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string version_id = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated VersionRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+message BatchExtractionSelection {
+  string job_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  repeated ExtractionRetentionBinding bindings = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+}
+message DisposeBatchRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated BatchVersionSelection versions = 5 [(buf.validate.field).repeated.max_items = 32];
+  repeated BatchExtractionSelection extractions = 6 [(buf.validate.field).repeated.max_items = 32];
+}
+message DisposeBatchResponse {
   CommitResult result = 1;
 }

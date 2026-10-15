@@ -37,8 +37,8 @@ UNION SELECT v.scope_id FROM extraction_attempts a JOIN extraction_attempt_memor
 UNION SELECT d.scope_id FROM extraction_attempts a JOIN extraction_attempt_memory_inputs i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id JOIN memory_dependencies d ON d.tenant_id=i.tenant_id AND d.memory_version_id=i.version_id WHERE a.tenant_id=$1 AND a.job_id=$2;
 
 -- name: ExtractionDisposalBlocked :one
-SELECT EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN fact_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.job_id=sqlc.arg(job_id))
-OR EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_memory_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN memory_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.job_id=sqlc.arg(job_id))
+SELECT EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN fact_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.job_id=sqlc.arg(job_id) AND NOT (p.version_id=ANY(coalesce(sqlc.arg(selected_fact_versions)::text[],ARRAY[]::text[]))))
+OR EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_memory_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN memory_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.job_id=sqlc.arg(job_id) AND NOT (p.version_id=ANY(coalesce(sqlc.arg(selected_memory_versions)::text[],ARRAY[]::text[]))))
 OR EXISTS(SELECT 1 FROM audit_export_requests WHERE tenant_id=sqlc.arg(tenant_id) AND scope_id=ANY(sqlc.arg(scopes)::text[]))
 OR EXISTS(SELECT 1 FROM consumer_offsets WHERE tenant_id=sqlc.arg(tenant_id) AND consumer_id LIKE 'archive-%' AND acknowledged_revision<sqlc.arg(required_revision)::bigint);
 

@@ -14,6 +14,12 @@ import (
 // DisposeExtraction removes only the retained job and provider artifacts. Source
 // records and live derived proposals are not implicitly selected for disposal.
 func (t *transaction) DisposeExtraction(ctx context.Context, r model.ExtractionDisposalRequest) error {
+	return t.disposeExtraction(ctx, r, nil, nil)
+}
+
+// Selected versions are supplied only by DisposeBatch, which must remove all
+// of them in this transaction before success. Single-artifact calls select none.
+func (t *transaction) disposeExtraction(ctx context.Context, r model.ExtractionDisposalRequest, selectedFacts, selectedMemories []string) error {
 	bindings := append([]model.ExtractionRetentionBinding(nil), r.Bindings...)
 	sort.Slice(bindings, func(i, j int) bool { return bindings[i].Scope < bindings[j].Scope })
 	if len(bindings) == 0 || len(bindings) > 256 {
@@ -211,7 +217,7 @@ func (t *transaction) DisposeExtraction(ctx context.Context, r model.ExtractionD
 			}
 		}
 	}
-	blocked, err := q.ExtractionDisposalBlocked(ctx, ledgerdb.ExtractionDisposalBlockedParams{TenantID: t.tenant, JobID: job.ID, Scopes: scopeList, RequiredRevision: requiredRevision})
+	blocked, err := q.ExtractionDisposalBlocked(ctx, ledgerdb.ExtractionDisposalBlockedParams{TenantID: t.tenant, JobID: job.ID, Scopes: scopeList, RequiredRevision: requiredRevision, SelectedFactVersions: selectedFacts, SelectedMemoryVersions: selectedMemories})
 	if err != nil {
 		return err
 	}

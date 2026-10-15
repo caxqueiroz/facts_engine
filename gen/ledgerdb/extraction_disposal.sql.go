@@ -127,23 +127,27 @@ func (q *Queries) ExtractionDisposalAttempts(ctx context.Context, arg Extraction
 }
 
 const ExtractionDisposalBlocked = `-- name: ExtractionDisposalBlocked :one
-SELECT EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN fact_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=$1 AND a.job_id=$2)
-OR EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_memory_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN memory_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=$1 AND a.job_id=$2)
-OR EXISTS(SELECT 1 FROM audit_export_requests WHERE tenant_id=$1 AND scope_id=ANY($3::text[]))
-OR EXISTS(SELECT 1 FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id LIKE 'archive-%' AND acknowledged_revision<$4::bigint)
+SELECT EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN fact_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=$1 AND a.job_id=$2 AND NOT (p.version_id=ANY(coalesce($3::text[],ARRAY[]::text[]))))
+OR EXISTS(SELECT 1 FROM extraction_attempts a JOIN extraction_memory_proposals p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id JOIN memory_version_payloads v ON v.tenant_id=p.tenant_id AND v.version_id=p.version_id WHERE a.tenant_id=$1 AND a.job_id=$2 AND NOT (p.version_id=ANY(coalesce($4::text[],ARRAY[]::text[]))))
+OR EXISTS(SELECT 1 FROM audit_export_requests WHERE tenant_id=$1 AND scope_id=ANY($5::text[]))
+OR EXISTS(SELECT 1 FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id LIKE 'archive-%' AND acknowledged_revision<$6::bigint)
 `
 
 type ExtractionDisposalBlockedParams struct {
-	TenantID         string
-	JobID            string
-	Scopes           []string
-	RequiredRevision int64
+	TenantID               string
+	JobID                  string
+	SelectedFactVersions   []string
+	SelectedMemoryVersions []string
+	Scopes                 []string
+	RequiredRevision       int64
 }
 
 func (q *Queries) ExtractionDisposalBlocked(ctx context.Context, arg ExtractionDisposalBlockedParams) (pgtype.Bool, error) {
 	row := q.db.QueryRow(ctx, ExtractionDisposalBlocked,
 		arg.TenantID,
 		arg.JobID,
+		arg.SelectedFactVersions,
+		arg.SelectedMemoryVersions,
 		arg.Scopes,
 		arg.RequiredRevision,
 	)

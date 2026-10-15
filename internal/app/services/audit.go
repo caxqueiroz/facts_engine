@@ -365,6 +365,11 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 					include = include && b.Scope == r.Scope
 				}
 			}
+			if event.DisposalBatch != nil {
+				for _, scope := range event.DisposalBatch.Scopes() {
+					include = include && scope == r.Scope
+				}
+			}
 			if event.ProjectionCleanup != nil {
 				for _, b := range event.ProjectionCleanup.Bindings {
 					include = include && b.Scope == r.Scope

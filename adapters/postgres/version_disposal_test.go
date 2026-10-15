@@ -95,6 +95,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		}
 		return r
 	}
+	testVersionBatch(t, ctx, normal, engine, admin, c, now, secret)
 	f, m := request("fact", "a", fact), request("memory", "z", memory)
 	cleanupIndex := setupVersionCleanup(t, ctx, admin, c, fact, memory, secret)
 	expectedTargets := 1

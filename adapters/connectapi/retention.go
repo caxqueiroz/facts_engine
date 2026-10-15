@@ -7,6 +7,7 @@ import (
 )
 
 type RetentionEngine interface {
+	DisposeBatch(context.Context, model.Caller, model.DisposalBatchRequest) (model.CommitResult, error)
 	CleanupProjection(context.Context, model.Caller, model.ProjectionCleanupRequest) (model.CommitResult, error)
 	DisposeVersion(context.Context, model.Caller, model.VersionDisposalRequest) (model.CommitResult, error)
 	DisposeExtraction(context.Context, model.Caller, model.ExtractionDisposalRequest) (model.CommitResult, error)
@@ -125,4 +126,27 @@ func (s *retentionService) CleanupProjection(ctx context.Context, r *v1.CleanupP
 		return nil, err
 	}
 	return &v1.CleanupProjectionResponse{Result: commit(out)}, nil
+}
+
+func (s *retentionService) DisposeBatch(ctx context.Context, r *v1.DisposeBatchRequest) (*v1.DisposeBatchResponse, error) {
+	request := model.DisposalBatchRequest{Command: command(r.Command), Scope: r.Scope, Reason: r.Reason}
+	for _, v := range r.Versions {
+		selection := model.VersionDisposalRequest{Kind: v.Kind, Scope: v.Scope, RecordID: v.RecordId, VersionID: v.VersionId}
+		for _, b := range v.Bindings {
+			selection.Bindings = append(selection.Bindings, model.VersionRetentionBinding{Scope: b.Scope, PolicyID: b.PolicyId, Jurisdiction: b.Jurisdiction})
+		}
+		request.Versions = append(request.Versions, selection)
+	}
+	for _, e := range r.Extractions {
+		selection := model.ExtractionDisposalRequest{JobID: e.JobId}
+		for _, b := range e.Bindings {
+			selection.Bindings = append(selection.Bindings, model.ExtractionRetentionBinding{Scope: b.Scope, JobPolicyID: b.JobPolicyId, RequestPolicyID: b.RequestPolicyId, ResponsePolicyID: b.ResponsePolicyId, Jurisdiction: b.Jurisdiction})
+		}
+		request.Extractions = append(request.Extractions, selection)
+	}
+	result, err := s.engine.DisposeBatch(ctx, callerFrom(ctx), request)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeBatchResponse{Result: commit(result)}, nil
 }

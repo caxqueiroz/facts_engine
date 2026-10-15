@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	RetentionService_DisposeBatch_FullMethodName            = "/memory.v1.RetentionService/DisposeBatch"
 	RetentionService_RegisterRetentionPolicy_FullMethodName = "/memory.v1.RetentionService/RegisterRetentionPolicy"
 	RetentionService_PlaceLegalHold_FullMethodName          = "/memory.v1.RetentionService/PlaceLegalHold"
 	RetentionService_ReleaseLegalHold_FullMethodName        = "/memory.v1.RetentionService/ReleaseLegalHold"
@@ -39,6 +40,7 @@ const (
 // Administrative controls retain engine authorization and database-role checks.
 // Disposal covers eligible evidence, orphan uploads, snapshots, contexts and terminal extraction artifacts.
 type RetentionServiceClient interface {
+	DisposeBatch(ctx context.Context, in *DisposeBatchRequest, opts ...grpc.CallOption) (*DisposeBatchResponse, error)
 	RegisterRetentionPolicy(ctx context.Context, in *RegisterRetentionPolicyRequest, opts ...grpc.CallOption) (*RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(ctx context.Context, in *PlaceLegalHoldRequest, opts ...grpc.CallOption) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(ctx context.Context, in *ReleaseLegalHoldRequest, opts ...grpc.CallOption) (*ReleaseLegalHoldResponse, error)
@@ -58,6 +60,16 @@ type retentionServiceClient struct {
 
 func NewRetentionServiceClient(cc grpc.ClientConnInterface) RetentionServiceClient {
 	return &retentionServiceClient{cc}
+}
+
+func (c *retentionServiceClient) DisposeBatch(ctx context.Context, in *DisposeBatchRequest, opts ...grpc.CallOption) (*DisposeBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisposeBatchResponse)
+	err := c.cc.Invoke(ctx, RetentionService_DisposeBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *retentionServiceClient) RegisterRetentionPolicy(ctx context.Context, in *RegisterRetentionPolicyRequest, opts ...grpc.CallOption) (*RegisterRetentionPolicyResponse, error) {
@@ -177,6 +189,7 @@ func (c *retentionServiceClient) GetRetentionStatus(ctx context.Context, in *Get
 // Administrative controls retain engine authorization and database-role checks.
 // Disposal covers eligible evidence, orphan uploads, snapshots, contexts and terminal extraction artifacts.
 type RetentionServiceServer interface {
+	DisposeBatch(context.Context, *DisposeBatchRequest) (*DisposeBatchResponse, error)
 	RegisterRetentionPolicy(context.Context, *RegisterRetentionPolicyRequest) (*RegisterRetentionPolicyResponse, error)
 	PlaceLegalHold(context.Context, *PlaceLegalHoldRequest) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *ReleaseLegalHoldRequest) (*ReleaseLegalHoldResponse, error)
@@ -198,6 +211,9 @@ type RetentionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedRetentionServiceServer struct{}
 
+func (UnimplementedRetentionServiceServer) DisposeBatch(context.Context, *DisposeBatchRequest) (*DisposeBatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisposeBatch not implemented")
+}
 func (UnimplementedRetentionServiceServer) RegisterRetentionPolicy(context.Context, *RegisterRetentionPolicyRequest) (*RegisterRetentionPolicyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterRetentionPolicy not implemented")
 }
@@ -250,6 +266,24 @@ func RegisterRetentionServiceServer(s grpc.ServiceRegistrar, srv RetentionServic
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&RetentionService_ServiceDesc, srv)
+}
+
+func _RetentionService_DisposeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisposeBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RetentionServiceServer).DisposeBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RetentionService_DisposeBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RetentionServiceServer).DisposeBatch(ctx, req.(*DisposeBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _RetentionService_RegisterRetentionPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -457,6 +491,10 @@ var RetentionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "memory.v1.RetentionService",
 	HandlerType: (*RetentionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "DisposeBatch",
+			Handler:    _RetentionService_DisposeBatch_Handler,
+		},
 		{
 			MethodName: "RegisterRetentionPolicy",
 			Handler:    _RetentionService_RegisterRetentionPolicy_Handler,

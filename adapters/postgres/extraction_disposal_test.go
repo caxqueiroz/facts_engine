@@ -135,6 +135,7 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 		t.Fatal("missing derived fixture", derivedRun, err)
 	}
 	reject(engine, request(derived), model.ErrPrecondition)
+	batchID := testDisposalBatch(t, ctx, normal, engine, runner, ledger, admin, c, derived, derivedRun.Result.Proposals[0], request(derived))
 	reject(normal, request(completed), model.ErrDenied)
 	for _, kind := range []string{"job", "request", "response"} {
 		r := request(completed)
@@ -282,8 +283,26 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 			gaps[gap.Kind]++
 		}
 	}
-	if gaps["extraction_job_content"] != 1 || gaps["extraction_attempt_content"] != 2 || gaps["extraction_result_content"] != 2 {
+	if gaps["extraction_job_content"] != 2 || gaps["extraction_attempt_content"] != 3 || gaps["extraction_result_content"] != 3 {
 		t.Fatal("missing disposal gaps", gaps)
+	}
+
+	batchChildren, parent := 0, false
+	for _, entry := range bundle.Bundle.Entries {
+		if entry.Kind != "retention" {
+			continue
+		}
+		var event model.RetentionEvent
+		if err = json.Unmarshal(entry.Payload, &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.BatchID == batchID {
+			batchChildren++
+		}
+		parent = parent || (event.ID == batchID && event.DisposalBatch != nil)
+	}
+	if batchChildren != 2 || !parent {
+		t.Fatal("batch audit grouping incomplete", batchChildren, parent)
 	}
 	if err = audit.Verify(*bundle.Bundle, map[string]ed25519.PublicKey{"extract-retention": private.Public().(ed25519.PublicKey)}); err != nil {
 		t.Fatal(err)
