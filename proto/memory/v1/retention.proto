@@ -18,7 +18,10 @@ service RetentionService {
 message RetentionPolicy {
   string id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
-  string record_class = 3 [(buf.validate.field).string.const = "evidence_bytes"];
+  string record_class = 3 [
+    (buf.validate.field).string.in = "evidence_bytes",
+    (buf.validate.field).string.in = "orphan_evidence_bytes"
+  ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
     max_bytes: 256

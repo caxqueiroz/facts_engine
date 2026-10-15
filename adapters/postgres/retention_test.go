@@ -58,6 +58,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	if _, err = engine.RegisterRetentionPolicy(ctx, c, policy); err != nil {
 		t.Fatal(err)
 	}
+	testPendingUploads(t, ctx, normal, engine, store, pool, admin, cipher, c)
 	register := func(id, object, scope, policy string) model.ObjectRef {
 		t.Helper()
 		ref, err := store.Put(ctx, c.Tenant, object, []byte(object))

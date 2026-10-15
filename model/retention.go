@@ -5,8 +5,9 @@ import (
 	"time"
 )
 
-// RetentionPolicy is immutable and application-owned. Durations are measured from
-// evidence registration, never a caller-supplied historical source timestamp.
+// RetentionPolicy is immutable and application-owned. Evidence-byte durations
+// start at registration; orphan-evidence durations start at recorded upload time.
+// Neither uses a caller-supplied historical source timestamp.
 type RetentionPolicy struct {
 	ID, Scope, RecordClass, Purpose, Jurisdiction string
 	MinimumAgeSeconds                             int64
@@ -15,6 +16,11 @@ type RetentionPolicyRequest struct {
 	Command
 	Policy RetentionPolicy
 }
+
+// PendingEvidenceUpload binds a new development-store object to its intended
+// scope and orphan cleanup policy before ledger registration. It grants no
+// permission to disclose content or to register evidence.
+type PendingEvidenceUpload struct{ ID, Scope, PolicyID string }
 type LegalHoldRequest struct {
 	Command
 	ID, Scope, Reason string

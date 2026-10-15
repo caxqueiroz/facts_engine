@@ -545,6 +545,16 @@ type Outbox struct {
 	LedgerRevision int64
 }
 
+type PendingEvidenceUpload struct {
+	TenantID      string
+	Locator       string
+	ObjectVersion string
+	ScopeID       string
+	PolicyID      string
+	ByteSize      int64
+	UploadedAt    pgtype.Timestamptz
+}
+
 type PolicyVersion struct {
 	TenantID string
 	ScopeID  string

@@ -3,6 +3,7 @@ package evidence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
@@ -44,6 +45,20 @@ func (s *Postgres) transaction(ctx context.Context, tenant string, fn func(pgx.T
 	return tx.Commit(ctx)
 }
 func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (model.ObjectRef, error) {
+	return s.put(ctx, tenant, id, payload, nil)
+}
+
+// PutPending records a new object's upload scope, orphan policy and database
+// timestamp atomically with its bytes. The caller owns upload authorization.
+// Existing objects without this provenance cannot be adopted retrospectively.
+func (s *Postgres) PutPending(ctx context.Context, tenant string, upload model.PendingEvidenceUpload, payload []byte) (model.ObjectRef, error) {
+	if !model.ValidID(upload.Scope) || !model.ValidID(upload.PolicyID) {
+		return model.ObjectRef{}, model.ErrInvalid
+	}
+	return s.put(ctx, tenant, upload.ID, payload, &upload)
+}
+
+func (s *Postgres) put(ctx context.Context, tenant, id string, payload []byte, upload *model.PendingEvidenceUpload) (model.ObjectRef, error) {
 	if !model.ValidID(id) || len(payload) > 16<<20 {
 		return model.ObjectRef{}, model.ErrInvalid
 	}
@@ -60,6 +75,11 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 		if disposed {
 			return model.ErrPrecondition
 		}
+		if upload != nil {
+			if err := s.recordPendingUpload(ctx, tx, tenant, ref, *upload); err != nil {
+				return err
+			}
+		}
 		err = ledgerdb.New(tx).InsertEvidenceObject(ctx, ledgerdb.InsertEvidenceObjectParams{TenantID: tenant, Locator: id, ObjectVersion: ref.Version, Payload: b})
 		return err
 	})
@@ -74,6 +94,46 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 		return ref, model.ErrPrecondition
 	}
 	return ref, nil
+}
+
+func (s *Postgres) recordPendingUpload(ctx context.Context, tx pgx.Tx, tenant string, ref model.ObjectRef, upload model.PendingEvidenceUpload) error {
+	queries := ledgerdb.New(tx)
+	retained, err := queries.GetPendingEvidenceUpload(ctx, ledgerdb.GetPendingEvidenceUploadParams{TenantID: tenant, Locator: ref.Locator, ObjectVersion: ref.Version})
+	if err == nil {
+		if retained.ScopeID != upload.Scope || retained.PolicyID != upload.PolicyID || retained.ByteSize != ref.Size {
+			return model.ErrConflict
+		}
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	_, err = queries.GetEvidenceObjectPayload(ctx, ledgerdb.GetEvidenceObjectPayloadParams{TenantID: tenant, Locator: ref.Locator, ObjectVersion: ref.Version})
+	if err == nil {
+		return model.ErrPrecondition
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	encrypted, err := queries.GetRetentionPolicyPayload(ctx, ledgerdb.GetRetentionPolicyPayloadParams{TenantID: tenant, ScopeID: upload.Scope, ID: upload.PolicyID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ErrPrecondition
+	}
+	if err != nil {
+		return err
+	}
+	raw, err := s.cipher.Open(tenant, encrypted)
+	if err != nil {
+		return err
+	}
+	var policy model.RetentionPolicy
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		return err
+	}
+	if policy.Scope != upload.Scope || policy.ID != upload.PolicyID || policy.RecordClass != "orphan_evidence_bytes" {
+		return model.ErrPrecondition
+	}
+	return queries.InsertPendingEvidenceUpload(ctx, ledgerdb.InsertPendingEvidenceUploadParams{TenantID: tenant, Locator: ref.Locator, ObjectVersion: ref.Version, ScopeID: upload.Scope, PolicyID: upload.PolicyID, ByteSize: ref.Size})
 }
 func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef) ([]byte, error) {
 	if err := ctx.Err(); err != nil {

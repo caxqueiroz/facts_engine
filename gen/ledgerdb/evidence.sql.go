@@ -7,6 +7,8 @@ package ledgerdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const GetEvidenceObjectPayload = `-- name: GetEvidenceObjectPayload :one
@@ -27,6 +29,36 @@ func (q *Queries) GetEvidenceObjectPayload(ctx context.Context, arg GetEvidenceO
 	return payload, err
 }
 
+const GetPendingEvidenceUpload = `-- name: GetPendingEvidenceUpload :one
+SELECT scope_id,policy_id,byte_size,uploaded_at FROM pending_evidence_uploads
+WHERE tenant_id=$1 AND locator=$2 AND object_version=$3
+`
+
+type GetPendingEvidenceUploadParams struct {
+	TenantID      string
+	Locator       string
+	ObjectVersion string
+}
+
+type GetPendingEvidenceUploadRow struct {
+	ScopeID    string
+	PolicyID   string
+	ByteSize   int64
+	UploadedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetPendingEvidenceUpload(ctx context.Context, arg GetPendingEvidenceUploadParams) (GetPendingEvidenceUploadRow, error) {
+	row := q.db.QueryRow(ctx, GetPendingEvidenceUpload, arg.TenantID, arg.Locator, arg.ObjectVersion)
+	var i GetPendingEvidenceUploadRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.PolicyID,
+		&i.ByteSize,
+		&i.UploadedAt,
+	)
+	return i, err
+}
+
 const InsertEvidenceObject = `-- name: InsertEvidenceObject :exec
 INSERT INTO evidence_objects (tenant_id,locator,object_version,payload)
 VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING
@@ -45,6 +77,32 @@ func (q *Queries) InsertEvidenceObject(ctx context.Context, arg InsertEvidenceOb
 		arg.Locator,
 		arg.ObjectVersion,
 		arg.Payload,
+	)
+	return err
+}
+
+const InsertPendingEvidenceUpload = `-- name: InsertPendingEvidenceUpload :exec
+INSERT INTO pending_evidence_uploads(tenant_id,locator,object_version,scope_id,policy_id,byte_size)
+VALUES($1,$2,$3,$4,$5,$6)
+`
+
+type InsertPendingEvidenceUploadParams struct {
+	TenantID      string
+	Locator       string
+	ObjectVersion string
+	ScopeID       string
+	PolicyID      string
+	ByteSize      int64
+}
+
+func (q *Queries) InsertPendingEvidenceUpload(ctx context.Context, arg InsertPendingEvidenceUploadParams) error {
+	_, err := q.db.Exec(ctx, InsertPendingEvidenceUpload,
+		arg.TenantID,
+		arg.Locator,
+		arg.ObjectVersion,
+		arg.ScopeID,
+		arg.PolicyID,
+		arg.ByteSize,
 	)
 	return err
 }
