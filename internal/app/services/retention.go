@@ -162,3 +162,29 @@ func (s *Service) DisposeOrphanEvidence(ctx context.Context, c model.Caller, r m
 	}
 	return s.retentionMutation(ctx, c, r.Scope, "dispose_orphan_evidence", "can_dispose", r.Object.Locator, r.Command, r, model.RetentionEvent{OrphanDisposal: &r, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy"}}, false)
 }
+
+func (s *Service) ScanOrphanEvidence(ctx context.Context, c model.Caller, q model.OrphanEvidenceQuery) ([]model.ObjectRef, error) {
+	if !model.ValidID(q.PolicyID) || !model.ValidID(q.Jurisdiction) || q.Limit < 1 || q.Limit > 100 || (q.AfterLocator != "" && !model.ValidID(q.AfterLocator)) || ((q.AfterLocator == "") != (q.AfterVersion == "")) || len(q.AfterVersion) > 64 {
+		return nil, model.ErrInvalid
+	}
+	if _, err := s.authorize(ctx, c, q.Scope, "can_dispose", model.Command{Purpose: q.Purpose}); err != nil {
+		return nil, err
+	}
+	var out []model.ObjectRef
+	err := s.ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		scanner, ok := tx.(model.OrphanEvidenceScannerTx)
+		if !ok {
+			return model.ErrPrecondition
+		}
+		var err error
+		out, err = scanner.ScanOrphanEvidence(ctx, q)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.authorize(ctx, c, q.Scope, "can_dispose", model.Command{Purpose: q.Purpose}); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

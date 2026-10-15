@@ -92,6 +92,8 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(auditWorker, "member", tenantObject), tuple(auditWorker, "operator", scopeObject), tuple(auditWorker, "auditor", scopeObject)}}})
 	archiveWorker := "service:" + openfga.ObjectID(tenant, "archive-worker")
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(archiveWorker, "member", tenantObject), tuple(archiveWorker, "reader", scopeObject), tuple(archiveWorker, "auditor", scopeObject)}}})
+	cleanupWorker := "service:" + openfga.ObjectID(tenant, "cleanup-worker")
+	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(cleanupWorker, "member", tenantObject), tuple(cleanupWorker, "disposal_operator", scopeObject)}}})
 	refreshWorker := "service:" + openfga.ObjectID(tenant, "refresh-worker")
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": []map[string]string{tuple(refreshWorker, "member", tenantObject), tuple(refreshWorker, "reader", scopeObject), tuple(refreshWorker, "auditor", scopeObject), tuple(refreshWorker, "proposer", scopeObject)}}})
 	public, private, err := ed25519.GenerateKey(rand.Reader)
@@ -182,6 +184,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	testStandaloneRefresh(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, projectionFact)
 	testStandaloneAudit(t, ctx, client, base, dsn, endpoint, store, modelID, tenant, principal, public)
 	testStandaloneArchive(t, ctx, client, base, dsn, endpoint, store, modelID, tenant)
+	testStandaloneCleanup(t, ctx, dsn, endpoint, store, modelID, tenant)
 	gatewayCert := authority.Issue(t, false, []string{"spiffe://test/gateway"}, time.Now().Add(time.Hour))
 	gatewayTLS := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: authority.Roots, Certificates: []tls.Certificate{gatewayCert.TLS}}, ForceAttemptHTTP2: true}
 	defer gatewayTLS.CloseIdleConnections()

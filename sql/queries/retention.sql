@@ -147,3 +147,20 @@ AND NOT (b.evidence_id=ANY(sqlc.arg(selected_ids)::text[])));
 -- name: HasRegisteredEvidenceObject :one
 SELECT EXISTS(SELECT 1 FROM evidence_retention
 WHERE tenant_id=$1 AND locator=$2 AND object_version=$3);
+
+-- name: ScanOrphanEvidence :many
+SELECT u.locator,u.object_version,u.byte_size
+FROM pending_evidence_uploads u
+JOIN retention_objects o USING(tenant_id,locator,object_version)
+JOIN evidence_objects b USING(tenant_id,locator,object_version)
+WHERE u.tenant_id=sqlc.arg(tenant_id) AND u.scope_id=sqlc.arg(scope_id) AND u.policy_id=sqlc.arg(policy_id)
+AND NOT o.disposed
+AND (u.locator COLLATE "C",u.object_version COLLATE "C")>(sqlc.arg(after_locator)::text COLLATE "C",sqlc.arg(after_version)::text COLLATE "C")
+AND u.uploaded_at<=clock_timestamp()-(sqlc.arg(minimum_age_seconds)::bigint*interval '1 second')
+AND NOT EXISTS(SELECT 1 FROM evidence_retention e WHERE e.tenant_id=u.tenant_id AND e.locator=u.locator AND e.object_version=u.object_version)
+ORDER BY u.locator COLLATE "C",u.object_version COLLATE "C"
+LIMIT sqlc.arg(page_limit);
+
+-- name: HasIncompleteEvidenceInventory :one
+SELECT EXISTS(SELECT 1 FROM evidence e WHERE e.tenant_id=$1
+AND NOT EXISTS(SELECT 1 FROM evidence_retention b WHERE b.tenant_id=e.tenant_id AND b.evidence_id=e.id));

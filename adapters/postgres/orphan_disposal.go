@@ -54,7 +54,7 @@ func (t *transaction) DisposeOrphanEvidence(ctx context.Context, r model.OrphanE
 		return model.ErrPrecondition
 	}
 	// Encrypted legacy metadata can alias any object; require a complete inventory.
-	legacy, err := q.HasUnboundLegacyEvidence(ctx, ledgerdb.HasUnboundLegacyEvidenceParams{TenantID: t.tenant, ID: ""})
+	legacy, err := q.HasIncompleteEvidenceInventory(ctx, t.tenant)
 	if err != nil {
 		return err
 	}
@@ -72,3 +72,40 @@ func (t *transaction) DisposeOrphanEvidence(ctx context.Context, r model.OrphanE
 }
 
 var _ model.OrphanEvidenceDisposalTx = (*transaction)(nil)
+
+func (t *transaction) ScanOrphanEvidence(ctx context.Context, r model.OrphanEvidenceQuery) ([]model.ObjectRef, error) {
+	if err := t.RequireScope(ctx, r.Scope); err != nil {
+		return nil, err
+	}
+	p, err := t.RetentionPolicy(ctx, r.Scope, r.PolicyID)
+	if err != nil {
+		return nil, err
+	}
+	if p.RecordClass != "orphan_evidence_bytes" || p.Purpose != r.Purpose || p.Jurisdiction != r.Jurisdiction {
+		return nil, model.ErrPrecondition
+	}
+	q := ledgerdb.New(t.tx)
+	holds, err := q.ListActiveLegalHolds(ctx, ledgerdb.ListActiveLegalHoldsParams{TenantID: t.tenant, ScopeID: r.Scope})
+	if err != nil {
+		return nil, err
+	}
+	if len(holds) > 0 {
+		return []model.ObjectRef{}, nil
+	}
+	legacy, err := q.HasIncompleteEvidenceInventory(ctx, t.tenant)
+	if err != nil {
+		return nil, err
+	}
+	if legacy {
+		return nil, model.ErrPrecondition
+	}
+	rows, err := q.ScanOrphanEvidence(ctx, ledgerdb.ScanOrphanEvidenceParams{TenantID: t.tenant, ScopeID: r.Scope, PolicyID: r.PolicyID, AfterLocator: r.AfterLocator, AfterVersion: r.AfterVersion, MinimumAgeSeconds: p.MinimumAgeSeconds, PageLimit: int32(r.Limit)})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.ObjectRef, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, model.ObjectRef{Locator: row.Locator, Version: row.ObjectVersion, Digest: row.ObjectVersion, Size: row.ByteSize})
+	}
+	return out, nil
+}

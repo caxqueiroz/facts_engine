@@ -86,3 +86,18 @@ type RetentionTx interface {
 type EvidenceLineageDisposalTx interface {
 	DisposeEvidenceLineage(context.Context, EvidenceDisposalRequest) error
 }
+
+// OrphanEvidenceQuery is a bounded, live scan, not a deletion authorization.
+// The optional cursor is the last locator/version pair returned by a prior page.
+type OrphanEvidenceQuery struct {
+	Scope, PolicyID, Jurisdiction, Purpose string
+	AfterLocator, AfterVersion             string
+	Limit                                  int
+}
+type OrphanEvidenceScannerTx interface {
+	ScanOrphanEvidence(context.Context, OrphanEvidenceQuery) ([]ObjectRef, error)
+}
+type OrphanEvidenceEngine interface {
+	ScanOrphanEvidence(context.Context, Caller, OrphanEvidenceQuery) ([]ObjectRef, error)
+	DisposeOrphanEvidence(context.Context, Caller, OrphanEvidenceDisposalRequest) (CommitResult, error)
+}

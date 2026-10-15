@@ -23,6 +23,7 @@ const (
 	RetentionService_PlaceLegalHold_FullMethodName          = "/memory.v1.RetentionService/PlaceLegalHold"
 	RetentionService_ReleaseLegalHold_FullMethodName        = "/memory.v1.RetentionService/ReleaseLegalHold"
 	RetentionService_DisposeEvidence_FullMethodName         = "/memory.v1.RetentionService/DisposeEvidence"
+	RetentionService_DisposeOrphanEvidence_FullMethodName   = "/memory.v1.RetentionService/DisposeOrphanEvidence"
 	RetentionService_GetRetentionStatus_FullMethodName      = "/memory.v1.RetentionService/GetRetentionStatus"
 )
 
@@ -37,6 +38,7 @@ type RetentionServiceClient interface {
 	PlaceLegalHold(ctx context.Context, in *PlaceLegalHoldRequest, opts ...grpc.CallOption) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(ctx context.Context, in *ReleaseLegalHoldRequest, opts ...grpc.CallOption) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(ctx context.Context, in *DisposeEvidenceRequest, opts ...grpc.CallOption) (*DisposeEvidenceResponse, error)
+	DisposeOrphanEvidence(ctx context.Context, in *DisposeOrphanEvidenceRequest, opts ...grpc.CallOption) (*DisposeOrphanEvidenceResponse, error)
 	GetRetentionStatus(ctx context.Context, in *GetRetentionStatusRequest, opts ...grpc.CallOption) (*GetRetentionStatusResponse, error)
 }
 
@@ -88,6 +90,16 @@ func (c *retentionServiceClient) DisposeEvidence(ctx context.Context, in *Dispos
 	return out, nil
 }
 
+func (c *retentionServiceClient) DisposeOrphanEvidence(ctx context.Context, in *DisposeOrphanEvidenceRequest, opts ...grpc.CallOption) (*DisposeOrphanEvidenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisposeOrphanEvidenceResponse)
+	err := c.cc.Invoke(ctx, RetentionService_DisposeOrphanEvidence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *retentionServiceClient) GetRetentionStatus(ctx context.Context, in *GetRetentionStatusRequest, opts ...grpc.CallOption) (*GetRetentionStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRetentionStatusResponse)
@@ -109,6 +121,7 @@ type RetentionServiceServer interface {
 	PlaceLegalHold(context.Context, *PlaceLegalHoldRequest) (*PlaceLegalHoldResponse, error)
 	ReleaseLegalHold(context.Context, *ReleaseLegalHoldRequest) (*ReleaseLegalHoldResponse, error)
 	DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error)
+	DisposeOrphanEvidence(context.Context, *DisposeOrphanEvidenceRequest) (*DisposeOrphanEvidenceResponse, error)
 	GetRetentionStatus(context.Context, *GetRetentionStatusRequest) (*GetRetentionStatusResponse, error)
 	mustEmbedUnimplementedRetentionServiceServer()
 }
@@ -131,6 +144,9 @@ func (UnimplementedRetentionServiceServer) ReleaseLegalHold(context.Context, *Re
 }
 func (UnimplementedRetentionServiceServer) DisposeEvidence(context.Context, *DisposeEvidenceRequest) (*DisposeEvidenceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisposeEvidence not implemented")
+}
+func (UnimplementedRetentionServiceServer) DisposeOrphanEvidence(context.Context, *DisposeOrphanEvidenceRequest) (*DisposeOrphanEvidenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisposeOrphanEvidence not implemented")
 }
 func (UnimplementedRetentionServiceServer) GetRetentionStatus(context.Context, *GetRetentionStatusRequest) (*GetRetentionStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRetentionStatus not implemented")
@@ -228,6 +244,24 @@ func _RetentionService_DisposeEvidence_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RetentionService_DisposeOrphanEvidence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisposeOrphanEvidenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RetentionServiceServer).DisposeOrphanEvidence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RetentionService_DisposeOrphanEvidence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RetentionServiceServer).DisposeOrphanEvidence(ctx, req.(*DisposeOrphanEvidenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RetentionService_GetRetentionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRetentionStatusRequest)
 	if err := dec(in); err != nil {
@@ -268,6 +302,10 @@ var RetentionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DisposeEvidence",
 			Handler:    _RetentionService_DisposeEvidence_Handler,
+		},
+		{
+			MethodName: "DisposeOrphanEvidence",
+			Handler:    _RetentionService_DisposeOrphanEvidence_Handler,
 		},
 		{
 			MethodName: "GetRetentionStatus",

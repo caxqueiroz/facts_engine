@@ -285,6 +285,18 @@ func (q *Queries) HasFactEvidenceReference(ctx context.Context, arg HasFactEvide
 	return exists, err
 }
 
+const HasIncompleteEvidenceInventory = `-- name: HasIncompleteEvidenceInventory :one
+SELECT EXISTS(SELECT 1 FROM evidence e WHERE e.tenant_id=$1
+AND NOT EXISTS(SELECT 1 FROM evidence_retention b WHERE b.tenant_id=e.tenant_id AND b.evidence_id=e.id))
+`
+
+func (q *Queries) HasIncompleteEvidenceInventory(ctx context.Context, tenantID string) (bool, error) {
+	row := q.db.QueryRow(ctx, HasIncompleteEvidenceInventory, tenantID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const HasMemoryAttestationReference = `-- name: HasMemoryAttestationReference :one
 SELECT EXISTS(SELECT 1
 FROM memory_attestations
@@ -599,4 +611,62 @@ func (q *Queries) MarkEvidenceObjectDisposed(ctx context.Context, arg MarkEviden
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const ScanOrphanEvidence = `-- name: ScanOrphanEvidence :many
+SELECT u.locator,u.object_version,u.byte_size
+FROM pending_evidence_uploads u
+JOIN retention_objects o USING(tenant_id,locator,object_version)
+JOIN evidence_objects b USING(tenant_id,locator,object_version)
+WHERE u.tenant_id=$1 AND u.scope_id=$2 AND u.policy_id=$3
+AND NOT o.disposed
+AND (u.locator COLLATE "C",u.object_version COLLATE "C")>($4::text COLLATE "C",$5::text COLLATE "C")
+AND u.uploaded_at<=clock_timestamp()-($6::bigint*interval '1 second')
+AND NOT EXISTS(SELECT 1 FROM evidence_retention e WHERE e.tenant_id=u.tenant_id AND e.locator=u.locator AND e.object_version=u.object_version)
+ORDER BY u.locator COLLATE "C",u.object_version COLLATE "C"
+LIMIT $7
+`
+
+type ScanOrphanEvidenceParams struct {
+	TenantID          string
+	ScopeID           string
+	PolicyID          string
+	AfterLocator      string
+	AfterVersion      string
+	MinimumAgeSeconds int64
+	PageLimit         int32
+}
+
+type ScanOrphanEvidenceRow struct {
+	Locator       string
+	ObjectVersion string
+	ByteSize      int64
+}
+
+func (q *Queries) ScanOrphanEvidence(ctx context.Context, arg ScanOrphanEvidenceParams) ([]ScanOrphanEvidenceRow, error) {
+	rows, err := q.db.Query(ctx, ScanOrphanEvidence,
+		arg.TenantID,
+		arg.ScopeID,
+		arg.PolicyID,
+		arg.AfterLocator,
+		arg.AfterVersion,
+		arg.MinimumAgeSeconds,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScanOrphanEvidenceRow{}
+	for rows.Next() {
+		var i ScanOrphanEvidenceRow
+		if err := rows.Scan(&i.Locator, &i.ObjectVersion, &i.ByteSize); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -71,6 +71,28 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	var handler workers.Handler
 	var consumer model.ConsumerKey
 	switch c.Mode {
+	case "orphan-cleanup":
+		store, err := evidence.NewPostgres(pool, cipher)
+		if err != nil {
+			return errors.New("cannot initialize cleanup evidence store")
+		}
+		engine, err := facts.NewWithOptions(ledger, auth, store, model.EngineOptions{Telemetry: telemetry.Options})
+		if err != nil {
+			return errors.New("cannot initialize cleanup engine")
+		}
+		caller := model.Caller{Tenant: c.OrphanCleanup.Tenant, Principal: c.Principal, Service: true}
+		ticker, err := workers.NewOrphanCleanup(engine, caller, *c.OrphanCleanup)
+		if err != nil {
+			return errors.New("cannot initialize cleanup worker")
+		}
+		logger.Info("worker started", "mode", c.Mode)
+		err = RunOrphanLoop(ctx, ticker, time.Duration(c.OrphanCleanup.IntervalMinutes)*time.Minute, time.Duration(c.DeliveryTimeoutSeconds)*time.Second, logger)
+		logger.Info("worker stopped", "mode", c.Mode, "failed", err != nil)
+		if err != nil {
+			return errors.New("worker stopped after orphan cleanup failure")
+		}
+		return nil
+
 	case "projection":
 		index, closeIndex, err := runtimeconfig.OpenLexical(startup, []runtimeconfig.LexicalRoute{c.Projection})
 		if err != nil {

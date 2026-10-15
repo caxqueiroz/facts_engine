@@ -791,11 +791,147 @@ func (x *RetentionStatus) GetBlockers() []string {
 	return nil
 }
 
+type DisposeOrphanEvidenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command       *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Scope         string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	Object        *ObjectRef             `protobuf:"bytes,4,opt,name=object,proto3" json:"object,omitempty"`
+	PolicyId      string                 `protobuf:"bytes,5,opt,name=policy_id,json=policyId,proto3" json:"policy_id,omitempty"`
+	Jurisdiction  string                 `protobuf:"bytes,6,opt,name=jurisdiction,proto3" json:"jurisdiction,omitempty"`
+	Reason        string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisposeOrphanEvidenceRequest) Reset() {
+	*x = DisposeOrphanEvidenceRequest{}
+	mi := &file_memory_v1_retention_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisposeOrphanEvidenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisposeOrphanEvidenceRequest) ProtoMessage() {}
+
+func (x *DisposeOrphanEvidenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisposeOrphanEvidenceRequest.ProtoReflect.Descriptor instead.
+func (*DisposeOrphanEvidenceRequest) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetTenant() string {
+	if x != nil {
+		return x.Tenant
+	}
+	return ""
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetObject() *ObjectRef {
+	if x != nil {
+		return x.Object
+	}
+	return nil
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetPolicyId() string {
+	if x != nil {
+		return x.PolicyId
+	}
+	return ""
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetJurisdiction() string {
+	if x != nil {
+		return x.Jurisdiction
+	}
+	return ""
+}
+
+func (x *DisposeOrphanEvidenceRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type DisposeOrphanEvidenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *CommitResult          `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisposeOrphanEvidenceResponse) Reset() {
+	*x = DisposeOrphanEvidenceResponse{}
+	mi := &file_memory_v1_retention_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisposeOrphanEvidenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisposeOrphanEvidenceResponse) ProtoMessage() {}
+
+func (x *DisposeOrphanEvidenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_retention_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisposeOrphanEvidenceResponse.ProtoReflect.Descriptor instead.
+func (*DisposeOrphanEvidenceResponse) Descriptor() ([]byte, []int) {
+	return file_memory_v1_retention_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DisposeOrphanEvidenceResponse) GetResult() *CommitResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_memory_v1_retention_proto protoreflect.FileDescriptor
 
 const file_memory_v1_retention_proto_rawDesc = "" +
 	"\n" +
-	"\x19memory/v1/retention.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\"\x92\x03\n" +
+	"\x19memory/v1/retention.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/evidence.proto\"\x92\x03\n" +
 	"\x0fRetentionPolicy\x129\n" +
 	"\x02id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12?\n" +
 	"\x05scope\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x12O\n" +
@@ -858,12 +994,24 @@ const file_memory_v1_retention_proto_rawDesc = "" +
 	"\rregistered_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\fregisteredAt\x12\x1a\n" +
 	"\bdisposed\x18\x04 \x01(\bR\bdisposed\x12!\n" +
 	"\factive_holds\x18\x05 \x03(\tR\vactiveHolds\x12\x1a\n" +
-	"\bblockers\x18\x06 \x03(\tR\bblockers2\xf5\x03\n" +
+	"\bblockers\x18\x06 \x03(\tR\bblockers\"\xc9\x03\n" +
+	"\x1cDisposeOrphanEvidenceRequest\x12A\n" +
+	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
+	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
+	"\x05scope\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x05scope\x124\n" +
+	"\x06object\x18\x04 \x01(\v2\x14.memory.v1.ObjectRefB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12F\n" +
+	"\tpolicy_id\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\bpolicyId\x12M\n" +
+	"\fjurisdiction\x18\x06 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\fjurisdiction\x12\"\n" +
+	"\x06reason\x18\a \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x06reason\"P\n" +
+	"\x1dDisposeOrphanEvidenceResponse\x12/\n" +
+	"\x06result\x18\x01 \x01(\v2\x17.memory.v1.CommitResultR\x06result2\xe1\x04\n" +
 	"\x10RetentionService\x12p\n" +
 	"\x17RegisterRetentionPolicy\x12).memory.v1.RegisterRetentionPolicyRequest\x1a*.memory.v1.RegisterRetentionPolicyResponse\x12U\n" +
 	"\x0ePlaceLegalHold\x12 .memory.v1.PlaceLegalHoldRequest\x1a!.memory.v1.PlaceLegalHoldResponse\x12[\n" +
 	"\x10ReleaseLegalHold\x12\".memory.v1.ReleaseLegalHoldRequest\x1a#.memory.v1.ReleaseLegalHoldResponse\x12X\n" +
-	"\x0fDisposeEvidence\x12!.memory.v1.DisposeEvidenceRequest\x1a\".memory.v1.DisposeEvidenceResponse\x12a\n" +
+	"\x0fDisposeEvidence\x12!.memory.v1.DisposeEvidenceRequest\x1a\".memory.v1.DisposeEvidenceResponse\x12j\n" +
+	"\x15DisposeOrphanEvidence\x12'.memory.v1.DisposeOrphanEvidenceRequest\x1a(.memory.v1.DisposeOrphanEvidenceResponse\x12a\n" +
 	"\x12GetRetentionStatus\x12$.memory.v1.GetRetentionStatusRequest\x1a%.memory.v1.GetRetentionStatusResponseB;Z9github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1b\x06proto3"
 
 var (
@@ -878,7 +1026,7 @@ func file_memory_v1_retention_proto_rawDescGZIP() []byte {
 	return file_memory_v1_retention_proto_rawDescData
 }
 
-var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_memory_v1_retention_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_memory_v1_retention_proto_goTypes = []any{
 	(*RetentionPolicy)(nil),                 // 0: memory.v1.RetentionPolicy
 	(*RegisterRetentionPolicyRequest)(nil),  // 1: memory.v1.RegisterRetentionPolicyRequest
@@ -892,37 +1040,45 @@ var file_memory_v1_retention_proto_goTypes = []any{
 	(*GetRetentionStatusRequest)(nil),       // 9: memory.v1.GetRetentionStatusRequest
 	(*GetRetentionStatusResponse)(nil),      // 10: memory.v1.GetRetentionStatusResponse
 	(*RetentionStatus)(nil),                 // 11: memory.v1.RetentionStatus
-	(*Command)(nil),                         // 12: memory.v1.Command
-	(*CommitResult)(nil),                    // 13: memory.v1.CommitResult
-	(*timestamppb.Timestamp)(nil),           // 14: google.protobuf.Timestamp
+	(*DisposeOrphanEvidenceRequest)(nil),    // 12: memory.v1.DisposeOrphanEvidenceRequest
+	(*DisposeOrphanEvidenceResponse)(nil),   // 13: memory.v1.DisposeOrphanEvidenceResponse
+	(*Command)(nil),                         // 14: memory.v1.Command
+	(*CommitResult)(nil),                    // 15: memory.v1.CommitResult
+	(*timestamppb.Timestamp)(nil),           // 16: google.protobuf.Timestamp
+	(*ObjectRef)(nil),                       // 17: memory.v1.ObjectRef
 }
 var file_memory_v1_retention_proto_depIdxs = []int32{
-	12, // 0: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
+	14, // 0: memory.v1.RegisterRetentionPolicyRequest.command:type_name -> memory.v1.Command
 	0,  // 1: memory.v1.RegisterRetentionPolicyRequest.policy:type_name -> memory.v1.RetentionPolicy
-	13, // 2: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
-	12, // 3: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
-	13, // 4: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	12, // 5: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
-	13, // 6: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
-	12, // 7: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
-	13, // 8: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	15, // 2: memory.v1.RegisterRetentionPolicyResponse.result:type_name -> memory.v1.CommitResult
+	14, // 3: memory.v1.PlaceLegalHoldRequest.command:type_name -> memory.v1.Command
+	15, // 4: memory.v1.PlaceLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	14, // 5: memory.v1.ReleaseLegalHoldRequest.command:type_name -> memory.v1.Command
+	15, // 6: memory.v1.ReleaseLegalHoldResponse.result:type_name -> memory.v1.CommitResult
+	14, // 7: memory.v1.DisposeEvidenceRequest.command:type_name -> memory.v1.Command
+	15, // 8: memory.v1.DisposeEvidenceResponse.result:type_name -> memory.v1.CommitResult
 	11, // 9: memory.v1.GetRetentionStatusResponse.status:type_name -> memory.v1.RetentionStatus
-	14, // 10: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
-	1,  // 11: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
-	3,  // 12: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
-	5,  // 13: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
-	7,  // 14: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
-	9,  // 15: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
-	2,  // 16: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
-	4,  // 17: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
-	6,  // 18: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
-	8,  // 19: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
-	10, // 20: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
-	16, // [16:21] is the sub-list for method output_type
-	11, // [11:16] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	16, // 10: memory.v1.RetentionStatus.registered_at:type_name -> google.protobuf.Timestamp
+	14, // 11: memory.v1.DisposeOrphanEvidenceRequest.command:type_name -> memory.v1.Command
+	17, // 12: memory.v1.DisposeOrphanEvidenceRequest.object:type_name -> memory.v1.ObjectRef
+	15, // 13: memory.v1.DisposeOrphanEvidenceResponse.result:type_name -> memory.v1.CommitResult
+	1,  // 14: memory.v1.RetentionService.RegisterRetentionPolicy:input_type -> memory.v1.RegisterRetentionPolicyRequest
+	3,  // 15: memory.v1.RetentionService.PlaceLegalHold:input_type -> memory.v1.PlaceLegalHoldRequest
+	5,  // 16: memory.v1.RetentionService.ReleaseLegalHold:input_type -> memory.v1.ReleaseLegalHoldRequest
+	7,  // 17: memory.v1.RetentionService.DisposeEvidence:input_type -> memory.v1.DisposeEvidenceRequest
+	12, // 18: memory.v1.RetentionService.DisposeOrphanEvidence:input_type -> memory.v1.DisposeOrphanEvidenceRequest
+	9,  // 19: memory.v1.RetentionService.GetRetentionStatus:input_type -> memory.v1.GetRetentionStatusRequest
+	2,  // 20: memory.v1.RetentionService.RegisterRetentionPolicy:output_type -> memory.v1.RegisterRetentionPolicyResponse
+	4,  // 21: memory.v1.RetentionService.PlaceLegalHold:output_type -> memory.v1.PlaceLegalHoldResponse
+	6,  // 22: memory.v1.RetentionService.ReleaseLegalHold:output_type -> memory.v1.ReleaseLegalHoldResponse
+	8,  // 23: memory.v1.RetentionService.DisposeEvidence:output_type -> memory.v1.DisposeEvidenceResponse
+	13, // 24: memory.v1.RetentionService.DisposeOrphanEvidence:output_type -> memory.v1.DisposeOrphanEvidenceResponse
+	10, // 25: memory.v1.RetentionService.GetRetentionStatus:output_type -> memory.v1.GetRetentionStatusResponse
+	20, // [20:26] is the sub-list for method output_type
+	14, // [14:20] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_retention_proto_init() }
@@ -931,13 +1087,14 @@ func file_memory_v1_retention_proto_init() {
 		return
 	}
 	file_memory_v1_common_proto_init()
+	file_memory_v1_evidence_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_retention_proto_rawDesc), len(file_memory_v1_retention_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

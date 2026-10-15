@@ -4,6 +4,7 @@ package memory.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "memory/v1/common.proto";
+import "memory/v1/evidence.proto";
 
 option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 // Administrative controls retain engine authorization and database-role checks.
@@ -13,6 +14,7 @@ service RetentionService {
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc DisposeOrphanEvidence(DisposeOrphanEvidenceRequest) returns (DisposeOrphanEvidenceResponse);
   rpc GetRetentionStatus(GetRetentionStatusRequest) returns (GetRetentionStatusResponse);
 }
 message RetentionPolicy {
@@ -107,4 +109,20 @@ message RetentionStatus {
   bool disposed = 4;
   repeated string active_holds = 5;
   repeated string blockers = 6;
+}
+
+message DisposeOrphanEvidenceRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string scope = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  ObjectRef object = 4 [(buf.validate.field).required = true];
+  string policy_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 7 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+}
+message DisposeOrphanEvidenceResponse {
+  CommitResult result = 1;
 }

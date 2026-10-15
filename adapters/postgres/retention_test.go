@@ -61,6 +61,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	}
 	testPendingUploads(t, ctx, normal, engine, store, pool, admin, cipher, c)
 	testOrphanDisposal(t, ctx, normal, engine, ledger, store, admin, c)
+	testOrphanCleanup(t, ctx, normal, engine, store, c)
 	register := func(id, object, scope, policy string) model.ObjectRef {
 		t.Helper()
 		ref, err := store.Put(ctx, c.Tenant, object, []byte(object))

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"github.com/caxqueiroz/facts_engine/internal/runtimeconfig"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/caxqueiroz/facts_engine/workers"
 	"path/filepath"
 )
 
@@ -90,25 +91,26 @@ func (c *RefreshConfig) bindings() []model.MemoryRefreshBinding {
 }
 
 type Config struct {
-	Telemetry              *runtimeconfig.Telemetry   `json:"telemetry,omitempty"`
-	OpenFGATraceContext    bool                       `json:"openfga_trace_context,omitempty"`
-	Extraction             *ExtractionConfig          `json:"extraction"`
-	Refresh                *RefreshConfig             `json:"refresh"`
-	Archive                *ArchiveConfig             `json:"archive"`
-	Audit                  AuditConfig                `json:"audit"`
-	Mode                   string                     `json:"mode"`
-	Principal              string                     `json:"principal"`
-	Projection             runtimeconfig.LexicalRoute `json:"projection"`
-	OpenFGAURL             string                     `json:"openfga_url"`
-	OpenFGAStore           string                     `json:"openfga_store"`
-	OpenFGAModel           string                     `json:"openfga_model"`
-	MaxConnections         int32                      `json:"max_connections"`
-	MaxAttempts            int                        `json:"max_attempts"`
-	LeaseSeconds           int                        `json:"lease_seconds"`
-	PollMilliseconds       int                        `json:"poll_milliseconds"`
-	MinBackoffMilliseconds int                        `json:"min_backoff_milliseconds"`
-	MaxBackoffSeconds      int                        `json:"max_backoff_seconds"`
-	DeliveryTimeoutSeconds int                        `json:"delivery_timeout_seconds"`
+	OrphanCleanup          *workers.OrphanCleanupConfig `json:"orphan_cleanup,omitempty"`
+	Telemetry              *runtimeconfig.Telemetry     `json:"telemetry,omitempty"`
+	OpenFGATraceContext    bool                         `json:"openfga_trace_context,omitempty"`
+	Extraction             *ExtractionConfig            `json:"extraction"`
+	Refresh                *RefreshConfig               `json:"refresh"`
+	Archive                *ArchiveConfig               `json:"archive"`
+	Audit                  AuditConfig                  `json:"audit"`
+	Mode                   string                       `json:"mode"`
+	Principal              string                       `json:"principal"`
+	Projection             runtimeconfig.LexicalRoute   `json:"projection"`
+	OpenFGAURL             string                       `json:"openfga_url"`
+	OpenFGAStore           string                       `json:"openfga_store"`
+	OpenFGAModel           string                       `json:"openfga_model"`
+	MaxConnections         int32                        `json:"max_connections"`
+	MaxAttempts            int                          `json:"max_attempts"`
+	LeaseSeconds           int                          `json:"lease_seconds"`
+	PollMilliseconds       int                          `json:"poll_milliseconds"`
+	MinBackoffMilliseconds int                          `json:"min_backoff_milliseconds"`
+	MaxBackoffSeconds      int                          `json:"max_backoff_seconds"`
+	DeliveryTimeoutSeconds int                          `json:"delivery_timeout_seconds"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -125,17 +127,25 @@ func (c Config) Validate() error {
 	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
 		return model.ErrInvalid
 	}
-	if c.Mode == "refresh-sweep" {
+	if c.Mode == "refresh-sweep" || c.Mode == "orphan-cleanup" {
 		if c.MaxAttempts != 0 || c.LeaseSeconds != 0 || c.PollMilliseconds != 0 || c.MinBackoffMilliseconds != 0 || c.MaxBackoffSeconds != 0 {
 			return model.ErrInvalid
 		}
 	} else if c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 {
 		return model.ErrInvalid
 	}
+	if c.Mode != "orphan-cleanup" && c.OrphanCleanup != nil {
+		return model.ErrInvalid
+	}
 	if c.Mode != "extraction" && c.Extraction != nil {
 		return model.ErrInvalid
 	}
 	switch c.Mode {
+	case "orphan-cleanup":
+		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.OrphanCleanup.Validate() != nil {
+			return model.ErrInvalid
+		}
+
 	case "projection":
 		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || runtimeconfig.ValidateRoutes([]runtimeconfig.LexicalRoute{c.Projection}) != nil {
 			return model.ErrInvalid

@@ -411,3 +411,8 @@ func (e *Engine) RebuildIndex(ctx context.Context, c Caller, r model.RebuildRequ
 func (e *Engine) DisposeOrphanEvidence(ctx context.Context, c Caller, r model.OrphanEvidenceDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeOrphanEvidence(ctx, c, r)
 }
+
+// ScanOrphanEvidence returns a bounded page of currently eligible uploads.
+func (e *Engine) ScanOrphanEvidence(ctx context.Context, c Caller, q model.OrphanEvidenceQuery) ([]model.ObjectRef, error) {
+	return e.service.ScanOrphanEvidence(ctx, c, q)
+}

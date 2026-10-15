@@ -7,6 +7,7 @@ import (
 )
 
 type RetentionEngine interface {
+	DisposeOrphanEvidence(context.Context, model.Caller, model.OrphanEvidenceDisposalRequest) (model.CommitResult, error)
 	RegisterRetentionPolicy(context.Context, model.Caller, model.RetentionPolicyRequest) (model.CommitResult, error)
 	PlaceLegalHold(context.Context, model.Caller, model.LegalHoldRequest) (model.CommitResult, error)
 	ReleaseLegalHold(context.Context, model.Caller, model.ReleaseLegalHoldRequest) (model.CommitResult, error)
@@ -51,4 +52,12 @@ func (s *retentionService) GetRetentionStatus(ctx context.Context, r *v1.GetRete
 	}
 	converter := responseConverter{}
 	return &v1.GetRetentionStatusResponse{Status: &v1.RetentionStatus{EvidenceId: out.EvidenceID, PolicyId: out.PolicyID, RegisteredAt: converter.timestamp(out.RegisteredAt), Disposed: out.Disposed, ActiveHolds: append([]string(nil), out.ActiveHolds...), Blockers: append([]string(nil), out.Blockers...)}}, converter.err
+}
+
+func (s *retentionService) DisposeOrphanEvidence(ctx context.Context, r *v1.DisposeOrphanEvidenceRequest) (*v1.DisposeOrphanEvidenceResponse, error) {
+	out, err := s.engine.DisposeOrphanEvidence(ctx, callerFrom(ctx), model.OrphanEvidenceDisposalRequest{Command: command(r.Command), Scope: r.Scope, PolicyID: r.PolicyId, Jurisdiction: r.Jurisdiction, Reason: r.Reason, Object: objectFromProto(r.Object)})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeOrphanEvidenceResponse{Result: commit(out)}, nil
 }
