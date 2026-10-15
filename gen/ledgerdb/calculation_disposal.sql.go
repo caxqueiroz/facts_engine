@@ -29,7 +29,7 @@ func (q *Queries) CalculationContentAvailable(ctx context.Context, arg Calculati
 }
 
 const CalculationDisposalBlocked = `-- name: CalculationDisposalBlocked :one
-SELECT EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=$1 AND d.calculation_id=$2)
+SELECT EXISTS(SELECT 1 FROM decision_receipts d JOIN decision_payloads dp ON dp.tenant_id=d.tenant_id AND dp.decision_id=d.id WHERE d.tenant_id=$1 AND d.calculation_id=$2)
 OR EXISTS(SELECT 1 FROM audit_export_requests a WHERE a.tenant_id=$1 AND a.scope_id=ANY($3::text[]))
 OR EXISTS(SELECT 1 FROM consumer_offsets c WHERE c.tenant_id=$1 AND c.consumer_id LIKE 'archive-%' AND c.acknowledged_revision<$4::bigint)
 `

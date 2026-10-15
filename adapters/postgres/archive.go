@@ -300,6 +300,11 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 						scopes[b.Scope] = true
 					}
 				}
+				if event.DecisionDisposal != nil {
+					for _, b := range event.DecisionDisposal.Bindings {
+						scopes[b.Scope] = true
+					}
+				}
 				if event.ExtractionDisposal != nil {
 					for _, b := range event.ExtractionDisposal.Bindings {
 						scopes[b.Scope] = true

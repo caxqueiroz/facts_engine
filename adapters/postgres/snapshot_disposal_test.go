@@ -232,6 +232,18 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := audit.Verify(*result.Bundle, map[string]ed25519.PublicKey{"snapshot-key": private.Public().(ed25519.PublicKey)}); err != nil {
+		t.Fatal(err)
+	}
+	decisionGap := false
+	for _, gap := range result.Bundle.Manifest.Gaps {
+		if gap.Kind == "decision_content" {
+			decisionGap = true
+		}
+	}
+	if !decisionGap {
+		t.Fatal("signed decision content gap missing")
+	}
 	calculationGap := false
 	for _, g := range result.Bundle.Manifest.Gaps {
 		if g.Kind == "calculation_content" && g.ID == disposedCalculation {

@@ -136,6 +136,23 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 			t.Fatalf("context disposal got %v want %v", err, want)
 		}
 	}
+	artifact := model.ArtifactReference{}
+	if err := ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
+		ev, err := tx.Evidence(ctx, "case1-source")
+		artifact = model.ArtifactReference{EvidenceID: ev.ID, Digest: ev.Object.Digest}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	decisionRequest := func(m model.ContextManifest) model.DecisionReceipt {
+		ref := model.VersionReference{RecordID: m.Items[0].Fact.RecordID, VersionID: m.Items[0].Fact.VersionID}
+		return model.DecisionReceipt{Command: command("record-" + m.ID), Scope: "case1", ApplicationID: "app", ExternalDecisionID: m.ID, ContextID: m.ID, SelectedItems: []model.VersionReference{ref}, UsedItems: []model.VersionReference{ref}, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact, Output: artifact, DecidedAt: time.Now().UTC(), Outcome: "succeeded"}
+	}
+	for _, scope := range []string{"case1", "case2"} {
+		if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: command("decisions-" + scope), Policy: model.RetentionPolicy{ID: "decisions", Scope: scope, RecordClass: "decision_payload", Purpose: "context-retention", Jurisdiction: "SG"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	batchOne, batchMulti := prepare("batch-one", false), prepare("batch-multi", true)
 	batch := model.DisposalBatchRequest{Command: command("batch-contexts"), Scope: "case1", Reason: "retention period expired"}
 	for _, m := range []model.ContextManifest{batchOne, batchMulti} {
@@ -143,6 +160,22 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		item.Command = model.Command{}
 		item.Reason = ""
 		batch.Contexts = append(batch.Contexts, item)
+		dr := decisionRequest(m)
+		if len(m.Memories) > 0 {
+			ref := model.VersionReference{RecordID: m.Memories[0].Memory.RecordID, VersionID: m.Memories[0].Memory.VersionID}
+			dr.SelectedItems = append(dr.SelectedItems, ref)
+			dr.UsedItems = append(dr.UsedItems, ref)
+		}
+		decision, err := normal.RecordDecision(ctx, c, dr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ds := model.DecisionDisposalRequest{DecisionID: decision.ID}
+		for _, scope := range decision.Scopes {
+			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "SG"})
+		}
+		batch.Decisions = append(batch.Decisions, ds)
+
 	}
 	badBatch := batch
 	badBatch.Contexts = append([]model.ContextDisposalRequest(nil), batch.Contexts...)
@@ -156,12 +189,22 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 			t.Fatal("failed batch lost context", err)
 		}
 	}
+	for _, d := range batch.Decisions {
+		if _, err := normal.GetDecisionReceipt(ctx, c, model.DecisionQuery{ID: d.DecisionID, Purpose: "read"}); err != nil {
+			t.Fatal("failed batch lost decision", err)
+		}
+	}
 	firstBatch, err := engine.DisposeBatch(ctx, c, batch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	batch.Contexts[0], batch.Contexts[1] = batch.Contexts[1], batch.Contexts[0]
 	testDisposalBatchRemote(t, ctx, engine, c, batch, firstBatch)
+	for _, d := range batch.Decisions {
+		if _, err := normal.GetDecisionReceipt(ctx, c, model.DecisionQuery{ID: d.DecisionID, Purpose: "read"}); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("decision retained", err)
+		}
+	}
 	for _, m := range []model.ContextManifest{batchOne, batchMulti} {
 		if _, err := normal.GetContextManifest(ctx, c, model.ContextQuery{ID: m.ID, Purpose: "read"}); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal("batch context retained", err)
@@ -202,18 +245,6 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	reject(engine, request(one), model.ErrPrecondition)
 	if _, err := admin.Exec(ctx, "DELETE FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id='archive-pending'", c.Tenant); err != nil {
 		t.Fatal(err)
-	}
-	artifact := model.ArtifactReference{}
-	if err := ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
-		ev, err := tx.Evidence(ctx, "case1-source")
-		artifact = model.ArtifactReference{EvidenceID: ev.ID, Digest: ev.Object.Digest}
-		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
-	decisionRequest := func(m model.ContextManifest) model.DecisionReceipt {
-		ref := model.VersionReference{RecordID: m.Items[0].Fact.RecordID, VersionID: m.Items[0].Fact.VersionID}
-		return model.DecisionReceipt{Command: command("record-" + m.ID), Scope: "case1", ApplicationID: "app", ExternalDecisionID: m.ID, ContextID: m.ID, SelectedItems: []model.VersionReference{ref}, UsedItems: []model.VersionReference{ref}, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact, Output: artifact, DecidedAt: time.Now().UTC(), Outcome: "succeeded"}
 	}
 	if _, err := normal.RecordDecision(ctx, c, decisionRequest(decision)); err != nil {
 		t.Fatal(err)

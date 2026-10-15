@@ -48,7 +48,7 @@ func (q *Queries) DeleteMemoryVersionPayload(ctx context.Context, arg DeleteMemo
 const FactDisposalBlocked = `-- name: FactDisposalBlocked :one
 SELECT EXISTS(SELECT 1 FROM fact_snapshot_items i JOIN fact_snapshot_payloads p ON p.tenant_id=i.tenant_id AND p.snapshot_id=i.snapshot_id WHERE i.tenant_id=$1 AND i.version_id=$2)
 OR EXISTS(SELECT 1 FROM context_items i JOIN context_payloads p ON p.tenant_id=i.tenant_id AND p.context_id=i.context_id WHERE i.tenant_id=$1 AND i.version_id=$2)
-OR EXISTS(SELECT 1 FROM decision_items x WHERE x.tenant_id=$1 AND x.version_id=$2)
+OR EXISTS(SELECT 1 FROM decision_items x JOIN decision_payloads dp ON dp.tenant_id=x.tenant_id AND dp.decision_id=x.decision_id WHERE x.tenant_id=$1 AND x.version_id=$2)
 OR EXISTS(SELECT 1 FROM attestations x WHERE x.tenant_id=$1 AND x.version_id=$2)
 OR EXISTS(SELECT 1 FROM memory_dependencies d JOIN memory_version_payloads p ON p.tenant_id=d.tenant_id AND p.version_id=d.memory_version_id WHERE d.tenant_id=$1 AND d.version_id=$2)
 OR EXISTS(SELECT 1 FROM extraction_memory_dependencies d JOIN extraction_job_payloads p ON p.tenant_id=d.tenant_id AND p.job_id=d.job_id WHERE d.tenant_id=$1 AND d.version_id=$2)
@@ -147,7 +147,7 @@ func (q *Queries) InsertMemoryVersionDisposal(ctx context.Context, arg InsertMem
 
 const MemoryDisposalBlocked = `-- name: MemoryDisposalBlocked :one
 SELECT EXISTS(SELECT 1 FROM context_memory_items i JOIN context_payloads p ON p.tenant_id=i.tenant_id AND p.context_id=i.context_id WHERE i.tenant_id=$1 AND i.version_id=$2)
-OR EXISTS(SELECT 1 FROM decision_memory_items x WHERE x.tenant_id=$1 AND x.version_id=$2)
+OR EXISTS(SELECT 1 FROM decision_memory_items x JOIN decision_payloads dp ON dp.tenant_id=x.tenant_id AND dp.decision_id=x.decision_id WHERE x.tenant_id=$1 AND x.version_id=$2)
 OR EXISTS(SELECT 1 FROM memory_attestations x WHERE x.tenant_id=$1 AND x.version_id=$2)
 OR EXISTS(SELECT 1 FROM extraction_jobs j JOIN extraction_job_payloads p ON p.tenant_id=j.tenant_id AND p.job_id=j.id WHERE j.tenant_id=$1 AND j.memory_version_id=$2)
 OR EXISTS(SELECT 1 FROM extraction_attempt_memory_inputs i JOIN extraction_attempt_payloads p ON p.tenant_id=i.tenant_id AND p.attempt_id=i.attempt_id WHERE i.tenant_id=$1 AND i.version_id=$2 AND i.payload_retained)

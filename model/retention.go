@@ -115,6 +115,7 @@ type VersionDisposalTx interface {
 }
 
 type RetentionEvent struct {
+	DecisionDisposal        *DecisionDisposalRequest    `json:",omitempty"`
 	CalculationDisposal     *CalculationDisposalRequest `json:",omitempty"`
 	BatchID                 string                      `json:",omitempty"`
 	DisposalBatch           *DisposalBatchRequest       `json:",omitempty"`
@@ -186,3 +187,11 @@ type CalculationDisposalRequest struct {
 	Bindings              []CalculationRetentionBinding
 }
 type CalculationRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }
+
+// DecisionDisposalRequest selects independently governed scope policies.
+type DecisionDisposalRequest struct {
+	Command
+	DecisionID, Reason string
+	Bindings           []DecisionRetentionBinding
+}
+type DecisionRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }

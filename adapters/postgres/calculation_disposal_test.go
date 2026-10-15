@@ -27,6 +27,14 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 			if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(scope + p.ID), Policy: p}); err != nil {
 				t.Fatal(err)
 			}
+			p.RecordClass = "decision_payload"
+			p.ID = "decisions"
+			if young {
+				p.ID = "decisions-young"
+			}
+			if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(scope + p.ID), Policy: p}); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	reject := func(e *facts.Engine, r model.DisposalBatchRequest, want error) {
@@ -55,8 +63,24 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 			snapSelection.Bindings = append(snapSelection.Bindings, model.SnapshotRetentionBinding{Scope: item.Selector.Scope, PolicyID: "snapshots", Jurisdiction: "SG"})
 		}
 		r := model.DisposalBatchRequest{Command: cmd("dispose-" + calc.ID), Scope: "case1", Reason: "expired", Calculations: []model.CalculationDisposalRequest{selection}, Snapshots: []model.SnapshotDisposalRequest{snapSelection}}
+		used := []model.VersionReference{}
+		for _, item := range snapshot.Items {
+			used = append(used, model.VersionReference{RecordID: item.Resolution.RecordID, VersionID: item.Resolution.VersionID})
+		}
+		decision, err := normal.RecordDecision(ctx, c, model.DecisionReceipt{Command: cmd("decision-" + calc.ID), Scope: "case1", ApplicationID: "batch", ExternalDecisionID: calc.ID, SnapshotID: snapshot.ID, CalculationID: calc.ID, SelectedItems: used, UsedItems: used, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: receipt.Input, Output: receipt.Output, DecidedAt: time.Now().UTC(), Outcome: "succeeded"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ds := model.DecisionDisposalRequest{DecisionID: decision.ID}
+		for _, scope := range decision.Scopes {
+			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "SG"})
+		}
+		r.Decisions = []model.DecisionDisposalRequest{ds}
 		retained := func() {
 			t.Helper()
+			if _, err := normal.GetDecisionReceipt(ctx, c, model.DecisionQuery{ID: decision.ID, Purpose: "read"}); err != nil {
+				t.Fatal("failed batch lost decision", err)
+			}
 			if _, err := normal.GetCalculationReceipt(ctx, c, model.CalculationQuery{ID: calc.ID, Purpose: "read"}); err != nil {
 				t.Fatal("failed batch lost calculation", err)
 			}
@@ -64,6 +88,46 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 				t.Fatal("failed batch lost snapshot", err)
 			}
 		}
+		if _, err := admin.Exec(ctx, "DELETE FROM decision_items WHERE tenant_id=$1 AND decision_id=$2 AND role='selected' AND ordinal=0", c.Tenant, decision.ID); err != nil {
+			t.Fatal(err)
+		}
+		reject(engine, r, model.ErrPrecondition)
+		if _, err := admin.Exec(ctx, "INSERT INTO decision_items(tenant_id,decision_id,role,ordinal,record_id,version_id,scope_id) VALUES($1,$2,'selected',0,$3,$4,$5)", c.Tenant, decision.ID, used[0].RecordID, used[0].VersionID, snapshot.Items[0].Selector.Scope); err != nil {
+			t.Fatal(err)
+		}
+		retained()
+		if _, err := admin.Exec(ctx, "INSERT INTO consumer_offsets(tenant_id,consumer_id,max_attempts) VALUES($1,'archive-decision-pending',3)", c.Tenant); err != nil {
+			t.Fatal(err)
+		}
+		reject(engine, r, model.ErrPrecondition)
+		if _, err := admin.Exec(ctx, "DELETE FROM consumer_offsets WHERE tenant_id=$1 AND consumer_id='archive-decision-pending'", c.Tenant); err != nil {
+			t.Fatal(err)
+		}
+		noDecision := r
+		noDecision.Decisions = nil
+		reject(engine, noDecision, model.ErrPrecondition)
+		youngDecision := r
+		youngDecision.Decisions = append([]model.DecisionDisposalRequest(nil), r.Decisions...)
+		youngDecision.Decisions[0].Bindings = append([]model.DecisionRetentionBinding(nil), ds.Bindings...)
+		youngDecision.Decisions[0].Bindings[0].PolicyID = "decisions-young"
+		reject(engine, youngDecision, model.ErrPrecondition)
+		if len(ds.Bindings) > 1 {
+			missing := r
+			missing.Decisions = append([]model.DecisionDisposalRequest(nil), r.Decisions...)
+			missing.Decisions[0].Bindings = ds.Bindings[:1]
+			reject(engine, missing, model.ErrDenied)
+		}
+		if _, err := admin.Exec(ctx, "REVOKE DELETE ON decision_payloads FROM facts_retention"); err != nil {
+			t.Fatal(err)
+		}
+		_, decisionErr := engine.DisposeBatch(ctx, c, r)
+		if _, err := admin.Exec(ctx, "GRANT DELETE ON decision_payloads TO facts_retention"); err != nil {
+			t.Fatal(err)
+		}
+		if !errors.Is(decisionErr, model.ErrDenied) {
+			t.Fatal(decisionErr)
+		}
+		retained()
 		reject(normal, r, model.ErrDenied)
 		incomplete := r
 		incomplete.Calculations = nil
@@ -109,6 +173,9 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 			t.Fatal("complete calculation selection", err)
 		}
 		testDisposalBatchRemote(t, ctx, engine, c, r, first)
+		if _, err := normal.GetDecisionReceipt(ctx, c, model.DecisionQuery{ID: decision.ID, Purpose: "read"}); !errors.Is(err, model.ErrPrecondition) {
+			t.Fatal("decision retained", err)
+		}
 		if _, err := normal.GetCalculationReceipt(ctx, c, model.CalculationQuery{ID: calc.ID, Purpose: "read"}); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal("calculation retained", err)
 		}

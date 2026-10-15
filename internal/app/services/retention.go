@@ -55,7 +55,7 @@ func (s *Service) retentionMutation(ctx context.Context, c model.Caller, scope, 
 }
 func (s *Service) RegisterRetentionPolicy(ctx context.Context, c model.Caller, r model.RetentionPolicyRequest) (model.CommitResult, error) {
 	p := r.Policy
-	if !model.ValidID(p.ID) || !model.ValidID(p.Scope) || (p.RecordClass != "evidence_bytes" && p.RecordClass != "orphan_evidence_bytes" && p.RecordClass != "snapshot_payload" && p.RecordClass != "context_payload" && p.RecordClass != "calculation_payload" && p.RecordClass != "extraction_job_payload" && p.RecordClass != "extraction_request_payload" && p.RecordClass != "extraction_response_payload" && p.RecordClass != "fact_payload" && p.RecordClass != "memory_payload") || p.Purpose == "" || len(p.Purpose) > 256 || !model.ValidID(p.Jurisdiction) || p.MinimumAgeSeconds < 0 || p.MinimumAgeSeconds > 100*366*86400 {
+	if !model.ValidID(p.ID) || !model.ValidID(p.Scope) || (p.RecordClass != "evidence_bytes" && p.RecordClass != "orphan_evidence_bytes" && p.RecordClass != "snapshot_payload" && p.RecordClass != "context_payload" && p.RecordClass != "calculation_payload" && p.RecordClass != "decision_payload" && p.RecordClass != "extraction_job_payload" && p.RecordClass != "extraction_request_payload" && p.RecordClass != "extraction_response_payload" && p.RecordClass != "fact_payload" && p.RecordClass != "memory_payload") || p.Purpose == "" || len(p.Purpose) > 256 || !model.ValidID(p.Jurisdiction) || p.MinimumAgeSeconds < 0 || p.MinimumAgeSeconds > 100*366*86400 {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	return s.retentionMutation(ctx, c, p.Scope, "register_retention_policy", "can_manage_retention", p.ID, r.Command, r, model.RetentionEvent{Policy: &p}, false)

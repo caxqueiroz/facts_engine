@@ -189,3 +189,6 @@ GRANT SELECT,INSERT ON decision_guards TO facts_runtime,facts_archiver;
 GRANT UPDATE(epoch) ON decision_guards TO facts_runtime,facts_archiver;
 REVOKE UPDATE,DELETE,TRUNCATE ON decision_disposals FROM facts_runtime;
 REVOKE DELETE,TRUNCATE ON decision_guards FROM facts_runtime;
+
+GRANT INSERT ON decision_disposals TO facts_retention;
+GRANT DELETE ON decision_payloads TO facts_retention;

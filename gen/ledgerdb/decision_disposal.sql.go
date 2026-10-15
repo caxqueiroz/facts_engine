@@ -7,7 +7,153 @@ package ledgerdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const DecisionContentAvailable = `-- name: DecisionContentAvailable :one
+SELECT EXISTS(SELECT 1 FROM decision_payloads p WHERE p.tenant_id=$1 AND p.decision_id=$2)
+AND NOT EXISTS(SELECT 1 FROM decision_disposals d WHERE d.tenant_id=$1 AND d.decision_id=$2)
+`
+
+type DecisionContentAvailableParams struct {
+	TenantID   string
+	DecisionID string
+}
+
+func (q *Queries) DecisionContentAvailable(ctx context.Context, arg DecisionContentAvailableParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, DecisionContentAvailable, arg.TenantID, arg.DecisionID)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const DecisionDisposalBlocked = `-- name: DecisionDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM audit_export_requests a WHERE a.tenant_id=$1 AND a.scope_id=ANY($2::text[]))
+OR EXISTS(SELECT 1 FROM consumer_offsets c WHERE c.tenant_id=$1 AND c.consumer_id LIKE 'archive-%' AND c.acknowledged_revision<$3::bigint)
+`
+
+type DecisionDisposalBlockedParams struct {
+	TenantID         string
+	Scopes           []string
+	RequiredRevision int64
+}
+
+func (q *Queries) DecisionDisposalBlocked(ctx context.Context, arg DecisionDisposalBlockedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, DecisionDisposalBlocked, arg.TenantID, arg.Scopes, arg.RequiredRevision)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const DecisionRetentionHeader = `-- name: DecisionRetentionHeader :one
+SELECT d.scope_id,d.application_id,d.external_decision_id,d.request_digest,d.context_id,d.snapshot_id,d.calculation_id,d.ledger_revision,e.recorded_at,
+ARRAY(SELECT a.role||'/'||a.evidence_id FROM decision_artifacts a WHERE a.tenant_id=d.tenant_id AND a.decision_id=d.id ORDER BY a.role COLLATE "C")::text[] AS artifacts,
+ARRAY(SELECT value FROM (
+ SELECT 'fact/'||i.role||'/'||i.ordinal::text||'/'||i.record_id||'/'||i.version_id||'/'||i.scope_id AS value FROM decision_items i WHERE i.tenant_id=d.tenant_id AND i.decision_id=d.id
+ UNION ALL SELECT 'memory/'||i.role||'/'||i.ordinal::text||'/'||i.record_id||'/'||i.version_id||'/'||i.scope_id FROM decision_memory_items i WHERE i.tenant_id=d.tenant_id AND i.decision_id=d.id
+) items ORDER BY value COLLATE "C")::text[] AS items
+FROM decision_receipts d JOIN ledger_events e ON e.tenant_id=d.tenant_id AND e.ledger_revision=d.ledger_revision WHERE d.tenant_id=$1 AND d.id=$2
+`
+
+type DecisionRetentionHeaderParams struct {
+	TenantID string
+	ID       string
+}
+
+type DecisionRetentionHeaderRow struct {
+	ScopeID            string
+	ApplicationID      string
+	ExternalDecisionID string
+	RequestDigest      string
+	ContextID          pgtype.Text
+	SnapshotID         pgtype.Text
+	CalculationID      pgtype.Text
+	LedgerRevision     int64
+	RecordedAt         pgtype.Timestamptz
+	Artifacts          []string
+	Items              []string
+}
+
+func (q *Queries) DecisionRetentionHeader(ctx context.Context, arg DecisionRetentionHeaderParams) (DecisionRetentionHeaderRow, error) {
+	row := q.db.QueryRow(ctx, DecisionRetentionHeader, arg.TenantID, arg.ID)
+	var i DecisionRetentionHeaderRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.ApplicationID,
+		&i.ExternalDecisionID,
+		&i.RequestDigest,
+		&i.ContextID,
+		&i.SnapshotID,
+		&i.CalculationID,
+		&i.LedgerRevision,
+		&i.RecordedAt,
+		&i.Artifacts,
+		&i.Items,
+	)
+	return i, err
+}
+
+const DecisionRetentionScopes = `-- name: DecisionRetentionScopes :many
+SELECT s.scope_id FROM decision_scopes s WHERE s.tenant_id=$1 AND s.decision_id=$2 ORDER BY s.scope_id COLLATE "C"
+`
+
+type DecisionRetentionScopesParams struct {
+	TenantID   string
+	DecisionID string
+}
+
+func (q *Queries) DecisionRetentionScopes(ctx context.Context, arg DecisionRetentionScopesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, DecisionRetentionScopes, arg.TenantID, arg.DecisionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var scope_id string
+		if err := rows.Scan(&scope_id); err != nil {
+			return nil, err
+		}
+		items = append(items, scope_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const DeleteDecisionPayload = `-- name: DeleteDecisionPayload :execrows
+DELETE FROM decision_payloads WHERE tenant_id=$1 AND decision_id=$2
+`
+
+type DeleteDecisionPayloadParams struct {
+	TenantID   string
+	DecisionID string
+}
+
+func (q *Queries) DeleteDecisionPayload(ctx context.Context, arg DeleteDecisionPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteDecisionPayload, arg.TenantID, arg.DecisionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const InsertDecisionDisposal = `-- name: InsertDecisionDisposal :exec
+INSERT INTO decision_disposals(tenant_id,decision_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertDecisionDisposalParams struct {
+	TenantID   string
+	DecisionID string
+	Payload    []byte
+}
+
+func (q *Queries) InsertDecisionDisposal(ctx context.Context, arg InsertDecisionDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertDecisionDisposal, arg.TenantID, arg.DecisionID, arg.Payload)
+	return err
+}
 
 const LockDecisionGuard = `-- name: LockDecisionGuard :exec
 INSERT INTO decision_guards(tenant_id,decision_id,epoch) VALUES($1,$2,1)

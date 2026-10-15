@@ -18,7 +18,7 @@ ARRAY(SELECT a.role||'/'||a.evidence_id FROM calculation_artifacts a WHERE a.ten
 FROM calculation_receipts c JOIN ledger_events e ON e.tenant_id=c.tenant_id AND e.ledger_revision=c.ledger_revision WHERE c.tenant_id=$1 AND c.id=$2;
 
 -- name: CalculationDisposalBlocked :one
-SELECT EXISTS(SELECT 1 FROM decision_receipts d WHERE d.tenant_id=sqlc.arg(tenant_id) AND d.calculation_id=sqlc.arg(calculation_id))
+SELECT EXISTS(SELECT 1 FROM decision_receipts d JOIN decision_payloads dp ON dp.tenant_id=d.tenant_id AND dp.decision_id=d.id WHERE d.tenant_id=sqlc.arg(tenant_id) AND d.calculation_id=sqlc.arg(calculation_id))
 OR EXISTS(SELECT 1 FROM audit_export_requests a WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.scope_id=ANY(sqlc.arg(scopes)::text[]))
 OR EXISTS(SELECT 1 FROM consumer_offsets c WHERE c.tenant_id=sqlc.arg(tenant_id) AND c.consumer_id LIKE 'archive-%' AND c.acknowledged_revision<sqlc.arg(required_revision)::bigint);
 
