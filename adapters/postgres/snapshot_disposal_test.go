@@ -172,6 +172,7 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 	if err := admin.QueryRow(ctx, "SELECT payload FROM fact_snapshot_payloads WHERE tenant_id=$1 AND snapshot_id=$2", c.Tenant, one.ID).Scan(&original); err != nil {
 		t.Fatal(err)
 	}
+	verifyArchiveReplay := archiveSnapshotsBeforeDisposal(t, ctx, admin, cipher, signer, map[string]ed25519.PublicKey{"snapshot-key": private.Public().(ed25519.PublicKey)}, c.Tenant, one, multi)
 	for _, s := range []model.FactSnapshot{one, multi} {
 		r := request(s)
 		first, err := engine.DisposeSnapshot(ctx, c, r)
@@ -206,6 +207,7 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 			t.Fatal(err)
 		}
 	}
+	verifyArchiveReplay()
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)

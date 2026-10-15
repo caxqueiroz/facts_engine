@@ -87,11 +87,31 @@ func (a *Archive) Handle(ctx context.Context, d model.Delivery) (err error) {
 			return err
 		}
 		m := batch.Manifest
-		if m.Tenant != a.caller.Tenant || m.Stream != a.stream || m.ThroughRevision != revision || m.Payload.Digest != model.BytesDigest(raw) {
+		if m.Tenant != a.caller.Tenant || m.Stream != a.stream || m.ThroughRevision != revision {
 			return model.ErrConflict
 		}
-		_, err = a.store.Read(ctx, a.caller.Tenant, m.Payload)
-		return err
+		if m.Payload.Size < 0 || m.Payload.Size > 64<<20 {
+			return model.ErrPrecondition
+		}
+		retained, err := a.store.Read(ctx, a.caller.Tenant, m.Payload)
+		if canceled := ctx.Err(); canceled != nil {
+			return canceled
+		}
+		if err != nil {
+			return err
+		}
+		if int64(len(retained)) != m.Payload.Size || model.BytesDigest(retained) != m.Payload.Digest {
+			return model.ErrPrecondition
+		}
+		if m.Payload.Digest != model.BytesDigest(raw) && !archiveSnapshotRetentionReplay(retained, payload) {
+			return model.ErrConflict
+		}
+		for _, check := range checks {
+			if err := validateWorkerAuthorization(check); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	if !errors.Is(err, model.ErrNotFound) {
 		return err
