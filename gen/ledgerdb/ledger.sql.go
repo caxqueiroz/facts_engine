@@ -74,7 +74,7 @@ func (q *Queries) GetAttestationKind(ctx context.Context, arg GetAttestationKind
 }
 
 const GetFactAttestationPayload = `-- name: GetFactAttestationPayload :one
-SELECT payload FROM attestations WHERE tenant_id=$1 AND id=$2
+SELECT p.payload FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id WHERE a.tenant_id=$1 AND a.id=$2
 `
 
 type GetFactAttestationPayloadParams struct {
@@ -204,7 +204,7 @@ func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) erro
 }
 
 const ListCurrentFactAttestations = `-- name: ListCurrentFactAttestations :many
-SELECT a.payload FROM attestations a WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id
+SELECT p.payload FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id
 `
 
 type ListCurrentFactAttestationsParams struct {

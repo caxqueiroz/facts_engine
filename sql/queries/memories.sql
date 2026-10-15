@@ -61,20 +61,23 @@ INSERT INTO attestation_identities (tenant_id,id,scope_id,kind)
 VALUES ($1,$2,$3,'memory');
 
 -- name: ListMemoryAttestationPayloads :many
-SELECT a.payload
-FROM memory_attestations a
+SELECT p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND (sqlc.arg(revision)::bigint=0 OR a.ledger_revision<=sqlc.arg(revision)) AND NOT EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND (sqlc.arg(revision)::bigint=0 OR w.ledger_revision<=sqlc.arg(revision))) ORDER BY a.id;
 
 -- name: GetMemoryAttestationPayload :one
-SELECT payload
-FROM memory_attestations
-WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.id=$2;
+
+-- name: InsertMemoryAttestationHeader :exec
+INSERT INTO memory_attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7);
 
 -- name: InsertMemoryAttestationPayload :exec
-INSERT INTO memory_attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+INSERT INTO memory_attestation_payloads(tenant_id,attestation_id,payload) VALUES($1,$2,$3);
 
 -- name: InsertMemoryWithdrawal :exec
 INSERT INTO memory_attestation_events (tenant_id,attestation_id,actor,ledger_revision)

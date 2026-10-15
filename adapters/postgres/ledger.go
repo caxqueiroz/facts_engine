@@ -356,6 +356,9 @@ func (t *transaction) Attestations(ctx context.Context, version string) ([]model
 		if err := rows.Scan(&b); err != nil {
 			return nil, err
 		}
+		if len(b) == 0 {
+			return nil, model.ErrPrecondition
+		}
 		var a model.Attestation
 		if err := t.decode(b, &a); err != nil {
 			return nil, err
@@ -387,7 +390,14 @@ func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string,
 	}
 	out := model.CommitResult{}
 	var a model.Attestation
-	if err := t.read(ctx, &a, ledgerdb.GetFactAttestationPayload, t.tenant, id); err != nil {
+	payload, err := ledgerdb.New(t.tx).GetFactAttestationPayload(ctx, ledgerdb.GetFactAttestationPayloadParams{TenantID: t.tenant, ID: id})
+	if err != nil {
+		return out, translate(err)
+	}
+	if len(payload) == 0 {
+		return out, model.ErrPrecondition
+	}
+	if err = t.decode(payload, &a); err != nil {
 		return out, err
 	}
 	if a.Scope != scope || a.Attestor != c {

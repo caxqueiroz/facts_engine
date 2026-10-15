@@ -20,7 +20,7 @@ SELECT stream_revision FROM records WHERE tenant_id=$1 AND id=$2 FOR UPDATE;
 INSERT INTO outbox (tenant_id,event_id,ledger_revision) VALUES ($1,$2,$3);
 
 -- name: ListCurrentFactAttestations :many
-SELECT a.payload FROM attestations a WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id;
+SELECT p.payload FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id WHERE a.tenant_id=$1 AND a.version_id=$2 AND NOT EXISTS(SELECT 1 FROM attestation_events e WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id) ORDER BY a.id;
 
 -- name: InsertFactAttestationIdentity :exec
 INSERT INTO attestation_identities (tenant_id,id,scope_id,kind) VALUES($1,$2,$3,'fact');
@@ -29,7 +29,7 @@ INSERT INTO attestation_identities (tenant_id,id,scope_id,kind) VALUES($1,$2,$3,
 SELECT kind FROM attestation_identities WHERE tenant_id=$1 AND id=$2;
 
 -- name: GetFactAttestationPayload :one
-SELECT payload FROM attestations WHERE tenant_id=$1 AND id=$2;
+SELECT p.payload FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id WHERE a.tenant_id=$1 AND a.id=$2;
 
 -- name: InsertLedgerEvent :one
 INSERT INTO ledger_events(tenant_id,id,ledger_revision,event_type,scope_id,payload) VALUES($1,$2,$3,$4,$5,$6) RETURNING recorded_at;

@@ -54,9 +54,9 @@ func (q *Queries) GetActiveMemoryType(ctx context.Context, arg GetActiveMemoryTy
 }
 
 const GetMemoryAttestationPayload = `-- name: GetMemoryAttestationPayload :one
-SELECT payload
-FROM memory_attestations
-WHERE tenant_id=$1 AND id=$2
+SELECT p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.id=$2
 `
 
 type GetMemoryAttestationPayloadParams struct {
@@ -117,6 +117,34 @@ func (q *Queries) GetMemoryVersionPayload(ctx context.Context, arg GetMemoryVers
 	return payload, err
 }
 
+const InsertMemoryAttestationHeader = `-- name: InsertMemoryAttestationHeader :exec
+INSERT INTO memory_attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+`
+
+type InsertMemoryAttestationHeaderParams struct {
+	TenantID       string
+	ID             string
+	ScopeID        string
+	RecordID       string
+	VersionID      string
+	EvidenceID     string
+	LedgerRevision int64
+}
+
+func (q *Queries) InsertMemoryAttestationHeader(ctx context.Context, arg InsertMemoryAttestationHeaderParams) error {
+	_, err := q.db.Exec(ctx, InsertMemoryAttestationHeader,
+		arg.TenantID,
+		arg.ID,
+		arg.ScopeID,
+		arg.RecordID,
+		arg.VersionID,
+		arg.EvidenceID,
+		arg.LedgerRevision,
+	)
+	return err
+}
+
 const InsertMemoryAttestationIdentity = `-- name: InsertMemoryAttestationIdentity :exec
 INSERT INTO attestation_identities (tenant_id,id,scope_id,kind)
 VALUES ($1,$2,$3,'memory')
@@ -134,32 +162,17 @@ func (q *Queries) InsertMemoryAttestationIdentity(ctx context.Context, arg Inser
 }
 
 const InsertMemoryAttestationPayload = `-- name: InsertMemoryAttestationPayload :exec
-INSERT INTO memory_attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision,payload)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO memory_attestation_payloads(tenant_id,attestation_id,payload) VALUES($1,$2,$3)
 `
 
 type InsertMemoryAttestationPayloadParams struct {
-	TenantID       string
-	ID             string
-	ScopeID        string
-	RecordID       string
-	VersionID      string
-	EvidenceID     string
-	LedgerRevision int64
-	Payload        []byte
+	TenantID      string
+	AttestationID string
+	Payload       []byte
 }
 
 func (q *Queries) InsertMemoryAttestationPayload(ctx context.Context, arg InsertMemoryAttestationPayloadParams) error {
-	_, err := q.db.Exec(ctx, InsertMemoryAttestationPayload,
-		arg.TenantID,
-		arg.ID,
-		arg.ScopeID,
-		arg.RecordID,
-		arg.VersionID,
-		arg.EvidenceID,
-		arg.LedgerRevision,
-		arg.Payload,
-	)
+	_, err := q.db.Exec(ctx, InsertMemoryAttestationPayload, arg.TenantID, arg.AttestationID, arg.Payload)
 	return err
 }
 
@@ -305,8 +318,8 @@ func (q *Queries) InsertMemoryWithdrawal(ctx context.Context, arg InsertMemoryWi
 }
 
 const ListMemoryAttestationPayloads = `-- name: ListMemoryAttestationPayloads :many
-SELECT a.payload
-FROM memory_attestations a
+SELECT p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND ($3::bigint=0 OR a.ledger_revision<=$3) AND NOT EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND ($3::bigint=0 OR w.ledger_revision<=$3)) ORDER BY a.id

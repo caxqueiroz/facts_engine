@@ -32,6 +32,9 @@ func (t *transaction) MemoryAttestations(ctx context.Context, version string, re
 		if err = rows.Scan(&payload); err != nil {
 			return nil, err
 		}
+		if len(payload) == 0 {
+			return nil, model.ErrPrecondition
+		}
 		var a model.Attestation
 		if err = t.decode(payload, &a); err != nil {
 			return nil, err
@@ -45,6 +48,9 @@ func (t *transaction) withdrawMemoryAttestation(ctx context.Context, id, scope s
 	payload, err := ledgerdb.New(t.tx).GetMemoryAttestationPayload(ctx, ledgerdb.GetMemoryAttestationPayloadParams{TenantID: t.tenant, ID: id})
 	if err != nil {
 		return model.CommitResult{}, translate(err)
+	}
+	if len(payload) == 0 {
+		return model.CommitResult{}, model.ErrPrecondition
 	}
 	if err := t.decode(payload, &a); err != nil {
 		return model.CommitResult{}, err
@@ -73,7 +79,10 @@ func (t *transaction) flushMemoryAttestations(ctx context.Context, e model.Event
 		if err != nil {
 			return err
 		}
-		if err = ledgerdb.New(t.tx).InsertMemoryAttestationPayload(ctx, ledgerdb.InsertMemoryAttestationPayloadParams{TenantID: t.tenant, ID: a.ID, ScopeID: a.Scope, RecordID: a.RecordID, VersionID: a.VersionID, EvidenceID: a.EvidenceID, LedgerRevision: e.LedgerRevision, Payload: payload}); err != nil {
+		if err = ledgerdb.New(t.tx).InsertMemoryAttestationHeader(ctx, ledgerdb.InsertMemoryAttestationHeaderParams{TenantID: t.tenant, ID: a.ID, ScopeID: a.Scope, RecordID: a.RecordID, VersionID: a.VersionID, EvidenceID: a.EvidenceID, LedgerRevision: e.LedgerRevision}); err != nil {
+			return err
+		}
+		if err = ledgerdb.New(t.tx).InsertMemoryAttestationPayload(ctx, ledgerdb.InsertMemoryAttestationPayloadParams{TenantID: t.tenant, AttestationID: a.ID, Payload: payload}); err != nil {
 			return err
 		}
 	}

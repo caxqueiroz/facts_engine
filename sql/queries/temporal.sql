@@ -20,8 +20,11 @@ INSERT INTO rejected_versions (tenant_id,record_id,version_id,ledger_revision)
 VALUES ($1,$2,$3,$4);
 
 -- name: InsertFactAttestation :exec
-INSERT INTO attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,payload,ledger_revision)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+INSERT INTO attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7);
+
+-- name: InsertFactAttestationPayload :exec
+INSERT INTO fact_attestation_payloads(tenant_id,attestation_id,payload) VALUES($1,$2,$3);
 
 -- name: InsertFactWithdrawal :exec
 INSERT INTO attestation_events(tenant_id,attestation_id,actor,ledger_revision)
@@ -78,8 +81,8 @@ FROM attestation_events e
 WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision IS NULL)));
 
 -- name: ListHistoricalAttestationPayloads :many
-SELECT a.payload
-FROM attestations a
+SELECT p.payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND a.ledger_revision<=$3 AND NOT EXISTS(SELECT 1
 FROM attestation_events e
 WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision<=$3) ORDER BY a.id;

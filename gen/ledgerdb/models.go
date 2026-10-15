@@ -46,7 +46,6 @@ type Attestation struct {
 	RecordID       string
 	VersionID      string
 	EvidenceID     string
-	Payload        []byte
 	LedgerRevision pgtype.Int8
 	Kind           string
 }
@@ -536,6 +535,12 @@ type ExtractionSubject struct {
 	SubjectID string
 }
 
+type FactAttestationPayload struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+}
+
 type FactSnapshot struct {
 	TenantID          string
 	ID                string
@@ -609,7 +614,6 @@ type MemoryAttestation struct {
 	VersionID      string
 	EvidenceID     string
 	LedgerRevision int64
-	Payload        []byte
 	Kind           string
 }
 
@@ -618,6 +622,12 @@ type MemoryAttestationEvent struct {
 	AttestationID  string
 	Actor          string
 	LedgerRevision int64
+}
+
+type MemoryAttestationPayload struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
 }
 
 type MemoryDependency struct {

@@ -192,3 +192,7 @@ REVOKE DELETE,TRUNCATE ON decision_guards FROM facts_runtime;
 
 GRANT INSERT ON decision_disposals TO facts_retention;
 GRANT DELETE ON decision_payloads TO facts_retention;
+
+GRANT SELECT,INSERT ON fact_attestation_payloads,memory_attestation_payloads TO facts_runtime;
+REVOKE UPDATE,DELETE,TRUNCATE ON fact_attestation_payloads,memory_attestation_payloads,attestations,memory_attestations FROM facts_runtime;
+GRANT SELECT ON fact_attestation_payloads,memory_attestation_payloads TO facts_archiver;

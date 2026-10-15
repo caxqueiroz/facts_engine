@@ -198,8 +198,8 @@ func (q *Queries) InsertAcceptedInterval(ctx context.Context, arg InsertAccepted
 }
 
 const InsertFactAttestation = `-- name: InsertFactAttestation :exec
-INSERT INTO attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,payload,ledger_revision)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO attestations(tenant_id,id,scope_id,record_id,version_id,evidence_id,ledger_revision)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
 `
 
 type InsertFactAttestationParams struct {
@@ -209,7 +209,6 @@ type InsertFactAttestationParams struct {
 	RecordID       string
 	VersionID      string
 	EvidenceID     string
-	Payload        []byte
 	LedgerRevision pgtype.Int8
 }
 
@@ -221,9 +220,23 @@ func (q *Queries) InsertFactAttestation(ctx context.Context, arg InsertFactAttes
 		arg.RecordID,
 		arg.VersionID,
 		arg.EvidenceID,
-		arg.Payload,
 		arg.LedgerRevision,
 	)
+	return err
+}
+
+const InsertFactAttestationPayload = `-- name: InsertFactAttestationPayload :exec
+INSERT INTO fact_attestation_payloads(tenant_id,attestation_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertFactAttestationPayloadParams struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+}
+
+func (q *Queries) InsertFactAttestationPayload(ctx context.Context, arg InsertFactAttestationPayloadParams) error {
+	_, err := q.db.Exec(ctx, InsertFactAttestationPayload, arg.TenantID, arg.AttestationID, arg.Payload)
 	return err
 }
 
@@ -588,8 +601,8 @@ func (q *Queries) ListHistoricalAcceptances(ctx context.Context, arg ListHistori
 }
 
 const ListHistoricalAttestationPayloads = `-- name: ListHistoricalAttestationPayloads :many
-SELECT a.payload
-FROM attestations a
+SELECT p.payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND a.ledger_revision<=$3 AND NOT EXISTS(SELECT 1
 FROM attestation_events e
 WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision<=$3) ORDER BY a.id

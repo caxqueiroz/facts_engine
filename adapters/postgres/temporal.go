@@ -68,7 +68,10 @@ func (t *transaction) flushTemporal(ctx context.Context, e model.Event) error {
 		if err != nil {
 			return err
 		}
-		if err := ledgerdb.New(t.tx).InsertFactAttestation(ctx, ledgerdb.InsertFactAttestationParams{TenantID: t.tenant, ID: a.ID, ScopeID: a.Scope, RecordID: a.RecordID, VersionID: a.VersionID, EvidenceID: a.EvidenceID, Payload: b, LedgerRevision: pgtype.Int8{Int64: e.LedgerRevision, Valid: true}}); err != nil {
+		if err := ledgerdb.New(t.tx).InsertFactAttestation(ctx, ledgerdb.InsertFactAttestationParams{TenantID: t.tenant, ID: a.ID, ScopeID: a.Scope, RecordID: a.RecordID, VersionID: a.VersionID, EvidenceID: a.EvidenceID, LedgerRevision: pgtype.Int8{Int64: e.LedgerRevision, Valid: true}}); err != nil {
+			return err
+		}
+		if err := ledgerdb.New(t.tx).InsertFactAttestationPayload(ctx, ledgerdb.InsertFactAttestationPayloadParams{TenantID: t.tenant, AttestationID: a.ID, Payload: b}); err != nil {
 			return err
 		}
 	}
@@ -193,6 +196,9 @@ func (t *transaction) HistoricalAttestations(ctx context.Context, version string
 		var b []byte
 		if err := rows.Scan(&b); err != nil {
 			return nil, err
+		}
+		if len(b) == 0 {
+			return nil, model.ErrPrecondition
 		}
 		var a model.Attestation
 		if err := t.decode(b, &a); err != nil {

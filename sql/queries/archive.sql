@@ -88,16 +88,16 @@ LEFT JOIN calculation_disposals d ON d.tenant_id=c.tenant_id AND d.calculation_i
 WHERE c.tenant_id=$1 AND c.ledger_revision=$2;
 
 -- name: ListArchiveMemoryAttestation :many
-SELECT a.id,a.payload
-FROM memory_attestations a
+SELECT a.id,p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
 WHERE a.tenant_id=$1 AND (a.ledger_revision=$2 OR EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND w.ledger_revision=$2));
 
 -- name: ListArchiveAttestation :many
-SELECT id,payload
-FROM attestations
-WHERE tenant_id=$1 AND ledger_revision=$2;
+SELECT a.id,p.payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.ledger_revision=$2;
 
 -- name: ListArchiveTimeline :many
 SELECT record_id||'/'||ordinal::text,payload
@@ -233,14 +233,14 @@ FROM evidence
 WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001;
 
 -- name: ListAuditMemoryAttestation :many
-SELECT id,payload
-FROM memory_attestations
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001;
+SELECT a.id,p.payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.scope_id=$2 ORDER BY a.id LIMIT 10001;
 
 -- name: ListAuditAttestation :many
-SELECT id,payload
-FROM attestations
-WHERE tenant_id=$1 AND scope_id=$2 ORDER BY id LIMIT 10001;
+SELECT a.id,p.payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+WHERE a.tenant_id=$1 AND a.scope_id=$2 ORDER BY a.id LIMIT 10001;
 
 -- name: ListAuditSnapshot :many
 SELECT s.id,coalesce(p.payload,d.payload)::bytea AS payload
