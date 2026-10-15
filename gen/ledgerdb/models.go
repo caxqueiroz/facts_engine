@@ -320,6 +320,13 @@ type ExtractionAttempt struct {
 	LedgerRevision int64
 }
 
+type ExtractionAttemptDisposal struct {
+	TenantID   string
+	AttemptID  string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
 type ExtractionAttemptFactInput struct {
 	TenantID        string
 	AttemptID       string
@@ -351,6 +358,12 @@ type ExtractionAttemptPayload struct {
 	Payload   []byte
 }
 
+type ExtractionContentGuard struct {
+	TenantID string
+	JobID    string
+	Epoch    int64
+}
+
 type ExtractionInventoryGuard struct {
 	TenantID  string
 	AttemptID string
@@ -367,6 +380,13 @@ type ExtractionJob struct {
 	LedgerRevision  int64
 	MemoryRecordID  pgtype.Text
 	MemoryVersionID pgtype.Text
+}
+
+type ExtractionJobDisposal struct {
+	TenantID   string
+	JobID      string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
 }
 
 type ExtractionJobPayload struct {
@@ -450,6 +470,13 @@ type ExtractionResult struct {
 	JobID          string
 	ScopeID        string
 	LedgerRevision int64
+}
+
+type ExtractionResultDisposal struct {
+	TenantID   string
+	AttemptID  string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
 }
 
 type ExtractionResultPayload struct {

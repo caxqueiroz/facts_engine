@@ -254,9 +254,10 @@ func (q *Queries) ListArchiveDecision(ctx context.Context, arg ListArchiveDecisi
 }
 
 const ListArchiveExtractionAttempt = `-- name: ListArchiveExtractionAttempt :many
-SELECT h.id,p.payload
+SELECT h.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts h
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
@@ -290,10 +291,43 @@ func (q *Queries) ListArchiveExtractionAttempt(ctx context.Context, arg ListArch
 	return items, nil
 }
 
+const ListArchiveExtractionContentJobs = `-- name: ListArchiveExtractionContentJobs :many
+SELECT j.id AS job_id FROM extraction_jobs j WHERE j.tenant_id=$1 AND j.ledger_revision=$2
+UNION SELECT a.job_id FROM extraction_attempts a WHERE a.tenant_id=$1 AND a.ledger_revision=$2
+UNION SELECT r.job_id FROM extraction_results r WHERE r.tenant_id=$1 AND r.ledger_revision=$2
+ORDER BY job_id
+`
+
+type ListArchiveExtractionContentJobsParams struct {
+	TenantID       string
+	LedgerRevision int64
+}
+
+func (q *Queries) ListArchiveExtractionContentJobs(ctx context.Context, arg ListArchiveExtractionContentJobsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, ListArchiveExtractionContentJobs, arg.TenantID, arg.LedgerRevision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var job_id string
+		if err := rows.Scan(&job_id); err != nil {
+			return nil, err
+		}
+		items = append(items, job_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListArchiveExtractionJob = `-- name: ListArchiveExtractionJob :many
-SELECT h.id,p.payload
+SELECT h.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_jobs h
 LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+LEFT JOIN extraction_job_disposals d ON d.tenant_id=h.tenant_id AND d.job_id=h.id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
@@ -328,9 +362,10 @@ func (q *Queries) ListArchiveExtractionJob(ctx context.Context, arg ListArchiveE
 }
 
 const ListArchiveExtractionResult = `-- name: ListArchiveExtractionResult :many
-SELECT h.attempt_id,p.payload
+SELECT h.attempt_id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_results h
 LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+LEFT JOIN extraction_result_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.attempt_id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2
 `
 
@@ -1036,9 +1071,10 @@ func (q *Queries) ListAuditEvidence(ctx context.Context, arg ListAuditEvidencePa
 }
 
 const ListAuditExtractionAttempt = `-- name: ListAuditExtractionAttempt :many
-SELECT a.id,p.payload
+SELECT a.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts a
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=a.tenant_id AND d.attempt_id=a.id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -1078,9 +1114,10 @@ func (q *Queries) ListAuditExtractionAttempt(ctx context.Context, arg ListAuditE
 }
 
 const ListAuditExtractionJob = `-- name: ListAuditExtractionJob :many
-SELECT j.id,p.payload
+SELECT j.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_jobs j
 LEFT JOIN extraction_job_payloads p ON p.tenant_id=j.tenant_id AND p.job_id=j.id
+LEFT JOIN extraction_job_disposals d ON d.tenant_id=j.tenant_id AND d.job_id=j.id
 WHERE j.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1
@@ -1119,9 +1156,10 @@ func (q *Queries) ListAuditExtractionJob(ctx context.Context, arg ListAuditExtra
 }
 
 const ListAuditExtractionResult = `-- name: ListAuditExtractionResult :many
-SELECT a.attempt_id,p.payload
+SELECT a.attempt_id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_results a
 LEFT JOIN extraction_result_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.attempt_id
+LEFT JOIN extraction_result_disposals d ON d.tenant_id=a.tenant_id AND d.attempt_id=a.attempt_id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d

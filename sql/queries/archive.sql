@@ -26,21 +26,24 @@ LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id
 WHERE v.tenant_id=$1 AND v.ledger_revision=$2;
 
 -- name: ListArchiveExtractionAttempt :many
-SELECT h.id,p.payload
+SELECT h.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts h
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionResult :many
-SELECT h.attempt_id,p.payload
+SELECT h.attempt_id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_results h
 LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+LEFT JOIN extraction_result_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.attempt_id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionJob :many
-SELECT h.id,p.payload
+SELECT h.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_jobs h
 LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+LEFT JOIN extraction_job_disposals d ON d.tenant_id=h.tenant_id AND d.job_id=h.id
 WHERE h.tenant_id=$1 AND h.ledger_revision=$2;
 
 -- name: ListArchiveExtractionRetry :many
@@ -154,9 +157,10 @@ FROM decision_scopes s
 WHERE s.tenant_id=c.tenant_id AND s.decision_id=c.id AND s.scope_id=$2) ORDER BY c.id LIMIT 10001;
 
 -- name: ListAuditExtractionAttempt :many
-SELECT a.id,p.payload
+SELECT a.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts a
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=a.tenant_id AND d.attempt_id=a.id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -165,9 +169,10 @@ FROM memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.memory_version_id=j.memory_version_id AND d.scope_id=$2)) ORDER BY a.ledger_revision LIMIT 10001;
 
 -- name: ListAuditExtractionResult :many
-SELECT a.attempt_id,p.payload
+SELECT a.attempt_id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_results a
 LEFT JOIN extraction_result_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.attempt_id
+LEFT JOIN extraction_result_disposals d ON d.tenant_id=a.tenant_id AND d.attempt_id=a.attempt_id
 JOIN extraction_jobs j ON j.tenant_id=a.tenant_id AND j.id=a.job_id
 WHERE a.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
@@ -182,9 +187,10 @@ JOIN extraction_jobs j ON j.tenant_id=r.tenant_id AND j.id=r.job_id
 WHERE r.tenant_id=$1 AND j.scope_id=$2 ORDER BY r.ledger_revision LIMIT 10001;
 
 -- name: ListAuditExtractionJob :many
-SELECT j.id,p.payload
+SELECT j.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_jobs j
 LEFT JOIN extraction_job_payloads p ON p.tenant_id=j.tenant_id AND p.job_id=j.id
+LEFT JOIN extraction_job_disposals d ON d.tenant_id=j.tenant_id AND d.job_id=j.id
 WHERE j.tenant_id=$1 AND (j.scope_id=$2 OR EXISTS(SELECT 1
 FROM extraction_memory_dependencies d
 WHERE d.tenant_id=j.tenant_id AND d.job_id=j.id AND d.scope_id=$2) OR EXISTS(SELECT 1
@@ -271,3 +277,9 @@ SELECT e.attestation_id,e.actor,e.recorded_at,e.ledger_revision
 FROM attestation_events e
 JOIN attestations a ON a.tenant_id=e.tenant_id AND a.id=e.attestation_id
 WHERE e.tenant_id=$1 AND a.scope_id=$2 ORDER BY e.attestation_id LIMIT 10001;
+
+-- name: ListArchiveExtractionContentJobs :many
+SELECT j.id AS job_id FROM extraction_jobs j WHERE j.tenant_id=sqlc.arg(tenant_id) AND j.ledger_revision=sqlc.arg(ledger_revision)
+UNION SELECT a.job_id FROM extraction_attempts a WHERE a.tenant_id=sqlc.arg(tenant_id) AND a.ledger_revision=sqlc.arg(ledger_revision)
+UNION SELECT r.job_id FROM extraction_results r WHERE r.tenant_id=sqlc.arg(tenant_id) AND r.ledger_revision=sqlc.arg(ledger_revision)
+ORDER BY job_id;

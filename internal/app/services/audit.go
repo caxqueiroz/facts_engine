@@ -312,14 +312,35 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				gaps = append(gaps, model.AuditGap{Kind: "memory_version_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
 			}
 		case "extraction_job", "extraction_attempt", "extraction_result":
-			var artifact struct{ RefreshScopes, ContentScopes []string }
+			var artifact struct {
+				RefreshScopes, ContentScopes []string
+				PayloadDisposed              bool
+				ID, AttemptID, Tenant, Scope string
+				Request                      struct{ Scope string }
+			}
 			if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
 				return nil, nil, err
 			}
 			for _, scope := range append(artifact.RefreshScopes, artifact.ContentScopes...) {
 				include = include && scope == r.Scope
 			}
-			if !r.IncludeEvidence {
+			if artifact.PayloadDisposed {
+				id, scope := artifact.ID, artifact.Scope
+				if entry.Kind == "extraction_job" {
+					scope = artifact.Request.Scope
+				}
+				if entry.Kind == "extraction_result" {
+					id = artifact.AttemptID
+				}
+				if id != entry.ID || artifact.Tenant != c.Tenant || !model.ValidExtractionTombstoneJSON(entry.Kind, entry.Payload) {
+					return nil, nil, model.ErrPrecondition
+				}
+				include = include && scope == r.Scope
+				if include {
+					gaps = append(gaps, model.AuditGap{Kind: entry.Kind + "_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
+				}
+			}
+			if !r.IncludeEvidence && !artifact.PayloadDisposed {
 				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "model_payloads_withheld"})
 				continue
 			}

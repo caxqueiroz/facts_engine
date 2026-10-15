@@ -26,6 +26,15 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		}
 		p.Event.RecordedAt = at.UTC()
 		e := p.Event
+		jobs, err := ledgerdb.New(t.tx).ListArchiveExtractionContentJobs(ctx, ledgerdb.ListArchiveExtractionContentJobsParams{TenantID: t.tenant, LedgerRevision: e.LedgerRevision})
+		if err != nil {
+			return err
+		}
+		for _, job := range jobs {
+			if _, err := t.tx.Exec(ctx, `INSERT INTO extraction_content_guards(tenant_id,job_id,epoch) VALUES($1,$2,1) ON CONFLICT(tenant_id,job_id) DO UPDATE SET epoch=extraction_content_guards.epoch+1`, t.tenant, job); err != nil {
+				return err
+			}
+		}
 		if e.Scope != d.Event.Scope || e.Caller.Tenant != d.Key.Tenant {
 			return model.ErrPrecondition
 		}
@@ -342,12 +351,30 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 						scopes[evidence.Scope] = true
 					}
 				}
-				var artifact struct{ RefreshScopes, ContentScopes []string }
+				var artifact struct {
+					RefreshScopes, ContentScopes []string
+					PayloadDisposed              bool
+					ID, AttemptID, Tenant, Scope string
+					Request                      struct{ Scope string }
+				}
 				if err := json.Unmarshal(entry.Payload, &artifact); err != nil {
 					return err
 				}
 				for _, scope := range append(artifact.RefreshScopes, artifact.ContentScopes...) {
 					scopes[scope] = true
+				}
+				if artifact.PayloadDisposed {
+					id, scope := artifact.ID, artifact.Scope
+					if entry.Kind == "extraction_job" {
+						scope = artifact.Request.Scope
+					}
+					if entry.Kind == "extraction_result" {
+						id = artifact.AttemptID
+					}
+					if id != entry.ID || scope != e.Scope || artifact.Tenant != t.tenant || !model.ValidExtractionTombstoneJSON(entry.Kind, entry.Payload) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: entry.Kind + "_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
 				}
 			case "context":
 				var m model.ContextManifest

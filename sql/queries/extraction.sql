@@ -1,7 +1,8 @@
 -- name: GetExtractionJobPayload :one
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_jobs h
 LEFT JOIN extraction_job_payloads p ON p.tenant_id=h.tenant_id AND p.job_id=h.id
+LEFT JOIN extraction_job_disposals d ON d.tenant_id=h.tenant_id AND d.job_id=h.id
 WHERE h.tenant_id=$1 AND h.id=$2;
 
 -- name: GetExtractionJobStatus :one
@@ -65,15 +66,17 @@ UPDATE extraction_quota SET reserved_tokens=reserved_tokens+$2,reserved_cost_uni
 WHERE tenant_id=$1;
 
 -- name: GetExtractionAttemptPayload :one
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts h
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.id
 WHERE h.tenant_id=$1 AND h.id=$2;
 
 -- name: GetExtractionResultPayload :one
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_results h
 LEFT JOIN extraction_result_payloads p ON p.tenant_id=h.tenant_id AND p.attempt_id=h.attempt_id
+LEFT JOIN extraction_result_disposals d ON d.tenant_id=h.tenant_id AND d.attempt_id=h.attempt_id
 WHERE h.tenant_id=$1 AND h.attempt_id=$2;
 
 -- name: FinishExtractionJob :execrows
@@ -117,9 +120,10 @@ INSERT INTO extraction_attempt_memory_inputs(tenant_id,attempt_id,record_id,vers
 SELECT EXISTS(SELECT 1 FROM extraction_attempts a LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id WHERE a.tenant_id=$1 AND i.attempt_id IS NULL);
 
 -- name: ListUninventoriedExtractionAttemptPage :many
-SELECT a.id,a.job_id,a.scope_id,p.payload
+SELECT a.id,a.job_id,a.scope_id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM extraction_attempts a
 LEFT JOIN extraction_attempt_payloads p ON p.tenant_id=a.tenant_id AND p.attempt_id=a.id
+LEFT JOIN extraction_attempt_disposals d ON d.tenant_id=a.tenant_id AND d.attempt_id=a.id
 LEFT JOIN extraction_attempt_inventories i ON i.tenant_id=a.tenant_id AND i.attempt_id=a.id
 WHERE a.tenant_id=$1 AND i.attempt_id IS NULL
 ORDER BY a.id COLLATE "C" LIMIT $2;
