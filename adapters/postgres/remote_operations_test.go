@@ -11,6 +11,9 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -26,9 +29,10 @@ func (operationsAuthorizer) Check(ctx context.Context, r model.AuthorizationRequ
 }
 
 type remoteRebuild struct {
-	client   memoryv1connect.OperationsServiceClient
-	t        *testing.T
-	registry *postgres.Ledger
+	client     memoryv1connect.OperationsServiceClient
+	grpcClient v1.OperationsServiceClient
+	t          *testing.T
+	registry   *postgres.Ledger
 }
 
 func newRemoteRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger, store *evidence.Postgres, index model.RebuildIndex) *remoteRebuild {
@@ -54,19 +58,26 @@ func newRemoteRebuild(t *testing.T, ctx context.Context, l, registry *postgres.L
 	if _, err := denied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "bank1", Generation: "g1", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("status operator: %v", err)
 	}
-	return &remoteRebuild{client: clientFor(model.Caller{Tenant: "bank1", Principal: "operator"}), t: t, registry: registry}
+	grpcDenied := v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "bank1", Principal: "reader"}))
+	if result, err := grpcDenied.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: "bank1", Generation: "g1", Purpose: "review", Action: "start", MaxAttempts: 3}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC rebuild permission", result, err)
+	}
+	if result, err := grpcDenied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "bank1", Generation: "g1", Purpose: "review"}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
+		t.Fatal("gRPC projection permission", result, err)
+	}
+	return &remoteRebuild{grpcClient: v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "bank1", Principal: "operator"})), client: clientFor(model.Caller{Tenant: "bank1", Principal: "operator"}), t: t, registry: registry}
 }
 func (r *remoteRebuild) call(ctx context.Context, k model.GenerationKey, action string, attempts int, fence int64) (model.RebuildStatus, error) {
 	r.t.Helper()
-	response, err := r.client.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: k.Tenant, Generation: k.Generation, Purpose: "verified_rebuild", Action: action, MaxAttempts: int32(attempts), ExpectedFence: fence})
+	response, err := r.grpcClient.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: k.Tenant, Generation: k.Generation, Purpose: "verified_rebuild", Action: action, MaxAttempts: int32(attempts), ExpectedFence: fence})
 	if err != nil {
 		// Existing rebuild assertions use domain errors; keep those assertions while
-		// executing the actual transition through the generated HTTP client.
+		// executing the actual transition through the generated grpc-go client over TLS/HTTP2.
 		for _, pair := range []struct {
-			code connect.Code
+			code codes.Code
 			err  error
-		}{{connect.CodeAlreadyExists, model.ErrConflict}, {connect.CodeAborted, model.ErrRevision}, {connect.CodeFailedPrecondition, model.ErrPrecondition}, {connect.CodeUnavailable, model.ErrUnavailable}, {connect.CodePermissionDenied, model.ErrDenied}} {
-			if connect.CodeOf(err) == pair.code {
+		}{{codes.AlreadyExists, model.ErrConflict}, {codes.Aborted, model.ErrRevision}, {codes.FailedPrecondition, model.ErrPrecondition}, {codes.Unavailable, model.ErrUnavailable}, {codes.PermissionDenied, model.ErrDenied}} {
+			if grpcstatus.Code(err) == pair.code {
 				return model.RebuildStatus{}, pair.err
 			}
 		}
@@ -84,6 +95,10 @@ func (r *remoteRebuild) call(ctx context.Context, k model.GenerationKey, action 
 	status, err := r.client.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: k.Tenant, Generation: k.Generation, Purpose: "review"})
 	if err != nil {
 		r.t.Fatal(err)
+	}
+	grpcStatus, err := r.grpcClient.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: k.Tenant, Generation: k.Generation, Purpose: "review"})
+	if err != nil || !proto.Equal(status, grpcStatus) {
+		r.t.Fatal("gRPC/Connect projection status differs", grpcStatus, err)
 	}
 	progress, err := r.registry.ConsumerStatus(ctx, model.ConsumerKey{Tenant: k.Tenant, Consumer: model.ProjectionConsumer(k.Generation)})
 	if err != nil {
