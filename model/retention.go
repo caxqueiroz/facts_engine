@@ -36,6 +36,17 @@ type EvidenceDisposalRequest struct {
 	Command
 	Scope, EvidenceID, PolicyID, Jurisdiction, Reason string
 }
+
+// OrphanEvidenceDisposalRequest selects exactly one immutable upload version.
+// It can only delete an object that has never been registered as evidence.
+type OrphanEvidenceDisposalRequest struct {
+	Command
+	Scope, PolicyID, Jurisdiction, Reason string
+	Object                                ObjectRef
+}
+type OrphanEvidenceDisposalTx interface {
+	DisposeOrphanEvidence(context.Context, OrphanEvidenceDisposalRequest) error
+}
 type RetentionEvent struct {
 	ID, Tenant, Scope, Kind, TargetID string
 	Caller                            Caller
@@ -44,6 +55,7 @@ type RetentionEvent struct {
 	Hold                              *LegalHoldRequest
 	Release                           *ReleaseLegalHoldRequest
 	Disposal                          *EvidenceDisposalRequest
+	OrphanDisposal                    *OrphanEvidenceDisposalRequest `json:",omitempty"`
 	LedgerRevision                    int64
 	Limitations                       []string
 }

@@ -21,6 +21,7 @@ type rollbackRetentionLedger struct{ *postgres.Ledger }
 type rollbackRetentionTx struct {
 	model.RetentionTx
 	model.EvidenceLineageDisposalTx
+	model.OrphanEvidenceDisposalTx
 }
 
 func (t rollbackRetentionTx) Append(context.Context, model.Event) (model.Event, error) {
@@ -28,7 +29,7 @@ func (t rollbackRetentionTx) Append(context.Context, model.Event) (model.Event, 
 }
 func (l rollbackRetentionLedger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
 	return l.Ledger.Transact(ctx, tenant, func(tx model.Tx) error {
-		return fn(rollbackRetentionTx{tx.(model.RetentionTx), tx.(model.EvidenceLineageDisposalTx)})
+		return fn(rollbackRetentionTx{tx.(model.RetentionTx), tx.(model.EvidenceLineageDisposalTx), tx.(model.OrphanEvidenceDisposalTx)})
 	})
 }
 func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, store *evidence.Postgres, admin *pgxpool.Pool) {
@@ -59,6 +60,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		t.Fatal(err)
 	}
 	testPendingUploads(t, ctx, normal, engine, store, pool, admin, cipher, c)
+	testOrphanDisposal(t, ctx, normal, engine, ledger, store, admin, c)
 	register := func(id, object, scope, policy string) model.ObjectRef {
 		t.Helper()
 		ref, err := store.Put(ctx, c.Tenant, object, []byte(object))

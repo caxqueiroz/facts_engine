@@ -321,6 +321,24 @@ func (q *Queries) HasMemoryEvidenceReference(ctx context.Context, arg HasMemoryE
 	return exists, err
 }
 
+const HasRegisteredEvidenceObject = `-- name: HasRegisteredEvidenceObject :one
+SELECT EXISTS(SELECT 1 FROM evidence_retention
+WHERE tenant_id=$1 AND locator=$2 AND object_version=$3)
+`
+
+type HasRegisteredEvidenceObjectParams struct {
+	TenantID      string
+	Locator       string
+	ObjectVersion string
+}
+
+func (q *Queries) HasRegisteredEvidenceObject(ctx context.Context, arg HasRegisteredEvidenceObjectParams) (bool, error) {
+	row := q.db.QueryRow(ctx, HasRegisteredEvidenceObject, arg.TenantID, arg.Locator, arg.ObjectVersion)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const HasSharedEvidenceObject = `-- name: HasSharedEvidenceObject :one
 SELECT EXISTS(SELECT 1
 FROM evidence_retention a

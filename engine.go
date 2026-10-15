@@ -406,3 +406,8 @@ func (e *Engine) GetProjectionStatus(ctx context.Context, c Caller, q model.Proj
 func (e *Engine) RebuildIndex(ctx context.Context, c Caller, r model.RebuildRequest) (model.RebuildStatus, error) {
 	return e.service.RebuildIndex(ctx, c, r)
 }
+
+// DisposeOrphanEvidence atomically removes an eligible unregistered upload.
+func (e *Engine) DisposeOrphanEvidence(ctx context.Context, c Caller, r model.OrphanEvidenceDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeOrphanEvidence(ctx, c, r)
+}

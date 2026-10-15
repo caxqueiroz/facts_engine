@@ -143,3 +143,7 @@ FROM evidence_retention a
 JOIN evidence_retention b USING(tenant_id,locator,object_version)
 WHERE a.tenant_id=$1 AND a.evidence_id=$2
 AND NOT (b.evidence_id=ANY(sqlc.arg(selected_ids)::text[])));
+
+-- name: HasRegisteredEvidenceObject :one
+SELECT EXISTS(SELECT 1 FROM evidence_retention
+WHERE tenant_id=$1 AND locator=$2 AND object_version=$3);
