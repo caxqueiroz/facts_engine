@@ -15,6 +15,8 @@ import (
 	v1 "github.com/caxqueiroz/facts_engine/gen/memory/v1"
 	"github.com/caxqueiroz/facts_engine/gen/memory/v1/memoryv1connect"
 	"github.com/caxqueiroz/facts_engine/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -31,6 +33,7 @@ func testRemoteFactParity(t *testing.T, ctx context.Context, engine *facts.Engin
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := memoryv1connect.NewFactServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
+	grpcClient := v1.NewFactServiceClient(governanceGRPC(t, engine, caller))
 	request := &v1.ProposeFactRequest{
 		Tenant: caller.Tenant, Command: &v1.Command{Key: proposal.Command.Key, Purpose: proposal.Purpose, CorrelationId: proposal.CorrelationID},
 		Key:           &v1.FactKey{Scope: proposal.Key.Scope, Subject: proposal.Key.Subject, Predicate: proposal.Key.Predicate, Discriminator: proposal.Key.Discriminator},
@@ -44,6 +47,10 @@ func testRemoteFactParity(t *testing.T, ctx context.Context, engine *facts.Engin
 	if err != nil {
 		t.Fatal(err)
 	}
+	grpcReplay, err := grpcClient.ProposeFact(ctx, request)
+	if err != nil || !proto.Equal(replay, grpcReplay) {
+		t.Fatal("gRPC fact replay", grpcReplay, err)
+	}
 	got := replay.Result
 	if got.Id != committed.ID || got.RecordId != committed.RecordID || got.VersionId != committed.VersionID || got.ContentDigest != committed.ContentDigest || got.LedgerRevision != committed.LedgerRevision || got.StreamRevision != committed.StreamRevision {
 		t.Fatalf("remote replay changed receipt: %v, %+v", got, committed)
@@ -56,6 +63,10 @@ func testRemoteFactParity(t *testing.T, ctx context.Context, engine *facts.Engin
 	remote, err := client.GetFact(ctx, &v1.GetFactRequest{Tenant: caller.Tenant, Purpose: query.Purpose, Key: request.Key, ValidAt: request.Valid.From})
 	if err != nil || remote.Result.State != embedded.State || remote.Result.LedgerRevision != embedded.LedgerRevision || remote.Result.StreamRevision != embedded.StreamRevision || remote.Result.RecordId != embedded.RecordID || remote.Result.VersionId != embedded.VersionID {
 		t.Fatalf("remote read differs: %v, %+v, %v", remote, embedded, err)
+	}
+	grpcRead, err := grpcClient.GetFact(ctx, &v1.GetFactRequest{Tenant: caller.Tenant, Purpose: query.Purpose, Key: request.Key, ValidAt: request.Valid.From})
+	if err != nil || !proto.Equal(remote, grpcRead) {
+		t.Fatal("gRPC fact read", grpcRead, err)
 	}
 	request.Command.Key = "remote-revision-conflict"
 	request.ExpectedRevision = 999
@@ -72,6 +83,15 @@ func testRemoteFactParity(t *testing.T, ctx context.Context, engine *facts.Engin
 	if !ok || conflict.RecordId != committed.RecordID || conflict.CurrentRevision != committed.StreamRevision || conflict.ExpectedRevision != 999 {
 		t.Fatalf("conflict detail: %v", detail)
 	}
+	result, grpcErr := grpcClient.ProposeFact(ctx, request)
+	grpcConflict := status.Convert(grpcErr)
+	if result != nil || grpcConflict.Code() != codes.Aborted || len(grpcConflict.Details()) != 1 {
+		t.Fatal("gRPC revision error", result, grpcErr)
+	}
+	grpcDetail, ok := grpcConflict.Details()[0].(*v1.RevisionConflict)
+	if !ok || !proto.Equal(conflict, grpcDetail) {
+		t.Fatal("gRPC revision detail differs", grpcDetail)
+	}
 }
 
 func testRemoteFactReads(t *testing.T, ctx context.Context, engine *facts.Engine, caller model.Caller, key model.FactKey, recordID string, validAt time.Time) {
@@ -87,6 +107,9 @@ func testRemoteFactReads(t *testing.T, ctx context.Context, engine *facts.Engine
 		return memoryv1connect.NewFactServiceClient(client), memoryv1connect.NewSnapshotServiceClient(client)
 	}
 	client, snapshots := makeClients(caller)
+	conn := governanceGRPC(t, engine, caller)
+	grpcClient := v1.NewFactServiceClient(conn)
+	grpcSnapshots := v1.NewSnapshotServiceClient(conn)
 	list := &v1.ListFactsRequest{Tenant: caller.Tenant, Scope: key.Scope, Subject: key.Subject, Purpose: "integration", ValidAt: timestamppb.New(validAt), Limit: 1}
 	first, err := client.ListFacts(ctx, list)
 	if err != nil {
@@ -96,23 +119,34 @@ func testRemoteFactReads(t *testing.T, ctx context.Context, engine *facts.Engine
 		t.Fatalf("first page: %v", first)
 	}
 	list.PageToken = first.NextPageToken
-	second, err := client.ListFacts(ctx, list)
+	second, err := grpcClient.ListFacts(ctx, list)
 	if err != nil || len(second.Items) != 1 || second.LedgerRevision != first.LedgerRevision || !second.EvaluatedAt.AsTime().Equal(first.EvaluatedAt.AsTime()) || second.Items[0].Selector.Predicate == first.Items[0].Selector.Predicate {
 		t.Fatalf("second page: %v, %v", second, err)
+	}
+	connectSecond, err := client.ListFacts(ctx, list)
+	if err != nil || !proto.Equal(second, connectSecond) {
+		t.Fatal("gRPC/Connect fact continuation differs", connectSecond, err)
 	}
 	// Signed cursors cannot be reused by another actor or with changed filters.
 	other := caller
 	other.Principal = "other-reviewer"
 	otherClient, _ := makeClients(other)
+	grpcOther := v1.NewFactServiceClient(governanceGRPC(t, engine, other))
 	if _, err := otherClient.ListFacts(ctx, list); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("cross-principal token: %v", err)
+	}
+	if result, err := grpcOther.ListFacts(ctx, list); result != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC cross-principal token", result, err)
 	}
 	list.Predicate = "preference"
 	if _, err := client.ListFacts(ctx, list); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("changed-filter token: %v", err)
 	}
+	if result, err := grpcClient.ListFacts(ctx, list); result != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC changed-filter token", result, err)
+	}
 	history := &v1.GetFactHistoryRequest{Tenant: caller.Tenant, Scope: key.Scope, RecordId: recordID, Purpose: "integration", Limit: 1}
-	h1, err := client.GetFactHistory(ctx, history)
+	h1, err := grpcClient.GetFactHistory(ctx, history)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,13 +158,24 @@ func testRemoteFactReads(t *testing.T, ctx context.Context, engine *facts.Engine
 	if err != nil || len(h2.Events) != 1 || h2.Events[0].StreamRevision != 2 || h2.Events[0].Type != "approve_fact" || h2.NextPageToken != "" || h2.LedgerRevision != h1.LedgerRevision {
 		t.Fatalf("second history: %v, %v", h2, err)
 	}
+	grpcH2, err := grpcClient.GetFactHistory(ctx, history)
+	if err != nil || !proto.Equal(h2, grpcH2) {
+		t.Fatal("gRPC/Connect history continuation differs", grpcH2, err)
+	}
 	if _, err := otherClient.GetFactHistory(ctx, history); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("history token actor: %v", err)
 	}
+	if result, err := grpcOther.GetFactHistory(ctx, history); result != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC history token actor", result, err)
+	}
 	request := &v1.CreateFactSnapshotRequest{Tenant: caller.Tenant, Command: &v1.Command{Key: "remote-snapshot", Purpose: "integration"}, Selectors: []*v1.FactKey{{Scope: key.Scope, Subject: key.Subject, Predicate: key.Predicate}}, ValidAt: timestamppb.New(validAt)}
-	created, err := snapshots.CreateFactSnapshot(ctx, request)
+	created, err := grpcSnapshots.CreateFactSnapshot(ctx, request)
 	if err != nil {
 		t.Fatal(err)
+	}
+	connectCreated, err := snapshots.CreateFactSnapshot(ctx, request)
+	if err != nil || !proto.Equal(created, connectCreated) {
+		t.Fatal("gRPC/Connect snapshot replay", connectCreated, err)
 	}
 	saved := created.Snapshot
 	embedded, err := engine.GetFactSnapshot(ctx, caller, model.SnapshotQuery{ID: saved.Id, Purpose: "integration"})
@@ -143,6 +188,10 @@ func testRemoteFactReads(t *testing.T, ctx context.Context, engine *facts.Engine
 	fetched, err := snapshots.GetFactSnapshot(ctx, &v1.GetFactSnapshotRequest{Tenant: caller.Tenant, Id: saved.Id, Purpose: "integration"})
 	if err != nil || !proto.Equal(saved, fetched.Snapshot) {
 		t.Fatalf("get snapshot differs: %v, %v", fetched, err)
+	}
+	grpcFetched, err := grpcSnapshots.GetFactSnapshot(ctx, &v1.GetFactSnapshotRequest{Tenant: caller.Tenant, Id: saved.Id, Purpose: "integration"})
+	if err != nil || !proto.Equal(fetched, grpcFetched) {
+		t.Fatal("gRPC snapshot read", grpcFetched, err)
 	}
 	// Retry through the embedded entry point must return the remote commit.
 	retry, err := engine.CreateFactSnapshot(ctx, caller, model.FactSnapshotRequest{Command: model.Command{Key: "remote-snapshot", Purpose: "integration"}, Selectors: []model.FactKey{key}, ValidAt: validAt})
