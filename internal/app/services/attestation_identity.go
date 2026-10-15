@@ -32,7 +32,7 @@ func (s *Service) validIdentityReceipt(r model.AttestationIdentityReceipt, reque
 }
 func (s *Service) RecordDelegatedAttestation(ctx context.Context, c model.Caller, r model.DelegatedAttestationRequest) (model.CommitResult, error) {
 	a := r.Attestation
-	if !c.Service || !model.ValidID(r.GrantID) || !model.ValidID(r.Key) || a.Kind != "client_confirmation" || !validConfirmation(a) || a.Attestor.Tenant != c.Tenant || !model.ValidID(a.Attestor.Principal) || a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || (c.Initiator != "" && c.Initiator != a.Attestor.Principal) {
+	if !c.Service || !model.ValidID(r.GrantID) || !model.ValidID(r.Key) || a.Kind != "client_confirmation" || !validConfirmation(a) || a.Attestor.Tenant != c.Tenant || !model.ValidID(a.Attestor.Principal) || a.PayloadDisposed || a.DisposedPayloadDigest != "" || a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || (c.Initiator != "" && c.Initiator != a.Attestor.Principal) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if s.attestationIdentity.Verifier == nil {

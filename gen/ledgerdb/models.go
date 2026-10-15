@@ -68,6 +68,12 @@ type AttestationEvent struct {
 	LedgerRevision pgtype.Int8
 }
 
+type AttestationGuard struct {
+	TenantID      string
+	AttestationID string
+	Epoch         int64
+}
+
 type AttestationIdentity struct {
 	TenantID string
 	ID       string
@@ -535,6 +541,13 @@ type ExtractionSubject struct {
 	SubjectID string
 }
 
+type FactAttestationDisposal struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+	DisposedAt    pgtype.Timestamptz
+}
+
 type FactAttestationPayload struct {
 	TenantID      string
 	AttestationID string
@@ -615,6 +628,13 @@ type MemoryAttestation struct {
 	EvidenceID     string
 	LedgerRevision int64
 	Kind           string
+}
+
+type MemoryAttestationDisposal struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+	DisposedAt    pgtype.Timestamptz
 }
 
 type MemoryAttestationEvent struct {

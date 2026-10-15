@@ -345,6 +345,15 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 				if err := json.Unmarshal(entry.Payload, &attestation); err != nil {
 					return err
 				}
+				if err := ledgerdb.New(t.tx).LockAttestationGuard(ctx, ledgerdb.LockAttestationGuardParams{TenantID: t.tenant, AttestationID: attestation.ID}); err != nil {
+					return err
+				}
+				if attestation.PayloadDisposed {
+					if !model.ValidAttestationTombstone(attestation, t.tenant, entry.ID) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: entry.Kind + "_content", ID: attestation.ID, Reason: "disposed_under_retention_policy"})
+				}
 				scopes[attestation.Scope] = true
 				for _, evidenceID := range model.AttestationEvidence(attestation) {
 					present := false

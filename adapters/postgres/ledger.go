@@ -363,6 +363,9 @@ func (t *transaction) Attestations(ctx context.Context, version string) ([]model
 		if err := t.decode(b, &a); err != nil {
 			return nil, err
 		}
+		if a.PayloadDisposed {
+			return nil, model.ErrPrecondition
+		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
@@ -399,6 +402,9 @@ func (t *transaction) WithdrawAttestation(ctx context.Context, id, scope string,
 	}
 	if err = t.decode(payload, &a); err != nil {
 		return out, err
+	}
+	if a.PayloadDisposed {
+		return out, model.ErrPrecondition
 	}
 	if a.Scope != scope || a.Attestor != c {
 		return out, model.ErrDenied

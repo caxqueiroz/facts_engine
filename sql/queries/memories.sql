@@ -61,15 +61,15 @@ INSERT INTO attestation_identities (tenant_id,id,scope_id,kind)
 VALUES ($1,$2,$3,'memory');
 
 -- name: ListMemoryAttestationPayloads :many
-SELECT p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT (CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND (sqlc.arg(revision)::bigint=0 OR a.ledger_revision<=sqlc.arg(revision)) AND NOT EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND (sqlc.arg(revision)::bigint=0 OR w.ledger_revision<=sqlc.arg(revision))) ORDER BY a.id;
 
 -- name: GetMemoryAttestationPayload :one
-SELECT p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT (CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.id=$2;
 
 -- name: InsertMemoryAttestationHeader :exec

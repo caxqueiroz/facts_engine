@@ -39,6 +39,9 @@ func (t *transaction) MemoryAttestations(ctx context.Context, version string, re
 		if err = t.decode(payload, &a); err != nil {
 			return nil, err
 		}
+		if a.PayloadDisposed {
+			return nil, model.ErrPrecondition
+		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
@@ -54,6 +57,9 @@ func (t *transaction) withdrawMemoryAttestation(ctx context.Context, id, scope s
 	}
 	if err := t.decode(payload, &a); err != nil {
 		return model.CommitResult{}, err
+	}
+	if a.PayloadDisposed {
+		return model.CommitResult{}, model.ErrPrecondition
 	}
 	if a.Scope != scope || a.Attestor != c {
 		return model.CommitResult{}, model.ErrDenied

@@ -11,6 +11,7 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -107,6 +108,81 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 				if err := read(historical); err != nil {
 					t.Fatal(err)
 				}
+			}
+			// A disposal marker takes precedence over still-present payload bytes,
+			// and the shared epoch fences repeatable-read writers that began first.
+			original, err := cipher.Open("legacy", want[kind])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var attestation model.Attestation
+			if err = json.Unmarshal(original, &attestation); err != nil {
+				t.Fatal(err)
+			}
+			tombstoneBytes, err := json.Marshal(model.AttestationTombstone(attestation))
+			if err != nil {
+				t.Fatal(err)
+			}
+			marker, err := cipher.Seal("legacy", tombstoneBytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stale, err := admin.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stale.Rollback(ctx)
+			if err = stale.QueryRow(ctx, "SELECT count(*) FROM "+child+" WHERE tenant_id='legacy' AND attestation_id=$1", id).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			disposalTable := kind + "_attestation_disposals"
+			if _, err = admin.Exec(ctx, "INSERT INTO "+disposalTable+"(tenant_id,attestation_id,payload) VALUES('legacy',$1,$2)", id, marker); err != nil {
+				t.Fatal(err)
+			}
+			_, err = stale.Exec(ctx, "UPDATE "+child+" SET payload=payload WHERE tenant_id='legacy' AND attestation_id=$1", id)
+			var pgerr *pgconn.PgError
+			if !errors.As(err, &pgerr) || pgerr.Code != "40001" {
+				t.Fatal("stale attestation writer was not fenced", err)
+			}
+			_ = stale.Rollback(ctx)
+			blocked, err := admin.Exec(ctx, "UPDATE "+child+" SET payload=payload WHERE tenant_id='legacy' AND attestation_id=$1", id)
+			if err == nil || blocked.RowsAffected() != 0 || !errors.As(err, &pgerr) || pgerr.Code != "23514" {
+				t.Fatal("disposed attestation content was mutable", err)
+			}
+			for _, historical := range []bool{false, true} {
+				if err := read(historical); !errors.Is(err, model.ErrPrecondition) {
+					t.Fatal("disposal marker did not override live bytes", historical, err)
+				}
+			}
+			for _, query := range []struct {
+				sql string
+				arg any
+			}{{archiveQuery, int64(3)}, {auditQuery, "scope"}} {
+				rows, queryErr := admin.Query(ctx, query.sql, "legacy", query.arg)
+				if queryErr != nil {
+					t.Fatal(queryErr)
+				}
+				found := false
+				for rows.Next() {
+					var rowID string
+					var content []byte
+					if queryErr = rows.Scan(&rowID, &content); queryErr != nil {
+						rows.Close()
+						t.Fatal(queryErr)
+					}
+					if rowID == id {
+						found = bytes.Equal(content, marker)
+						break
+					}
+				}
+				queryErr = rows.Err()
+				rows.Close()
+				if queryErr != nil || !found {
+					t.Fatal("archive/audit did not preserve disposal marker", queryErr)
+				}
+			}
+			if _, err = admin.Exec(ctx, "DELETE FROM "+disposalTable+" WHERE tenant_id='legacy' AND attestation_id=$1", id); err != nil {
+				t.Fatal(err)
 			}
 			tx, err := runtime.Begin(ctx)
 			if err != nil {

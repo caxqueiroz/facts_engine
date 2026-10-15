@@ -601,8 +601,8 @@ func (q *Queries) ListHistoricalAcceptances(ctx context.Context, arg ListHistori
 }
 
 const ListHistoricalAttestationPayloads = `-- name: ListHistoricalAttestationPayloads :many
-SELECT p.payload
-FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT (CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN fact_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND a.ledger_revision<=$3 AND NOT EXISTS(SELECT 1
 FROM attestation_events e
 WHERE e.tenant_id=a.tenant_id AND e.attestation_id=a.id AND e.ledger_revision<=$3) ORDER BY a.id

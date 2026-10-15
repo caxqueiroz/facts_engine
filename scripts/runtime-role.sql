@@ -196,3 +196,9 @@ GRANT DELETE ON decision_payloads TO facts_retention;
 GRANT SELECT,INSERT ON fact_attestation_payloads,memory_attestation_payloads TO facts_runtime;
 REVOKE UPDATE,DELETE,TRUNCATE ON fact_attestation_payloads,memory_attestation_payloads,attestations,memory_attestations FROM facts_runtime;
 GRANT SELECT ON fact_attestation_payloads,memory_attestation_payloads TO facts_archiver;
+
+GRANT SELECT ON fact_attestation_disposals,memory_attestation_disposals TO facts_runtime,facts_archiver;
+GRANT SELECT,INSERT ON attestation_guards TO facts_runtime,facts_archiver;
+GRANT UPDATE(epoch) ON attestation_guards TO facts_runtime,facts_archiver;
+REVOKE UPDATE,DELETE,TRUNCATE ON fact_attestation_disposals,memory_attestation_disposals FROM facts_runtime;
+REVOKE DELETE,TRUNCATE ON attestation_guards FROM facts_runtime;

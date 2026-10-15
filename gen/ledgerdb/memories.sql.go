@@ -54,8 +54,8 @@ func (q *Queries) GetActiveMemoryType(ctx context.Context, arg GetActiveMemoryTy
 }
 
 const GetMemoryAttestationPayload = `-- name: GetMemoryAttestationPayload :one
-SELECT p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT (CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.id=$2
 `
 
@@ -318,8 +318,8 @@ func (q *Queries) InsertMemoryWithdrawal(ctx context.Context, arg InsertMemoryWi
 }
 
 const ListMemoryAttestationPayloads = `-- name: ListMemoryAttestationPayloads :many
-SELECT p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT (CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.version_id=$2 AND ($3::bigint=0 OR a.ledger_revision<=$3) AND NOT EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND ($3::bigint=0 OR w.ledger_revision<=$3)) ORDER BY a.id

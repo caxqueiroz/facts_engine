@@ -343,7 +343,7 @@ func (s *Service) RecordAttestation(ctx context.Context, c model.Caller, r model
 func (s *Service) recordAttestation(ctx context.Context, c model.Caller, r model.AttestationRequest, input any, delegation *model.AttestationDelegation) (model.CommitResult, error) {
 	a := r.Attestation
 	// Server-owned identity metadata never comes from an attestation request.
-	if a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || (delegation == nil && a.Attestor != c) || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+	if a.PayloadDisposed || a.DisposedPayloadDigest != "" || a.RecordedAt != nil || a.ReviewAuthorization != nil || a.Recorder != nil || a.Delegation != nil || a.EvidenceAuthorization != nil || !validConfirmation(a) || (a.Confirmation != nil && a.Confirmation.RespondedAt.After(time.Now().Add(time.Second))) || !validKind(a.Kind) || !model.ValidID(a.ID) || (delegation == nil && a.Attestor != c) || a.ContentDigest == "" || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		return model.CommitResult{}, model.ErrInvalid
 	}
 	if _, err := s.authorize(ctx, c, a.Scope, "can_attest", r.Command); err != nil {

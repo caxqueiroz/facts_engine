@@ -417,6 +417,17 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if include && m.PayloadDisposed {
 				gaps = append(gaps, model.AuditGap{Kind: "context_content", ID: m.ID, Reason: "disposed_under_retention_policy"})
 			}
+		case "attestation", "memory_attestation":
+			var a model.Attestation
+			if err := json.Unmarshal(entry.Payload, &a); err != nil {
+				return nil, nil, err
+			}
+			if a.PayloadDisposed {
+				if !model.ValidAttestationTombstone(a, c.Tenant, entry.ID) {
+					return nil, nil, model.ErrPrecondition
+				}
+				gaps = append(gaps, model.AuditGap{Kind: entry.Kind + "_content", ID: a.ID, Reason: "disposed_under_retention_policy"})
+			}
 		case "decision":
 			var d model.DecisionRecord
 			if err := json.Unmarshal(entry.Payload, &d); err != nil {

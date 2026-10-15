@@ -204,6 +204,9 @@ func (t *transaction) HistoricalAttestations(ctx context.Context, version string
 		if err := t.decode(b, &a); err != nil {
 			return nil, err
 		}
+		if a.PayloadDisposed {
+			return nil, model.ErrPrecondition
+		}
 		out = append(out, a)
 	}
 	return out, rows.Err()

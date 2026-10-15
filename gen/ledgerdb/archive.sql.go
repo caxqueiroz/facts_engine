@@ -36,8 +36,8 @@ func (q *Queries) GetArchiveEvent(ctx context.Context, arg GetArchiveEventParams
 }
 
 const ListArchiveAttestation = `-- name: ListArchiveAttestation :many
-SELECT a.id,p.payload
-FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT a.id,(CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN fact_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.ledger_revision=$2
 `
 
@@ -438,8 +438,8 @@ func (q *Queries) ListArchiveExtractionRetry(ctx context.Context, arg ListArchiv
 }
 
 const ListArchiveMemoryAttestation = `-- name: ListArchiveMemoryAttestation :many
-SELECT a.id,p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT a.id,(CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND (a.ledger_revision=$2 OR EXISTS(SELECT 1
 FROM memory_attestation_events w
 WHERE w.tenant_id=a.tenant_id AND w.attestation_id=a.id AND w.ledger_revision=$2))
@@ -768,8 +768,8 @@ func (q *Queries) ListArchiveTimeline(ctx context.Context, arg ListArchiveTimeli
 }
 
 const ListAuditAttestation = `-- name: ListAuditAttestation :many
-SELECT a.id,p.payload
-FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT a.id,(CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM attestations a LEFT JOIN fact_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN fact_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.scope_id=$2 ORDER BY a.id LIMIT 10001
 `
 
@@ -1284,8 +1284,8 @@ func (q *Queries) ListAuditFactTimeline(ctx context.Context, arg ListAuditFactTi
 }
 
 const ListAuditMemoryAttestation = `-- name: ListAuditMemoryAttestation :many
-SELECT a.id,p.payload
-FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id
+SELECT a.id,(CASE WHEN disposed.attestation_id IS NOT NULL THEN disposed.payload ELSE p.payload END)::bytea AS payload
+FROM memory_attestations a LEFT JOIN memory_attestation_payloads p ON p.tenant_id=a.tenant_id AND p.attestation_id=a.id LEFT JOIN memory_attestation_disposals disposed ON disposed.tenant_id=a.tenant_id AND disposed.attestation_id=a.id
 WHERE a.tenant_id=$1 AND a.scope_id=$2 ORDER BY a.id LIMIT 10001
 `
 

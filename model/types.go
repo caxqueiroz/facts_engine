@@ -239,6 +239,8 @@ type Approval struct {
 	ExpectedRevision           int64
 }
 type Attestation struct {
+	PayloadDisposed                                                 bool                   `json:",omitempty"`
+	DisposedPayloadDigest                                           string                 `json:",omitempty"`
 	RecordedAt                                                      *time.Time             `json:",omitempty"`
 	ReviewAuthorization                                             *AuthorizationDecision `json:",omitempty"`
 	Recorder                                                        *Caller                `json:",omitempty"`
