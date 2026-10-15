@@ -28,7 +28,7 @@ func testDisposedProjectionReads(t *testing.T, ctx context.Context, admin *pgxpo
 	if err = ledger.RegisterConsumer(ctx, model.ConsumerKey{Tenant: tenant, Consumer: model.ProjectionConsumer(key.Generation)}, 3); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = admin.Exec(ctx, "INSERT INTO projection_generations(tenant_id,generation,state,fence,through_revision) VALUES($1,$2,'paused',1,$3)", tenant, key.Generation, memoryRevision); err != nil {
+	if _, err = admin.Exec(ctx, "INSERT INTO projection_generations(tenant_id,generation,state,fence,through_revision) VALUES($1,$2,'building',1,$3)", tenant, key.Generation, memoryRevision); err != nil {
 		t.Fatal(err)
 	}
 	for _, target := range []struct {
@@ -150,6 +150,14 @@ func testDisposedProjectionReads(t *testing.T, ctx context.Context, admin *pgxpo
 	docs, err := ledger.ProjectionDocuments(ctx, key, memoryRevision)
 	if err != nil || len(docs) != 0 {
 		t.Fatal("legacy rebuild includes disposed content", docs, err)
+	}
+	// This owner-only source fixture has no physical index. Acknowledge its
+	// captured targets before constructing the paused verification fixture.
+	if _, err = admin.Exec(ctx, "INSERT INTO projection_cleanup_acknowledgements(tenant_id,kind,version_id,generation,acknowledgement_id) SELECT tenant_id,kind,version_id,generation,'source-fixture' FROM projection_cleanup_targets WHERE tenant_id=$1 AND generation=$2", tenant, key.Generation); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admin.Exec(ctx, "UPDATE projection_generations SET state='paused' WHERE tenant_id=$1 AND generation=$2", tenant, key.Generation); err != nil {
+		t.Fatal(err)
 	}
 	first, err := ledger.ProjectionDocumentPage(ctx, key, 1, memoryRevision, model.ProjectionCursor{}, 1)
 	if err != nil || len(first.Documents) != 0 || first.Next == nil || first.Next.Kind != "fact" || first.Next.VersionID != fact.ID {

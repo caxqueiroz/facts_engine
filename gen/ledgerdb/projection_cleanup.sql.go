@@ -35,6 +35,23 @@ func (q *Queries) GetProjectionCleanupJob(ctx context.Context, arg GetProjection
 	return i, err
 }
 
+const HasPendingProjectionCleanup = `-- name: HasPendingProjectionCleanup :one
+SELECT EXISTS(SELECT 1 FROM projection_cleanup_targets t WHERE t.tenant_id=$1 AND t.generation=$2
+AND NOT EXISTS(SELECT 1 FROM projection_cleanup_acknowledgements a WHERE a.tenant_id=t.tenant_id AND a.kind=t.kind AND a.version_id=t.version_id AND a.generation=t.generation))
+`
+
+type HasPendingProjectionCleanupParams struct {
+	TenantID   string
+	Generation string
+}
+
+func (q *Queries) HasPendingProjectionCleanup(ctx context.Context, arg HasPendingProjectionCleanupParams) (bool, error) {
+	row := q.db.QueryRow(ctx, HasPendingProjectionCleanup, arg.TenantID, arg.Generation)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const ListProjectionCleanupTargets = `-- name: ListProjectionCleanupTargets :many
 SELECT t.generation,a.acknowledgement_id,a.completed_at
 FROM projection_cleanup_targets t LEFT JOIN projection_cleanup_acknowledgements a USING(tenant_id,kind,version_id,generation)

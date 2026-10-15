@@ -127,6 +127,10 @@ func (l *Ledger) StartRebuild(ctx context.Context, k model.GenerationKey, a mode
 }
 func (l *Ledger) FreezeRebuild(ctx context.Context, k model.GenerationKey, a model.RebuildActor) (model.RebuildStatus, error) {
 	return l.rebuild(ctx, k, a, func(t *transaction) (model.RebuildStatus, error) {
+		if err := t.requireProjectionCleanup(ctx, k); err != nil {
+			return model.RebuildStatus{}, err
+		}
+
 		s, err := t.generation(ctx, k)
 		if err != nil {
 			return s, err
@@ -163,6 +167,10 @@ func (l *Ledger) VerifyRebuild(ctx context.Context, k model.GenerationKey, a mod
 		return model.RebuildStatus{}, model.ErrInvalid
 	}
 	return l.rebuild(ctx, k, a, func(t *transaction) (model.RebuildStatus, error) {
+		if err := t.requireProjectionCleanup(ctx, k); err != nil {
+			return model.RebuildStatus{}, err
+		}
+
 		s, err := t.generation(ctx, k)
 		if err != nil {
 			return s, err
@@ -244,6 +252,10 @@ func (l *Ledger) finishRebuild(ctx context.Context, k model.GenerationKey, a mod
 }
 func (l *Ledger) ActivateRebuild(ctx context.Context, k model.GenerationKey, a model.RebuildActor, verifiedFence int64) (model.RebuildStatus, error) {
 	return l.rebuild(ctx, k, a, func(t *transaction) (model.RebuildStatus, error) {
+		if err := t.requireProjectionCleanup(ctx, k); err != nil {
+			return model.RebuildStatus{}, err
+		}
+
 		s, err := t.generation(ctx, k)
 		if err != nil {
 			return s, err
@@ -402,6 +414,17 @@ func validateRebuildAuthorization(k model.GenerationKey, a model.RebuildActor) e
 	}
 	if time.Since(d.CheckedAt) > 30*time.Second || d.CheckedAt.After(time.Now().Add(time.Second)) {
 		return model.ErrUnavailable
+	}
+	return nil
+}
+
+func (t *transaction) requireProjectionCleanup(ctx context.Context, k model.GenerationKey) error {
+	pending, err := ledgerdb.New(t.tx).HasPendingProjectionCleanup(ctx, ledgerdb.HasPendingProjectionCleanupParams{TenantID: k.Tenant, Generation: k.Generation})
+	if err != nil {
+		return err
+	}
+	if pending {
+		return model.ErrPrecondition
 	}
 	return nil
 }

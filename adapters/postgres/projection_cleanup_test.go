@@ -125,6 +125,23 @@ func testProjectionCleanup(t *testing.T, ctx context.Context, admin, runtime *pg
 	register("cleanup-retired", "retired", true)
 	register("cleanup-abandoned", "abandoned", true)
 	register("cleanup-static", "", false)
+	rebuildCfg := admin.Config().Copy()
+	rebuildCfg.ConnConfig.RuntimeParams["role"] = "facts_rebuild"
+	rebuildPool, err := pgxpool.NewWithConfig(ctx, rebuildCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rebuildPool.Close()
+	rebuild, err := postgres.New(ctx, rebuildPool, cipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	building := model.GenerationKey{Tenant: tenant, Generation: "cleanup-building"}
+	actor := model.RebuildActor{Principal: "operator", Purpose: "cleanup-test"}
+	started, err := rebuild.StartRebuild(ctx, building, actor, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tombstones := map[string][]byte{"fact": seal(model.VersionTombstone(f)), "memory": seal(model.MemoryVersionTombstone(m))}
 	insert := func(tx pgx.Tx, kind string) error {
 		_, err := tx.Exec(ctx, "INSERT INTO "+kind+"_version_disposals(tenant_id,version_id,payload) VALUES($1,$2,$3)", tenant, version, tombstones[kind])
@@ -188,8 +205,23 @@ func testProjectionCleanup(t *testing.T, ctx context.Context, admin, runtime *pg
 		return s
 	}
 	initial := read(key)
-	if initial.Complete || len(initial.Targets) != 3 || initial.InventoryEpoch < 1 {
+	if initial.Complete || len(initial.Targets) != 4 || initial.InventoryEpoch < 1 {
 		t.Fatal(initial)
+	}
+	if _, err = rebuild.FreezeRebuild(ctx, building, actor); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("freeze ignored pending cleanup", err)
+	}
+	if _, err = rebuild.VerifyRebuild(ctx, building, actor, started.Fence, model.ProjectionCheck{Digest: model.Digest("empty")}); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("verify ignored pending cleanup", err)
+	}
+	if _, err = rebuild.ActivateRebuild(ctx, building, actor, started.Fence); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("activate ignored pending cleanup", err)
+	}
+	for _, state := range []string{"paused", "verified", "activating"} {
+		_, err = admin.Exec(ctx, "UPDATE projection_generations SET state=$3 WHERE tenant_id=$1 AND generation=$2", tenant, building.Generation, state)
+		if !errors.As(err, &pg) || pg.Code != "23514" {
+			t.Fatal("direct state change bypassed cleanup", state, err)
+		}
 	}
 	// A late registration invalidates an old disposal snapshot before it can capture targets.
 	stale, err := admin.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
@@ -223,10 +255,10 @@ func testProjectionCleanup(t *testing.T, ctx context.Context, admin, runtime *pg
 	}
 	memoryKey := key
 	memoryKey.Kind = "memory"
-	if s := read(memoryKey); s.Complete || len(s.Targets) != 4 || s.InventoryEpoch <= initial.InventoryEpoch {
+	if s := read(memoryKey); s.Complete || len(s.Targets) != 5 || s.InventoryEpoch <= initial.InventoryEpoch {
 		t.Fatal(s)
 	}
-	if s := read(key); len(s.Targets) != 3 {
+	if s := read(key); len(s.Targets) != 4 {
 		t.Fatal("captured target set changed", s)
 	}
 	for i, target := range initial.Targets {
@@ -273,4 +305,5 @@ func testProjectionCleanup(t *testing.T, ctx context.Context, admin, runtime *pg
 	if _, err = admin.Exec(ctx, "INSERT INTO projection_cleanup_targets(tenant_id,kind,version_id,generation) VALUES($1,'memory',$2,'cleanup-static')", tenant, version); err != nil {
 		t.Fatal(err)
 	}
+	testCleanupVerificationRace(t, ctx, admin, rebuild, building, actor, f, cipher)
 }
