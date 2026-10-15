@@ -154,3 +154,11 @@ REVOKE DELETE,TRUNCATE ON projection_retention_guards FROM facts_worker;
 
 -- Cleanup obligations are recorded with tombstones; execution is not enabled.
 GRANT SELECT ON projection_cleanup_jobs,projection_cleanup_targets,projection_cleanup_acknowledgements TO facts_runtime,facts_worker,facts_archiver;
+
+-- Governed ledger payload disposal captures cleanup targets atomically. It does
+-- not grant the retention role permission to acknowledge index cleanup.
+GRANT INSERT ON fact_version_disposals,memory_version_disposals,projection_cleanup_jobs,projection_cleanup_targets TO facts_retention;
+GRANT DELETE ON fact_version_payloads,memory_version_payloads TO facts_retention;
+GRANT SELECT ON projection_generations TO facts_retention;
+GRANT INSERT ON projection_retention_guards TO facts_retention;
+GRANT UPDATE(epoch) ON projection_retention_guards TO facts_retention;

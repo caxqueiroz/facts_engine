@@ -139,6 +139,7 @@ func TestPostgresLedger(t *testing.T) {
 	t.Run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
 	t.Run("projection destination inventory", func(t *testing.T) { testProjectionDestinations(t, ctx, admin, runtime) })
 	t.Run("context disposal", func(t *testing.T) { testContextDisposal(t, ctx, engine, store, admin) })
+	t.Run("version disposal", func(t *testing.T) { testVersionDisposal(t, ctx, engine, store, admin, runtime) })
 	t.Run("version disposal storage", func(t *testing.T) { testVersionDisposalStorage(t, ctx, engine, store, admin, runtime) })
 	t.Run("snapshot disposal", func(t *testing.T) { testSnapshotDisposal(t, ctx, engine, store, admin) })
 	t.Run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })

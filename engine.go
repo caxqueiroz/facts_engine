@@ -431,3 +431,9 @@ func (e *Engine) DisposeContext(ctx context.Context, c Caller, r model.ContextDi
 func (e *Engine) DisposeExtraction(ctx context.Context, c Caller, r model.ExtractionDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeExtraction(ctx, c, r)
 }
+
+// DisposeVersion removes eligible fact/memory ledger content and records durable
+// index cleanup obligations. Its receipt does not imply index cleanup completed.
+func (e *Engine) DisposeVersion(ctx context.Context, c Caller, r model.VersionDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeVersion(ctx, c, r)
+}

@@ -97,7 +97,25 @@ type ExtractionDisposalTx interface {
 	DisposeExtraction(context.Context, ExtractionDisposalRequest) error
 }
 
+type VersionRetentionBinding struct{ Scope, PolicyID, Jurisdiction string }
+
+// VersionDisposalRequest selects one immutable fact or memory payload. Its
+// index cleanup obligations are durable but may remain pending after commit.
+type VersionDisposalRequest struct {
+	Command
+	Kind, Scope, RecordID, VersionID, Reason string
+	Bindings                                 []VersionRetentionBinding
+}
+
+// VersionDisposalTx atomically validates retention policy and retained copies,
+// fences references/lifecycle writes, retains a tombstone, captures index cleanup
+// obligations and increments the owning record revision. It returns that revision.
+type VersionDisposalTx interface {
+	DisposeVersion(context.Context, VersionDisposalRequest) (int64, error)
+}
+
 type RetentionEvent struct {
+	VersionDisposal         *VersionDisposalRequest    `json:",omitempty"`
 	ExtractionDisposal      *ExtractionDisposalRequest `json:",omitempty"`
 	ContextDisposal         *ContextDisposalRequest    `json:",omitempty"`
 	SnapshotDisposal        *SnapshotDisposalRequest   `json:",omitempty"`

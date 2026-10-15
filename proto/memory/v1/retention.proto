@@ -14,6 +14,7 @@ service RetentionService {
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
   rpc DisposeEvidence(DisposeEvidenceRequest) returns (DisposeEvidenceResponse);
+  rpc DisposeVersion(DisposeVersionRequest) returns (DisposeVersionResponse);
   rpc DisposeExtraction(DisposeExtractionRequest) returns (DisposeExtractionResponse);
   rpc DisposeContext(DisposeContextRequest) returns (DisposeContextResponse);
   rpc DisposeSnapshot(DisposeSnapshotRequest) returns (DisposeSnapshotResponse);
@@ -30,7 +31,9 @@ message RetentionPolicy {
     (buf.validate.field).string.in = "context_payload",
     (buf.validate.field).string.in = "extraction_job_payload",
     (buf.validate.field).string.in = "extraction_request_payload",
-    (buf.validate.field).string.in = "extraction_response_payload"
+    (buf.validate.field).string.in = "extraction_response_payload",
+    (buf.validate.field).string.in = "fact_payload",
+    (buf.validate.field).string.in = "memory_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -200,5 +203,33 @@ message DisposeExtractionRequest {
   }];
 }
 message DisposeExtractionResponse {
+  CommitResult result = 1;
+}
+
+message VersionRetentionBinding {
+  string scope = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeVersionRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string version_id = 3 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string reason = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  repeated VersionRetentionBinding bindings = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+  string kind = 6 [
+    (buf.validate.field).string.in = "fact",
+    (buf.validate.field).string.in = "memory"
+  ];
+  string scope = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 8 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeVersionResponse {
   CommitResult result = 1;
 }
