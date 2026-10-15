@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -59,4 +60,34 @@ type ProjectionCleanupOptions struct{ Destination ProjectionDisposer }
 type ProjectionCleanupGate interface {
 	ProjectionDisposalSealer
 	SetProjectionGate(context.Context, GenerationKey, int64, bool) error
+}
+
+// ProjectionCleanupCursor orders captured targets within one tenant.
+type ProjectionCleanupCursor struct{ Kind, VersionID, Generation string }
+type ProjectionCleanupQuery struct {
+	Tenant string
+	After  ProjectionCleanupCursor
+	Limit  int
+}
+
+// ProjectionCleanupScanner is a trusted maintenance reader. Returned requests
+// have the original policy purpose/bindings but no command key or cleanup reason.
+// Execution must still pass the engine's fresh authorization and hold checks.
+type ProjectionCleanupScanner interface {
+	ScanProjectionCleanup(context.Context, ProjectionCleanupQuery) ([]ProjectionCleanupRequest, error)
+}
+type ProjectionCleanupEngine interface {
+	CleanupProjection(context.Context, Caller, ProjectionCleanupRequest) (CommitResult, error)
+}
+
+func (c ProjectionCleanupCursor) Valid() bool {
+	return c == (ProjectionCleanupCursor{}) || ((c.Kind == "fact" || c.Kind == "memory") && ValidID(c.VersionID) && ValidID(c.Generation))
+}
+func (c ProjectionCleanupCursor) Compare(other ProjectionCleanupCursor) int {
+	for _, pair := range [][2]string{{c.Kind, other.Kind}, {c.VersionID, other.VersionID}, {c.Generation, other.Generation}} {
+		if n := strings.Compare(pair[0], pair[1]); n != 0 {
+			return n
+		}
+	}
+	return 0
 }

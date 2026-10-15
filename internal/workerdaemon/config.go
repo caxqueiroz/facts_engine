@@ -90,7 +90,25 @@ func (c *RefreshConfig) bindings() []model.MemoryRefreshBinding {
 	return out
 }
 
+type ProjectionCleanupConfig struct {
+	workers.ProjectionCleanupConfig
+	Destinations []runtimeconfig.CleanupRoute `json:"destinations"`
+}
+
+func (c *ProjectionCleanupConfig) Validate() error {
+	if c == nil || c.ProjectionCleanupConfig.Validate() != nil || runtimeconfig.ValidateCleanupRoutes(c.Destinations) != nil {
+		return model.ErrInvalid
+	}
+	for _, r := range c.Destinations {
+		if r.Tenant != c.Tenant {
+			return model.ErrInvalid
+		}
+	}
+	return nil
+}
+
 type Config struct {
+	ProjectionCleanup      *ProjectionCleanupConfig     `json:"projection_cleanup,omitempty"`
 	OrphanCleanup          *workers.OrphanCleanupConfig `json:"orphan_cleanup,omitempty"`
 	Telemetry              *runtimeconfig.Telemetry     `json:"telemetry,omitempty"`
 	OpenFGATraceContext    bool                         `json:"openfga_trace_context,omitempty"`
@@ -127,11 +145,14 @@ func (c Config) Validate() error {
 	if !model.ValidID(c.Principal) || c.OpenFGAURL == "" || !model.ValidID(c.OpenFGAStore) || !model.ValidID(c.OpenFGAModel) || c.MaxConnections < 1 || c.MaxConnections > 32 || c.DeliveryTimeoutSeconds < 1 || c.DeliveryTimeoutSeconds > 300 {
 		return model.ErrInvalid
 	}
-	if c.Mode == "refresh-sweep" || c.Mode == "orphan-cleanup" {
+	if c.Mode == "refresh-sweep" || c.Mode == "orphan-cleanup" || c.Mode == "projection-cleanup" {
 		if c.MaxAttempts != 0 || c.LeaseSeconds != 0 || c.PollMilliseconds != 0 || c.MinBackoffMilliseconds != 0 || c.MaxBackoffSeconds != 0 {
 			return model.ErrInvalid
 		}
 	} else if c.MaxAttempts < 1 || c.MaxAttempts > 100 || c.LeaseSeconds < 3 || c.LeaseSeconds > 300 || c.PollMilliseconds < 1 || c.PollMilliseconds > 60000 || c.MinBackoffMilliseconds < 1 || c.MaxBackoffSeconds < 1 || c.MaxBackoffSeconds > 86400 || c.MinBackoffMilliseconds > c.MaxBackoffSeconds*1000 {
+		return model.ErrInvalid
+	}
+	if c.Mode != "projection-cleanup" && c.ProjectionCleanup != nil {
 		return model.ErrInvalid
 	}
 	if c.Mode != "orphan-cleanup" && c.OrphanCleanup != nil {
@@ -141,6 +162,11 @@ func (c Config) Validate() error {
 		return model.ErrInvalid
 	}
 	switch c.Mode {
+	case "projection-cleanup":
+		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.ProjectionCleanup.Validate() != nil {
+			return model.ErrInvalid
+		}
+
 	case "orphan-cleanup":
 		if c.Refresh != nil || c.Archive != nil || c.Audit != (AuditConfig{}) || c.Projection != (runtimeconfig.LexicalRoute{}) || c.OrphanCleanup.Validate() != nil {
 			return model.ErrInvalid

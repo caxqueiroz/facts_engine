@@ -122,6 +122,7 @@ func setupVersionCleanup(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 
 func testVersionCleanupExecution(t *testing.T, ctx context.Context, ledger *postgres.Ledger, store *evidence.Postgres, admin *pgxpool.Pool, c model.Caller, index *cleanupExecutionIndex, f, m model.VersionDisposalRequest, factDisposal, memoryDisposal model.CommitResult) {
 	t.Helper()
+	testCleanupScan(t, ctx, ledger, admin, c.Tenant, factDisposal.ID)
 	engine, err := facts.NewWithOptions(ledger, allow{}, store, model.EngineOptions{ProjectionCleanup: model.ProjectionCleanupOptions{Destination: index}})
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +237,9 @@ func testVersionCleanupExecution(t *testing.T, ctx context.Context, ledger *post
 			}
 		}
 		r = request(pair.v, pair.event, "terminal")
-		if _, err = engine.CleanupProjection(ctx, c, r); err != nil {
+		if pair.v.Kind == "memory" {
+			testStandaloneProjectionCleanup(t, ctx, ledger, c.Tenant, r.VersionID)
+		} else if _, err = engine.CleanupProjection(ctx, c, r); err != nil {
 			t.Fatal("terminal cleanup", err)
 		}
 		index.after = nil

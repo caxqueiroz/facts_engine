@@ -106,3 +106,21 @@ func (r Router) DisposeProjection(ctx context.Context, d model.ProjectionDisposa
 	}
 	return index.DisposeProjection(ctx, d)
 }
+
+// NewRetention opens an existing destination for cleanup without configuring an
+// embedding provider. Identity, schema, role and pool checks match New. The
+// caller supplies separately provisioned retention credentials; this does not
+// grant privileges or migrate the index.
+func NewRetention(ctx context.Context, db *sql.DB, config Config) (*Index, error) {
+	var embedder model.Embedder
+	if config.EmbeddingID != "none" {
+		embedder = retentionOnlyEmbedder{}
+	}
+	return New(ctx, db, config, embedder)
+}
+
+type retentionOnlyEmbedder struct{}
+
+func (retentionOnlyEmbedder) Embed(context.Context, string) ([]float32, error) {
+	return nil, model.ErrPrecondition
+}

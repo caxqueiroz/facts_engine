@@ -71,6 +71,33 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	var handler workers.Handler
 	var consumer model.ConsumerKey
 	switch c.Mode {
+	case "projection-cleanup":
+		index, closeIndex, err := runtimeconfig.OpenCleanup(startup, c.ProjectionCleanup.Destinations)
+		if err != nil {
+			return err
+		}
+		defer closeIndex()
+		store, err := evidence.NewPostgres(pool, cipher)
+		if err != nil {
+			return errors.New("cannot initialize cleanup evidence store")
+		}
+		engine, err := facts.NewWithOptions(ledger, auth, store, model.EngineOptions{Telemetry: telemetry.Options, ProjectionCleanup: model.ProjectionCleanupOptions{Destination: index}})
+		if err != nil {
+			return errors.New("cannot initialize projection cleanup engine")
+		}
+		caller := model.Caller{Tenant: c.ProjectionCleanup.Tenant, Principal: c.Principal, Service: true}
+		ticker, err := workers.NewProjectionCleanup(ledger, engine, caller, c.ProjectionCleanup.ProjectionCleanupConfig)
+		if err != nil {
+			return errors.New("cannot initialize projection cleanup worker")
+		}
+		logger.Info("worker started", "mode", c.Mode)
+		err = RunProjectionCleanupLoop(ctx, ticker, time.Duration(c.ProjectionCleanup.IntervalMinutes)*time.Minute, time.Duration(c.DeliveryTimeoutSeconds)*time.Second, logger)
+		logger.Info("worker stopped", "mode", c.Mode, "failed", err != nil)
+		if err != nil {
+			return errors.New("worker stopped after projection cleanup failure")
+		}
+		return nil
+
 	case "orphan-cleanup":
 		store, err := evidence.NewPostgres(pool, cipher)
 		if err != nil {

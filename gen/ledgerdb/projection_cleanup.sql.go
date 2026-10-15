@@ -155,3 +155,71 @@ func (q *Queries) ListProjectionCleanupTargets(ctx context.Context, arg ListProj
 	}
 	return items, nil
 }
+
+const ScanProjectionCleanup = `-- name: ScanProjectionCleanup :many
+WITH pending AS MATERIALIZED (
+ SELECT t.tenant_id,t.kind,t.version_id,t.generation FROM projection_cleanup_targets t
+ WHERE t.tenant_id=$1
+ AND (t.kind COLLATE "C",t.version_id COLLATE "C",t.generation COLLATE "C") >
+ ($2::text COLLATE "C",$3::text COLLATE "C",$4::text COLLATE "C")
+ AND NOT EXISTS(SELECT 1 FROM projection_cleanup_acknowledgements a WHERE a.tenant_id=t.tenant_id AND a.kind=t.kind AND a.version_id=t.version_id AND a.generation=t.generation)
+ ORDER BY t.kind COLLATE "C",t.version_id COLLATE "C",t.generation COLLATE "C" LIMIT $5
+)
+SELECT p.kind,p.version_id,p.generation,coalesce(e.id,'') AS event_id,coalesce(e.scope_id,'') AS scope_id,coalesce(e.ledger_revision,0)::bigint AS ledger_revision,
+ CASE WHEN octet_length(e.payload)<=1048576 THEN e.payload ELSE ''::bytea END AS payload
+FROM pending p LEFT JOIN retention_events e ON e.tenant_id=p.tenant_id AND e.target_id=p.version_id
+AND e.kind IN ('dispose_fact_payload','dispose_memory_payload') AND e.kind='dispose_'||p.kind||'_payload'
+ORDER BY p.kind COLLATE "C",p.version_id COLLATE "C",p.generation COLLATE "C"
+`
+
+type ScanProjectionCleanupParams struct {
+	TenantID        string
+	AfterKind       string
+	AfterVersion    string
+	AfterGeneration string
+	PageLimit       int32
+}
+
+type ScanProjectionCleanupRow struct {
+	Kind           string
+	VersionID      string
+	Generation     string
+	EventID        string
+	ScopeID        string
+	LedgerRevision int64
+	Payload        []byte
+}
+
+func (q *Queries) ScanProjectionCleanup(ctx context.Context, arg ScanProjectionCleanupParams) ([]ScanProjectionCleanupRow, error) {
+	rows, err := q.db.Query(ctx, ScanProjectionCleanup,
+		arg.TenantID,
+		arg.AfterKind,
+		arg.AfterVersion,
+		arg.AfterGeneration,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScanProjectionCleanupRow{}
+	for rows.Next() {
+		var i ScanProjectionCleanupRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.VersionID,
+			&i.Generation,
+			&i.EventID,
+			&i.ScopeID,
+			&i.LedgerRevision,
+			&i.Payload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
