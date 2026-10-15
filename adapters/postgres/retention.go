@@ -132,7 +132,7 @@ func (t *transaction) DisposeEvidence(ctx context.Context, r model.EvidenceDispo
 	if err != nil {
 		return err
 	}
-	return t.disposeEvidenceObject(ctx, e)
+	return t.disposeEvidenceObject(ctx, e, r.DeferObjectDeletion)
 }
 
 func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.EvidenceDisposalRequest) error {
@@ -186,7 +186,7 @@ func (t *transaction) DisposeEvidenceLineage(ctx context.Context, r model.Eviden
 	// Every member must pass before any deletion. Immutable metadata and the
 	// explicit command membership remain available in the retention event.
 	for _, e := range objects {
-		if err := t.disposeEvidenceObject(ctx, e); err != nil {
+		if err := t.disposeEvidenceObject(ctx, e, r.DeferObjectDeletion); err != nil {
 			return err
 		}
 	}
@@ -252,15 +252,17 @@ func (t *transaction) prepareEvidenceDisposal(ctx context.Context, r model.Evide
 	return e, disposed, nil
 }
 
-func (t *transaction) disposeEvidenceObject(ctx context.Context, e model.Evidence) error {
-	deleted, err := ledgerdb.New(t.tx).DeleteEvidenceObject(ctx, ledgerdb.DeleteEvidenceObjectParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
-	if err != nil {
-		return err
+func (t *transaction) disposeEvidenceObject(ctx context.Context, e model.Evidence, deferred bool) error {
+	if !deferred {
+		deleted, err := ledgerdb.New(t.tx).DeleteEvidenceObject(ctx, ledgerdb.DeleteEvidenceObjectParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
+		if err != nil {
+			return err
+		}
+		if deleted != 1 {
+			return model.ErrPrecondition
+		}
 	}
-	if deleted != 1 {
-		return model.ErrPrecondition
-	}
-	_, err = ledgerdb.New(t.tx).MarkEvidenceObjectDisposed(ctx, ledgerdb.MarkEvidenceObjectDisposedParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
+	_, err := ledgerdb.New(t.tx).MarkEvidenceObjectDisposed(ctx, ledgerdb.MarkEvidenceObjectDisposedParams{TenantID: t.tenant, Locator: e.Object.Locator, ObjectVersion: e.Object.Version})
 	return err
 }
 func (t *transaction) flushRetention(ctx context.Context, event model.Event) error {

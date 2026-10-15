@@ -35,8 +35,18 @@ type EvidenceDisposalRequest struct {
 	// DerivativeEvidenceIDs explicitly selects the complete direct derivative set.
 	// Empty preserves single-object disposal; custom adapters must implement EvidenceLineageDisposalTx.
 	DerivativeEvidenceIDs []string `json:",omitempty"`
+	// DeferObjectDeletion is service-owned and excluded from command identity.
+	// External stores are deleted by a retryable outbox worker after the ledger tombstone commits.
+	DeferObjectDeletion bool `json:"-"`
 	Command
 	Scope, EvidenceID, PolicyID, Jurisdiction, Reason string
+}
+
+// EvidenceVersionDeleter removes one exact immutable object version. It must be
+// tenant-isolated, idempotent, and treat an already missing version as success.
+// The engine invokes it only from a post-commit disposal worker.
+type EvidenceVersionDeleter interface {
+	DeleteEvidenceVersion(context.Context, string, ObjectRef) error
 }
 
 // OrphanEvidenceDisposalRequest selects exactly one immutable upload version.
@@ -168,8 +178,8 @@ type RetentionStatus struct {
 	Blockers             []string
 }
 
-// RetentionDomain binds the development disposal operation to one database.
-// Production object-store disposal requires a separate coordinated adapter.
+// RetentionDomain binds synchronous object deletion to the ledger database.
+// External stores use EvidenceVersionDeleter and post-commit outbox delivery.
 type RetentionDomain interface {
 	RetentionDomain(context.Context) (string, error)
 }

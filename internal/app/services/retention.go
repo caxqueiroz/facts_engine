@@ -26,6 +26,9 @@ func (s *Service) retentionMutation(ctx context.Context, c model.Caller, scope, 
 		event.TargetID = target
 		event.Caller = c
 		event.Command = cmd
+		if dispose && event.Disposal != nil && event.Disposal.DeferObjectDeletion {
+			event.Limitations = append(event.Limitations, "external_object_deletion_pending")
+		}
 		if dispose {
 			if len(event.Disposal.DerivativeEvidenceIDs) > 0 {
 				lineage, ok := tx.(model.EvidenceLineageDisposalTx)
@@ -90,9 +93,11 @@ func (s *Service) DisposeEvidence(ctx context.Context, c model.Caller, r model.E
 	if _, err := s.authorize(ctx, c, r.Scope, "can_dispose", r.Command); err != nil {
 		return model.CommitResult{}, err
 	}
-	if err := s.checkDisposalDomain(ctx); err != nil {
+	deferObjectDeletion, err := s.checkEvidenceDisposalDomain(ctx)
+	if err != nil {
 		return model.CommitResult{}, err
 	}
+	r.DeferObjectDeletion = deferObjectDeletion
 
 	return s.retentionMutation(ctx, c, r.Scope, "dispose_evidence", "can_dispose", r.EvidenceID, r.Command, r, model.RetentionEvent{Disposal: &r, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy", "referenced_payloads_require_coordinated_disposal"}}, true)
 }
@@ -121,9 +126,9 @@ func (s *Service) GetRetentionStatus(ctx context.Context, c model.Caller, q mode
 	return status, nil
 }
 
-func (s *Service) checkDisposalDomain(ctx context.Context) error {
-	// The initial disposal adapter operates only on PostgreSQL evidence in the
-	// very same retention domain as the ledger. External stores fail closed.
+func (s *Service) checkOrphanDisposalDomain(ctx context.Context) error {
+	// Orphan upload cleanup is synchronous and currently limited to the same
+	// PostgreSQL evidence and ledger retention domain.
 	ledger, ok := s.ledger.(model.RetentionDomain)
 	if !ok {
 		return model.ErrPrecondition
@@ -145,6 +150,30 @@ func (s *Service) checkDisposalDomain(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (s *Service) checkEvidenceDisposalDomain(ctx context.Context) (bool, error) {
+	ledger, ok := s.ledger.(model.RetentionDomain)
+	if !ok {
+		return false, model.ErrPrecondition
+	}
+	ledgerDomain, err := ledger.RetentionDomain(ctx)
+	if err != nil {
+		return false, err
+	}
+	if store, ok := s.evidence.(model.RetentionDomain); ok {
+		storeDomain, err := store.RetentionDomain(ctx)
+		if err != nil {
+			return false, err
+		}
+		if ledgerDomain != "" && ledgerDomain == storeDomain {
+			return false, nil
+		}
+	}
+	if _, ok := s.evidence.(model.EvidenceVersionDeleter); ok {
+		return true, nil
+	}
+	return false, model.ErrPrecondition
+}
 func (s *Service) DisposeOrphanEvidence(ctx context.Context, c model.Caller, r model.OrphanEvidenceDisposalRequest) (model.CommitResult, error) {
 	if !model.ValidID(r.Object.Locator) || !model.ValidID(r.PolicyID) || !model.ValidID(r.Jurisdiction) || len(r.Object.Version) != 64 || r.Object.Digest != r.Object.Version || r.Object.Size < 0 || r.Object.Size > 16<<20 || r.Reason == "" || len(r.Reason) > 1024 {
 		return model.CommitResult{}, model.ErrInvalid
@@ -157,7 +186,7 @@ func (s *Service) DisposeOrphanEvidence(ctx context.Context, c model.Caller, r m
 	if _, err := s.authorize(ctx, c, r.Scope, "can_dispose", r.Command); err != nil {
 		return model.CommitResult{}, err
 	}
-	if err := s.checkDisposalDomain(ctx); err != nil {
+	if err := s.checkOrphanDisposalDomain(ctx); err != nil {
 		return model.CommitResult{}, err
 	}
 	return s.retentionMutation(ctx, c, r.Scope, "dispose_orphan_evidence", "can_dispose", r.Object.Locator, r.Command, r, model.RetentionEvent{OrphanDisposal: &r, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy"}}, false)

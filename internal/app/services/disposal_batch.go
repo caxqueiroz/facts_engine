@@ -231,8 +231,13 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 		return model.CommitResult{}, err
 	}
 	if len(r.Evidence) > 0 {
-		if err = s.checkDisposalDomain(ctx); err != nil {
+		deferred, domainErr := s.checkEvidenceDisposalDomain(ctx)
+		if domainErr != nil {
+			err = domainErr
 			return model.CommitResult{}, err
+		}
+		for i := range r.Evidence {
+			r.Evidence[i].DeferObjectDeletion = deferred
 		}
 	}
 	return s.mutate(ctx, c, r.Scope, "dispose_batch", "can_dispose", r.Command, r, func(tx model.Tx, out *model.CommitResult) error {
@@ -346,7 +351,11 @@ func (s *Service) DisposeBatch(ctx context.Context, c model.Caller, r model.Disp
 		}
 		for _, item := range r.Evidence {
 			d := decisions[item.Scope]
-			event := model.RetentionEvent{Scope: item.Scope, Kind: "dispose_evidence", TargetID: item.EvidenceID, Disposal: &item, AdditionalAuthorization: []model.AuthorizationDecision{d}, Limitations: []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy", "external_copies_require_separate_disposal"}}
+			limitations := []string{"structural_metadata_retained", "backups_expire_under_separate_policy", "archives_expire_under_separate_policy", "external_copies_require_separate_disposal"}
+			if item.DeferObjectDeletion {
+				limitations = append(limitations, "external_object_deletion_pending")
+			}
+			event := model.RetentionEvent{Scope: item.Scope, Kind: "dispose_evidence", TargetID: item.EvidenceID, Disposal: &item, AdditionalAuthorization: []model.AuthorizationDecision{d}, Limitations: limitations}
 			if err = appendChild(event, "", "", "", 0); err != nil {
 				return err
 			}

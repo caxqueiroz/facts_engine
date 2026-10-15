@@ -68,7 +68,7 @@ func (t *transaction) DisposeOrphanEvidence(ctx context.Context, r model.OrphanE
 	if !mature {
 		return model.ErrPrecondition
 	}
-	return t.disposeEvidenceObject(ctx, model.Evidence{Object: r.Object})
+	return t.disposeEvidenceObject(ctx, model.Evidence{Object: r.Object}, false)
 }
 
 var _ model.OrphanEvidenceDisposalTx = (*transaction)(nil)

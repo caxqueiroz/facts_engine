@@ -15,10 +15,35 @@ import (
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
 	"github.com/caxqueiroz/facts_engine/model"
+	"github.com/caxqueiroz/facts_engine/workers"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type testExternalEvidenceStore struct {
+	objects map[string][]byte
+	deleted map[string]bool
+}
+
+func externalEvidenceKey(ref model.ObjectRef) string { return ref.Locator + "\x00" + ref.Version }
+func (s *testExternalEvidenceStore) Read(_ context.Context, _ string, ref model.ObjectRef) ([]byte, error) {
+	key := externalEvidenceKey(ref)
+	if s.deleted[key] {
+		return nil, model.ErrPrecondition
+	}
+	body, ok := s.objects[key]
+	if !ok {
+		return nil, model.ErrPrecondition
+	}
+	return append([]byte(nil), body...), nil
+}
+func (s *testExternalEvidenceStore) DeleteEvidenceVersion(_ context.Context, _ string, ref model.ObjectRef) error {
+	key := externalEvidenceKey(ref)
+	delete(s.objects, key)
+	s.deleted[key] = true
+	return nil
+}
 
 func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine, store *evidence.Postgres, admin, runtime *pgxpool.Pool) {
 	cfg := admin.Config().Copy()
@@ -247,7 +272,12 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	if _, err = store.Read(ctx, c.Tenant, sourceRef); err != nil {
 		t.Fatal("blocked evidence batch deleted source bytes", err)
 	}
-	disposedFact, err := engine.DisposeBatch(ctx, c, batchRequest)
+	externalEvidence := &testExternalEvidenceStore{objects: map[string][]byte{externalEvidenceKey(sourceRef): []byte(secret)}, deleted: map[string]bool{}}
+	externalEngine, err := facts.NewWithAudit(ledger, allow{}, externalEvidence, model.AuditOptions{Signer: signer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disposedFact, err := externalEngine.DisposeBatch(ctx, c, batchRequest)
 	var finalStreamRevision int64
 	if err == nil {
 		err = admin.QueryRow(ctx, `SELECT stream_revision FROM records WHERE tenant_id=$1 AND id=$2`, c.Tenant, fact.RecordID).Scan(&finalStreamRevision)
@@ -255,10 +285,36 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	if err != nil || finalStreamRevision != accepted.StreamRevision+2 {
 		t.Fatal(disposedFact, err)
 	}
-	if _, err = store.Read(ctx, c.Tenant, sourceRef); !errors.Is(err, model.ErrPrecondition) {
-		t.Fatal("coordinated batch retained source bytes", err)
+	if body, readErr := externalEvidence.Read(ctx, c.Tenant, sourceRef); readErr != nil || string(body) != secret {
+		t.Fatal("external object was deleted before committed outbox work", string(body), readErr)
 	}
-	testDisposalBatchRemote(t, ctx, engine, c, batchRequest, disposedFact)
+	if _, err = externalEngine.GetEvidenceContent(ctx, c, model.EvidenceQuery{ID: "a-source", Scope: "a", Purpose: "retention"}); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("committed logical tombstone did not block external evidence reads", err)
+	}
+	changes, err := externalEngine.ListChanges(ctx, c, model.ChangesQuery{Scope: "a", Purpose: "retention", AfterRevision: accepted.LedgerRevision, Limit: 16})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var disposalEvent *model.Event
+	for i := range changes.Events {
+		if changes.Events[i].Type == "dispose_evidence" {
+			disposalEvent = &changes.Events[i]
+		}
+	}
+	if disposalEvent == nil {
+		t.Fatal("evidence disposal outbox event missing")
+	}
+	handler, err := workers.NewEvidenceDisposalHandler(ledger, externalEvidence, c.Tenant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = handler.Handle(ctx, model.Delivery{Key: model.ConsumerKey{Tenant: c.Tenant, Consumer: model.EvidenceDisposalConsumer()}, Event: *disposalEvent}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = externalEvidence.Read(ctx, c.Tenant, sourceRef); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("external object survived post-commit disposal worker", err)
+	}
+	testDisposalBatchRemote(t, ctx, externalEngine, c, batchRequest, disposedFact)
 	replayArchives()
 	for _, r := range []model.VersionDisposalRequest{f, m} {
 		s, err := ledger.ProjectionCleanupStatus(ctx, model.ProjectionCleanupKey{Tenant: c.Tenant, Kind: r.Kind, VersionID: r.VersionID})

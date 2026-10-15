@@ -33,3 +33,7 @@ type ArchiveBatch struct {
 }
 
 func ArchiveConsumer(stream string) string { return "archive-" + Digest(stream) }
+
+// EvidenceDisposalConsumer identifies the trusted consumer that performs
+// post-commit deletion from external immutable evidence stores.
+func EvidenceDisposalConsumer() string { return "evidence-disposal" }

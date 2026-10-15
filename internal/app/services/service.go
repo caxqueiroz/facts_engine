@@ -209,6 +209,9 @@ func (s *Service) verifyEvidenceIntegrity(ctx context.Context, tenant string, e 
 	if err := ctx.Err(); err != nil {
 		return nil, false, err
 	}
+	if err := s.ensureEvidenceAvailable(ctx, tenant, e); err != nil {
+		return nil, false, err
+	}
 	b, err := s.evidence.Read(ctx, tenant, e.Object)
 	if interrupted := evidenceDependencyFailure(ctx, err); interrupted != nil {
 		return nil, false, interrupted
@@ -220,6 +223,32 @@ func (s *Service) verifyEvidenceIntegrity(ctx context.Context, tenant string, e 
 		return nil, true, model.ErrPrecondition
 	}
 	return b, false, nil
+}
+
+func (s *Service) ensureEvidenceAvailable(ctx context.Context, tenant string, e model.Evidence) error {
+	if e.ID == "" || s.ledger == nil {
+		return nil
+	}
+	if _, externalDisposal := s.evidence.(model.EvidenceVersionDeleter); !externalDisposal {
+		return nil
+	}
+	return s.ledger.Transact(ctx, tenant, func(tx model.Tx) error {
+		retention, ok := tx.(model.RetentionTx)
+		if !ok {
+			return nil
+		}
+		status, err := retention.RetentionStatus(ctx, e.Scope, e.ID)
+		if errors.Is(err, model.ErrNotFound) {
+			return nil // A just-registered candidate has not reached the ledger yet.
+		}
+		if err != nil {
+			return err
+		}
+		if status.Disposed {
+			return model.ErrPrecondition
+		}
+		return nil
+	})
 }
 func (s *Service) RegisterEvidence(ctx context.Context, c model.Caller, r model.EvidenceRequest) (model.CommitResult, error) {
 	e := r.Evidence
