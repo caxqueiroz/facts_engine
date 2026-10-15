@@ -116,13 +116,13 @@ func (s *Service) RunExtraction(ctx context.Context, c model.Caller, r model.Ext
 		if err != nil && !inputLimit {
 			return model.JobStatus{}, err
 		}
-		input = model.ExtractionInput{Schema: "memory-refresh-request-v1", Tenant: c.Tenant, JobID: job.ID, AttemptID: attempt.ID, Profile: job.Profile, Refresh: refresh, RedactionVersion: "original-utf8-v1"}
+		input = model.ExtractionInput{Schema: "memory-refresh-request-v1", Tenant: c.Tenant, JobID: job.ID, AttemptID: attempt.ID, Profile: job.Profile, Refresh: refresh, RedactionVersion: "original-utf8-v1", PayloadRanges: job.Request.PayloadRanges}
 	} else {
 		conversation, err := s.GetConversation(ctx, c, model.ConversationQuery{ID: job.Request.ConversationID, Scope: r.Scope, Purpose: r.Purpose})
 		if err != nil {
 			return model.JobStatus{}, err
 		}
-		input = model.ExtractionInput{Schema: "facts-extraction-input-v1", Tenant: c.Tenant, JobID: job.ID, AttemptID: attempt.ID, ConversationID: conversation.ID, ConversationDigest: conversation.Digest, Timezone: conversation.Request.Timezone, Profile: job.Profile, Subjects: job.Request.Subjects, Predicates: job.Predicates, Messages: []model.ExtractionInputMessage{}, OmittedRanges: []string{}, RedactionVersion: "original-utf8-v1"}
+		input = model.ExtractionInput{Schema: "facts-extraction-input-v1", Tenant: c.Tenant, JobID: job.ID, AttemptID: attempt.ID, ConversationID: conversation.ID, ConversationDigest: conversation.Digest, Timezone: conversation.Request.Timezone, Profile: job.Profile, Subjects: job.Request.Subjects, Predicates: job.Predicates, Messages: []model.ExtractionInputMessage{}, OmittedRanges: []string{}, RedactionVersion: "original-utf8-v1", PayloadRanges: job.Request.PayloadRanges}
 		if len(job.Request.MemoryTargets) > 0 {
 			input.Schema = "memory-extraction-input-v1"
 			input.MemoryTargets = job.Request.MemoryTargets

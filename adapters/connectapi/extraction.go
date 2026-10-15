@@ -37,12 +37,26 @@ func inputRangesToProto(ranges []model.ExtractionInputRange) []*v1.ExtractionInp
 	}
 	return out
 }
+func payloadRangesFromProto(ranges []*v1.ExtractionPayloadRange) ([]model.ExtractionPayloadRange, error) {
+	var out []model.ExtractionPayloadRange
+	for _, r := range ranges {
+		if r.Start > int64(int(^uint(0)>>1)) || r.End > int64(int(^uint(0)>>1)) {
+			return nil, model.ErrInvalid
+		}
+		out = append(out, model.ExtractionPayloadRange{Path: r.Path, Start: int(r.Start), End: int(r.End)})
+	}
+	return out, nil
+}
 func (s *extractionService) StartExtraction(ctx context.Context, r *v1.StartExtractionRequest) (*v1.StartExtractionResponse, error) {
 	ranges, err := inputRangesFromProto(r.InputRanges)
 	if err != nil {
 		return nil, err
 	}
-	q := model.ExtractionRequest{Command: command(r.Command), Scope: r.Scope, ConversationID: r.ConversationId, ProfileID: r.ProfileId, ExpectedProfileDigest: r.ExpectedProfileDigest, Subjects: r.Subjects, InputRanges: ranges, RedactedEvidenceIDs: r.RedactedEvidenceIds}
+	payloadRanges, err := payloadRangesFromProto(r.PayloadRanges)
+	if err != nil {
+		return nil, err
+	}
+	q := model.ExtractionRequest{Command: command(r.Command), Scope: r.Scope, ConversationID: r.ConversationId, ProfileID: r.ProfileId, ExpectedProfileDigest: r.ExpectedProfileDigest, Subjects: r.Subjects, InputRanges: ranges, PayloadRanges: payloadRanges, RedactedEvidenceIDs: r.RedactedEvidenceIds}
 	for _, p := range r.Predicates {
 		q.Predicates = append(q.Predicates, model.PredicateBinding{Predicate: p.Predicate, SchemaVersion: p.SchemaVersion})
 	}
@@ -96,7 +110,11 @@ func (s *extractionService) RetryJob(ctx context.Context, r *v1.RetryJobRequest)
 	return response, c.err
 }
 func (s *extractionService) StartMemoryRefresh(ctx context.Context, r *v1.StartMemoryRefreshRequest) (*v1.StartMemoryRefreshResponse, error) {
-	q := model.MemoryRefreshRequest{Command: command(r.Command), Scope: r.Scope, RecordID: r.RecordId, VersionID: r.VersionId, ProfileID: r.ProfileId}
+	payloadRanges, err := payloadRangesFromProto(r.PayloadRanges)
+	if err != nil {
+		return nil, err
+	}
+	q := model.MemoryRefreshRequest{Command: command(r.Command), Scope: r.Scope, RecordID: r.RecordId, VersionID: r.VersionId, ProfileID: r.ProfileId, PayloadRanges: payloadRanges}
 	if r.Trigger != nil {
 		q.Trigger = &model.MemoryRefreshTrigger{EventID: r.Trigger.EventId, LedgerRevision: r.Trigger.LedgerRevision}
 	}

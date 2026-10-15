@@ -21,10 +21,13 @@ type ExtractionResponse struct {
 // ExtractionPayloadRedaction applies field-omit-v1 to provider input only.
 // The policy and selected fields are included in the approved profile digest.
 type ExtractionPayloadRedaction struct {
-	PolicyVersion         string
-	DependencyPayloads    bool
-	OriginalMemoryPayload bool
-	RefreshEvidence       bool
+	PolicyVersion               string
+	DependencyPayloads          bool
+	OriginalMemoryPayload       bool
+	RefreshEvidence             bool
+	DependencyPayloadRanges     bool `json:",omitempty"`
+	OriginalMemoryPayloadRanges bool `json:",omitempty"`
+	RefreshEvidenceRanges       bool `json:",omitempty"`
 }
 type ExtractionProfile struct {
 	PayloadRedaction *ExtractionPayloadRedaction `json:",omitempty"`
@@ -58,9 +61,10 @@ type ExtractionOptions struct {
 }
 type PredicateBinding struct{ Predicate, SchemaVersion string }
 type ExtractionRequest struct {
-	RedactedEvidenceIDs   []string               `json:",omitempty"`
-	ExpectedProfileDigest string                 `json:",omitempty"`
-	InputRanges           []ExtractionInputRange `json:",omitempty"`
+	RedactedEvidenceIDs   []string                 `json:",omitempty"`
+	ExpectedProfileDigest string                   `json:",omitempty"`
+	InputRanges           []ExtractionInputRange   `json:",omitempty"`
+	PayloadRanges         []ExtractionPayloadRange `json:",omitempty"`
 	Command
 	Scope, ConversationID, ProfileID string
 	Subjects                         []string
@@ -112,6 +116,13 @@ type ExtractionInputRange struct {
 	Start, End int
 }
 
+// ExtractionPayloadRange selects a half-open UTF-8 byte range in a specific
+// provider-input string, addressed by its canonical JSON pointer.
+type ExtractionPayloadRange struct {
+	Path       string
+	Start, End int
+}
+
 type ExtractionInputMessage struct {
 	DerivativeEvidenceID, DerivativeDigest        string `json:",omitempty"`
 	DerivativeStart                               int    `json:",omitempty"`
@@ -121,8 +132,9 @@ type ExtractionInputMessage struct {
 	Content                                       string
 }
 type ExtractionInput struct {
-	PayloadRedactionVersion string   `json:",omitempty"`
-	PayloadOmittedPaths     []string `json:",omitempty"`
+	PayloadRedactionVersion string                   `json:",omitempty"`
+	PayloadOmittedPaths     []string                 `json:",omitempty"`
+	PayloadRanges           []ExtractionPayloadRange `json:",omitempty"`
 
 	InputSelectionVersion                                                          string                 `json:",omitempty"`
 	ExcludedRanges                                                                 []ExtractionInputRange `json:",omitempty"`
@@ -224,7 +236,8 @@ func ExtractionConsumer(stream string) string { return "extraction-" + Digest(st
 // MemoryRefreshRequest binds an asynchronous replacement proposal to an exact
 // accepted memory version. The job never accepts or supersedes it automatically.
 type MemoryRefreshRequest struct {
-	Trigger *MemoryRefreshTrigger `json:",omitempty"`
+	Trigger       *MemoryRefreshTrigger    `json:",omitempty"`
+	PayloadRanges []ExtractionPayloadRange `json:",omitempty"`
 	Command
 	Scope, RecordID, VersionID, ProfileID string
 }

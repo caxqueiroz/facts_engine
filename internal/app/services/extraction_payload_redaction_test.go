@@ -57,6 +57,53 @@ func TestPayloadOmissionPreservesCanonicalInput(t *testing.T) {
 		t.Fatal("unconfigured input encoding changed")
 	}
 }
+
+func TestPayloadRangeRedactionUsesApprovedUTF8Pointers(t *testing.T) {
+	text := "salary: €100"
+	quote := "source says €100"
+	input := model.ExtractionInput{
+		Schema:  "memory-refresh-request-v1",
+		Profile: model.ExtractionProfile{PayloadRedaction: &model.ExtractionPayloadRedaction{PolicyVersion: "policy", DependencyPayloadRanges: true, OriginalMemoryPayloadRanges: true, RefreshEvidenceRanges: true}},
+		PayloadRanges: []model.ExtractionPayloadRange{
+			{Path: "/Refresh/Dependencies/0/Versions/0/Proposal/Value/Text", Start: 8, End: 14},
+			{Path: "/Refresh/Original/Proposal/Body", Start: 8, End: 14},
+			{Path: "/Refresh/Evidence/0/Content", Start: 12, End: 18},
+		},
+		Refresh: &model.MemoryRefreshInput{
+			Original:     model.MemoryVersion{ID: "memory", Proposal: model.MemoryProposal{Body: text}},
+			Dependencies: []model.MemoryRefreshDependency{{Versions: []model.Version{{Proposal: model.FactProposal{Value: model.Value{Kind: model.Text, Text: &text}, Sources: []model.SourceSpan{{Quote: quote}}}}}}},
+			Evidence:     []model.ExtractionInputMessage{{Content: quote}},
+		},
+	}
+	raw, err := marshalExtractionInput(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire model.ExtractionInput
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if wire.PayloadRedactionVersion != "field-range-omit-v1" || len(wire.PayloadOmittedPaths) != 3 {
+		t.Fatalf("missing range provenance: %+v", wire)
+	}
+	if wire.Refresh.Original.Proposal.Body != "salary: [REDACTED]" || *wire.Refresh.Dependencies[0].Versions[0].Proposal.Value.Text != "salary: [REDACTED]" || wire.Refresh.Evidence[0].Content != "source says [REDACTED]" {
+		t.Fatalf("ranges not applied: %+v", wire.Refresh)
+	}
+	if *input.Refresh.Dependencies[0].Versions[0].Proposal.Value.Text != "salary: €100" {
+		t.Fatal("canonical extraction input was mutated")
+	}
+	for _, invalid := range []model.ExtractionPayloadRange{
+		{Path: "/Refresh/Original/Proposal/Body", Start: 9, End: 11}, // splits a UTF-8 character
+		{Path: "/Refresh/Original/ID", Start: 0, End: 1},
+		{Path: "/Refresh/Evidence/0/Content", Start: 100, End: 101},
+		{Path: "Refresh/Original/Proposal/Body", Start: 0, End: 1},
+	} {
+		input.PayloadRanges = []model.ExtractionPayloadRange{invalid}
+		if _, err := marshalExtractionInput(input); err == nil {
+			t.Fatalf("invalid or unapproved range accepted: %+v", invalid)
+		}
+	}
+}
 func TestPayloadRedactionProfileApprovalAndPinning(t *testing.T) {
 	prompt := []byte("refresh")
 	policy := &model.ExtractionPayloadRedaction{PolicyVersion: "policy", DependencyPayloads: true}

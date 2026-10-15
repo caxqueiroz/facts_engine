@@ -23,6 +23,9 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 	if !ok || approved.Profile.ParserVersion != "memory-refresh-json-v1" {
 		return model.JobStatus{}, model.ErrPrecondition
 	}
+	if len(r.PayloadRanges) > 0 && validatePayloadRanges(r.PayloadRanges, approved.Profile.PayloadRedaction) != nil {
+		return model.JobStatus{}, model.ErrInvalid
+	}
 	original, err := s.GetMemoryVersion(ctx, c, model.MemoryVersionQuery{Scope: r.Scope, RecordID: r.RecordID, VersionID: r.VersionID, Purpose: r.Purpose})
 	if err != nil {
 		return model.JobStatus{}, err
@@ -57,7 +60,7 @@ func (s *Service) StartMemoryRefresh(ctx context.Context, c model.Caller, r mode
 	}
 	slices.Sort(scopes)
 	scopes = slices.Compact(scopes)
-	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: model.ExtractionRequest{Command: r.Command, Scope: r.Scope, ProfileID: r.ProfileID, RefreshTrigger: r.Trigger, Refresh: &model.VersionReference{RecordID: r.RecordID, VersionID: r.VersionID}}, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), RefreshScopes: scopes}
+	job := model.ExtractionJob{ID: id(), Tenant: c.Tenant, Caller: c, Request: model.ExtractionRequest{Command: r.Command, Scope: r.Scope, ProfileID: r.ProfileID, RefreshTrigger: r.Trigger, Refresh: &model.VersionReference{RecordID: r.RecordID, VersionID: r.VersionID}, PayloadRanges: r.PayloadRanges}, Profile: approved.Profile, ProfileDigest: model.ExtractionProfileDigest(approved.Profile), RefreshScopes: scopes}
 	job.Authorization, err = s.extractionAuthorizations(ctx, c, job)
 	if err != nil {
 		return model.JobStatus{}, err

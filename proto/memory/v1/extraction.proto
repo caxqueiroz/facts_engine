@@ -28,6 +28,19 @@ message ExtractionInputRange {
   int64 start = 2 [(buf.validate.field).int64.gte = 0];
   int64 end = 3 [(buf.validate.field).int64.gt = 0];
 }
+message ExtractionPayloadRange {
+  option (buf.validate.message).cel = {
+    id: "extraction_payload_range.order"
+    message: "end must exceed start"
+    expression: "this.end > this.start"
+  };
+  string path = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 512
+  }];
+  int64 start = 2 [(buf.validate.field).int64.gte = 0];
+  int64 end = 3 [(buf.validate.field).int64.gt = 0];
+}
 message PredicateBinding {
   string predicate = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   string schema_version = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
@@ -67,6 +80,7 @@ message StartExtractionRequest {
     }
   }];
   string expected_profile_digest = 11 [(buf.validate.field).string.pattern = "^([a-f0-9]{64})?$"];
+  repeated ExtractionPayloadRange payload_ranges = 12 [(buf.validate.field).repeated.max_items = 256];
 }
 message StartExtractionResponse {
   JobStatus job = 1;
@@ -152,6 +166,7 @@ message StartMemoryRefreshRequest {
   string version_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   string profile_id = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
   MemoryRefreshTrigger trigger = 7;
+  repeated ExtractionPayloadRange payload_ranges = 8 [(buf.validate.field).repeated.max_items = 256];
 }
 message MemoryRefreshTrigger {
   string event_id = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];

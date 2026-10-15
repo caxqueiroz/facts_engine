@@ -83,6 +83,66 @@ func (x *ExtractionInputRange) GetEnd() int64 {
 	return 0
 }
 
+type ExtractionPayloadRange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Start         int64                  `protobuf:"varint,2,opt,name=start,proto3" json:"start,omitempty"`
+	End           int64                  `protobuf:"varint,3,opt,name=end,proto3" json:"end,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExtractionPayloadRange) Reset() {
+	*x = ExtractionPayloadRange{}
+	mi := &file_memory_v1_extraction_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExtractionPayloadRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExtractionPayloadRange) ProtoMessage() {}
+
+func (x *ExtractionPayloadRange) ProtoReflect() protoreflect.Message {
+	mi := &file_memory_v1_extraction_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExtractionPayloadRange.ProtoReflect.Descriptor instead.
+func (*ExtractionPayloadRange) Descriptor() ([]byte, []int) {
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ExtractionPayloadRange) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ExtractionPayloadRange) GetStart() int64 {
+	if x != nil {
+		return x.Start
+	}
+	return 0
+}
+
+func (x *ExtractionPayloadRange) GetEnd() int64 {
+	if x != nil {
+		return x.End
+	}
+	return 0
+}
+
 type PredicateBinding struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Predicate     string                 `protobuf:"bytes,1,opt,name=predicate,proto3" json:"predicate,omitempty"`
@@ -93,7 +153,7 @@ type PredicateBinding struct {
 
 func (x *PredicateBinding) Reset() {
 	*x = PredicateBinding{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[1]
+	mi := &file_memory_v1_extraction_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -105,7 +165,7 @@ func (x *PredicateBinding) String() string {
 func (*PredicateBinding) ProtoMessage() {}
 
 func (x *PredicateBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[1]
+	mi := &file_memory_v1_extraction_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,7 +178,7 @@ func (x *PredicateBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PredicateBinding.ProtoReflect.Descriptor instead.
 func (*PredicateBinding) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{1}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PredicateBinding) GetPredicate() string {
@@ -147,7 +207,7 @@ type MemoryExtractionTarget struct {
 
 func (x *MemoryExtractionTarget) Reset() {
 	*x = MemoryExtractionTarget{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[2]
+	mi := &file_memory_v1_extraction_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -159,7 +219,7 @@ func (x *MemoryExtractionTarget) String() string {
 func (*MemoryExtractionTarget) ProtoMessage() {}
 
 func (x *MemoryExtractionTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[2]
+	mi := &file_memory_v1_extraction_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -172,7 +232,7 @@ func (x *MemoryExtractionTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryExtractionTarget.ProtoReflect.Descriptor instead.
 func (*MemoryExtractionTarget) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{2}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *MemoryExtractionTarget) GetId() string {
@@ -216,13 +276,14 @@ type StartExtractionRequest struct {
 	InputRanges           []*ExtractionInputRange   `protobuf:"bytes,9,rep,name=input_ranges,json=inputRanges,proto3" json:"input_ranges,omitempty"`
 	RedactedEvidenceIds   []string                  `protobuf:"bytes,10,rep,name=redacted_evidence_ids,json=redactedEvidenceIds,proto3" json:"redacted_evidence_ids,omitempty"`
 	ExpectedProfileDigest string                    `protobuf:"bytes,11,opt,name=expected_profile_digest,json=expectedProfileDigest,proto3" json:"expected_profile_digest,omitempty"`
+	PayloadRanges         []*ExtractionPayloadRange `protobuf:"bytes,12,rep,name=payload_ranges,json=payloadRanges,proto3" json:"payload_ranges,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *StartExtractionRequest) Reset() {
 	*x = StartExtractionRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[3]
+	mi := &file_memory_v1_extraction_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -234,7 +295,7 @@ func (x *StartExtractionRequest) String() string {
 func (*StartExtractionRequest) ProtoMessage() {}
 
 func (x *StartExtractionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[3]
+	mi := &file_memory_v1_extraction_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -247,7 +308,7 @@ func (x *StartExtractionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartExtractionRequest.ProtoReflect.Descriptor instead.
 func (*StartExtractionRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{3}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StartExtractionRequest) GetTenant() string {
@@ -327,6 +388,13 @@ func (x *StartExtractionRequest) GetExpectedProfileDigest() string {
 	return ""
 }
 
+func (x *StartExtractionRequest) GetPayloadRanges() []*ExtractionPayloadRange {
+	if x != nil {
+		return x.PayloadRanges
+	}
+	return nil
+}
+
 type StartExtractionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Job           *JobStatus             `protobuf:"bytes,1,opt,name=job,proto3" json:"job,omitempty"`
@@ -336,7 +404,7 @@ type StartExtractionResponse struct {
 
 func (x *StartExtractionResponse) Reset() {
 	*x = StartExtractionResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[4]
+	mi := &file_memory_v1_extraction_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +416,7 @@ func (x *StartExtractionResponse) String() string {
 func (*StartExtractionResponse) ProtoMessage() {}
 
 func (x *StartExtractionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[4]
+	mi := &file_memory_v1_extraction_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +429,7 @@ func (x *StartExtractionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartExtractionResponse.ProtoReflect.Descriptor instead.
 func (*StartExtractionResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{4}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StartExtractionResponse) GetJob() *JobStatus {
@@ -387,7 +455,7 @@ type PlanExtractionChunksRequest struct {
 
 func (x *PlanExtractionChunksRequest) Reset() {
 	*x = PlanExtractionChunksRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[5]
+	mi := &file_memory_v1_extraction_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +467,7 @@ func (x *PlanExtractionChunksRequest) String() string {
 func (*PlanExtractionChunksRequest) ProtoMessage() {}
 
 func (x *PlanExtractionChunksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[5]
+	mi := &file_memory_v1_extraction_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +480,7 @@ func (x *PlanExtractionChunksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanExtractionChunksRequest.ProtoReflect.Descriptor instead.
 func (*PlanExtractionChunksRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{5}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PlanExtractionChunksRequest) GetTenant() string {
@@ -480,7 +548,7 @@ type PlanExtractionChunksResponse struct {
 
 func (x *PlanExtractionChunksResponse) Reset() {
 	*x = PlanExtractionChunksResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[6]
+	mi := &file_memory_v1_extraction_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +560,7 @@ func (x *PlanExtractionChunksResponse) String() string {
 func (*PlanExtractionChunksResponse) ProtoMessage() {}
 
 func (x *PlanExtractionChunksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[6]
+	mi := &file_memory_v1_extraction_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +573,7 @@ func (x *PlanExtractionChunksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanExtractionChunksResponse.ProtoReflect.Descriptor instead.
 func (*PlanExtractionChunksResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{6}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PlanExtractionChunksResponse) GetPlan() *ExtractionChunkPlan {
@@ -534,7 +602,7 @@ type ExtractionChunkPlan struct {
 
 func (x *ExtractionChunkPlan) Reset() {
 	*x = ExtractionChunkPlan{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[7]
+	mi := &file_memory_v1_extraction_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +614,7 @@ func (x *ExtractionChunkPlan) String() string {
 func (*ExtractionChunkPlan) ProtoMessage() {}
 
 func (x *ExtractionChunkPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[7]
+	mi := &file_memory_v1_extraction_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -559,7 +627,7 @@ func (x *ExtractionChunkPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionChunkPlan.ProtoReflect.Descriptor instead.
 func (*ExtractionChunkPlan) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{7}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ExtractionChunkPlan) GetVersion() string {
@@ -649,7 +717,7 @@ type ExtractionChunk struct {
 
 func (x *ExtractionChunk) Reset() {
 	*x = ExtractionChunk{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[8]
+	mi := &file_memory_v1_extraction_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -661,7 +729,7 @@ func (x *ExtractionChunk) String() string {
 func (*ExtractionChunk) ProtoMessage() {}
 
 func (x *ExtractionChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[8]
+	mi := &file_memory_v1_extraction_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -674,7 +742,7 @@ func (x *ExtractionChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionChunk.ProtoReflect.Descriptor instead.
 func (*ExtractionChunk) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{8}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ExtractionChunk) GetInputRanges() []*ExtractionInputRange {
@@ -703,7 +771,7 @@ type GetJobRequest struct {
 
 func (x *GetJobRequest) Reset() {
 	*x = GetJobRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[9]
+	mi := &file_memory_v1_extraction_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -715,7 +783,7 @@ func (x *GetJobRequest) String() string {
 func (*GetJobRequest) ProtoMessage() {}
 
 func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[9]
+	mi := &file_memory_v1_extraction_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -728,7 +796,7 @@ func (x *GetJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobRequest.ProtoReflect.Descriptor instead.
 func (*GetJobRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{9}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetJobRequest) GetTenant() string {
@@ -771,7 +839,7 @@ type GetExtractionRunRequest struct {
 
 func (x *GetExtractionRunRequest) Reset() {
 	*x = GetExtractionRunRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[10]
+	mi := &file_memory_v1_extraction_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +851,7 @@ func (x *GetExtractionRunRequest) String() string {
 func (*GetExtractionRunRequest) ProtoMessage() {}
 
 func (x *GetExtractionRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[10]
+	mi := &file_memory_v1_extraction_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +864,7 @@ func (x *GetExtractionRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExtractionRunRequest.ProtoReflect.Descriptor instead.
 func (*GetExtractionRunRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{10}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetExtractionRunRequest) GetTenant() string {
@@ -836,7 +904,7 @@ type GetJobResponse struct {
 
 func (x *GetJobResponse) Reset() {
 	*x = GetJobResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[11]
+	mi := &file_memory_v1_extraction_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +916,7 @@ func (x *GetJobResponse) String() string {
 func (*GetJobResponse) ProtoMessage() {}
 
 func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[11]
+	mi := &file_memory_v1_extraction_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +929,7 @@ func (x *GetJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJobResponse.ProtoReflect.Descriptor instead.
 func (*GetJobResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{11}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetJobResponse) GetJob() *JobStatus {
@@ -880,7 +948,7 @@ type GetExtractionRunResponse struct {
 
 func (x *GetExtractionRunResponse) Reset() {
 	*x = GetExtractionRunResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[12]
+	mi := &file_memory_v1_extraction_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +960,7 @@ func (x *GetExtractionRunResponse) String() string {
 func (*GetExtractionRunResponse) ProtoMessage() {}
 
 func (x *GetExtractionRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[12]
+	mi := &file_memory_v1_extraction_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +973,7 @@ func (x *GetExtractionRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExtractionRunResponse.ProtoReflect.Descriptor instead.
 func (*GetExtractionRunResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{12}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetExtractionRunResponse) GetRun() *ExtractionRun {
@@ -928,7 +996,7 @@ type RetryJobRequest struct {
 
 func (x *RetryJobRequest) Reset() {
 	*x = RetryJobRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[13]
+	mi := &file_memory_v1_extraction_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -940,7 +1008,7 @@ func (x *RetryJobRequest) String() string {
 func (*RetryJobRequest) ProtoMessage() {}
 
 func (x *RetryJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[13]
+	mi := &file_memory_v1_extraction_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -953,7 +1021,7 @@ func (x *RetryJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryJobRequest.ProtoReflect.Descriptor instead.
 func (*RetryJobRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{13}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RetryJobRequest) GetTenant() string {
@@ -1000,7 +1068,7 @@ type RetryJobResponse struct {
 
 func (x *RetryJobResponse) Reset() {
 	*x = RetryJobResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[14]
+	mi := &file_memory_v1_extraction_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1080,7 @@ func (x *RetryJobResponse) String() string {
 func (*RetryJobResponse) ProtoMessage() {}
 
 func (x *RetryJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[14]
+	mi := &file_memory_v1_extraction_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1025,7 +1093,7 @@ func (x *RetryJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryJobResponse.ProtoReflect.Descriptor instead.
 func (*RetryJobResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{14}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RetryJobResponse) GetJob() *JobStatus {
@@ -1036,21 +1104,22 @@ func (x *RetryJobResponse) GetJob() *JobStatus {
 }
 
 type StartMemoryRefreshRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tenant        string                 `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
-	Command       *Command               `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
-	Scope         string                 `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
-	RecordId      string                 `protobuf:"bytes,4,opt,name=record_id,json=recordId,proto3" json:"record_id,omitempty"`
-	VersionId     string                 `protobuf:"bytes,5,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
-	ProfileId     string                 `protobuf:"bytes,6,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
-	Trigger       *MemoryRefreshTrigger  `protobuf:"bytes,7,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Tenant        string                    `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Command       *Command                  `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Scope         string                    `protobuf:"bytes,3,opt,name=scope,proto3" json:"scope,omitempty"`
+	RecordId      string                    `protobuf:"bytes,4,opt,name=record_id,json=recordId,proto3" json:"record_id,omitempty"`
+	VersionId     string                    `protobuf:"bytes,5,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	ProfileId     string                    `protobuf:"bytes,6,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	Trigger       *MemoryRefreshTrigger     `protobuf:"bytes,7,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	PayloadRanges []*ExtractionPayloadRange `protobuf:"bytes,8,rep,name=payload_ranges,json=payloadRanges,proto3" json:"payload_ranges,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartMemoryRefreshRequest) Reset() {
 	*x = StartMemoryRefreshRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[15]
+	mi := &file_memory_v1_extraction_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1131,7 @@ func (x *StartMemoryRefreshRequest) String() string {
 func (*StartMemoryRefreshRequest) ProtoMessage() {}
 
 func (x *StartMemoryRefreshRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[15]
+	mi := &file_memory_v1_extraction_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1144,7 @@ func (x *StartMemoryRefreshRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartMemoryRefreshRequest.ProtoReflect.Descriptor instead.
 func (*StartMemoryRefreshRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{15}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartMemoryRefreshRequest) GetTenant() string {
@@ -1127,6 +1196,13 @@ func (x *StartMemoryRefreshRequest) GetTrigger() *MemoryRefreshTrigger {
 	return nil
 }
 
+func (x *StartMemoryRefreshRequest) GetPayloadRanges() []*ExtractionPayloadRange {
+	if x != nil {
+		return x.PayloadRanges
+	}
+	return nil
+}
+
 type MemoryRefreshTrigger struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	EventId        string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
@@ -1137,7 +1213,7 @@ type MemoryRefreshTrigger struct {
 
 func (x *MemoryRefreshTrigger) Reset() {
 	*x = MemoryRefreshTrigger{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[16]
+	mi := &file_memory_v1_extraction_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1149,7 +1225,7 @@ func (x *MemoryRefreshTrigger) String() string {
 func (*MemoryRefreshTrigger) ProtoMessage() {}
 
 func (x *MemoryRefreshTrigger) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[16]
+	mi := &file_memory_v1_extraction_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1162,7 +1238,7 @@ func (x *MemoryRefreshTrigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryRefreshTrigger.ProtoReflect.Descriptor instead.
 func (*MemoryRefreshTrigger) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{16}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MemoryRefreshTrigger) GetEventId() string {
@@ -1188,7 +1264,7 @@ type StartMemoryRefreshResponse struct {
 
 func (x *StartMemoryRefreshResponse) Reset() {
 	*x = StartMemoryRefreshResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[17]
+	mi := &file_memory_v1_extraction_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1276,7 @@ func (x *StartMemoryRefreshResponse) String() string {
 func (*StartMemoryRefreshResponse) ProtoMessage() {}
 
 func (x *StartMemoryRefreshResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[17]
+	mi := &file_memory_v1_extraction_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1289,7 @@ func (x *StartMemoryRefreshResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartMemoryRefreshResponse.ProtoReflect.Descriptor instead.
 func (*StartMemoryRefreshResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{17}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartMemoryRefreshResponse) GetJob() *JobStatus {
@@ -1244,7 +1320,7 @@ type JobStatus struct {
 
 func (x *JobStatus) Reset() {
 	*x = JobStatus{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[18]
+	mi := &file_memory_v1_extraction_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1256,7 +1332,7 @@ func (x *JobStatus) String() string {
 func (*JobStatus) ProtoMessage() {}
 
 func (x *JobStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[18]
+	mi := &file_memory_v1_extraction_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1269,7 +1345,7 @@ func (x *JobStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobStatus.ProtoReflect.Descriptor instead.
 func (*JobStatus) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{18}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *JobStatus) GetId() string {
@@ -1373,7 +1449,7 @@ type ExtractionRun struct {
 
 func (x *ExtractionRun) Reset() {
 	*x = ExtractionRun{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[19]
+	mi := &file_memory_v1_extraction_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +1461,7 @@ func (x *ExtractionRun) String() string {
 func (*ExtractionRun) ProtoMessage() {}
 
 func (x *ExtractionRun) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[19]
+	mi := &file_memory_v1_extraction_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +1474,7 @@ func (x *ExtractionRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionRun.ProtoReflect.Descriptor instead.
 func (*ExtractionRun) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{19}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ExtractionRun) GetAttempt() *ExtractionAttempt {
@@ -1442,7 +1518,7 @@ type ExtractionAttempt struct {
 
 func (x *ExtractionAttempt) Reset() {
 	*x = ExtractionAttempt{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[20]
+	mi := &file_memory_v1_extraction_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1454,7 +1530,7 @@ func (x *ExtractionAttempt) String() string {
 func (*ExtractionAttempt) ProtoMessage() {}
 
 func (x *ExtractionAttempt) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[20]
+	mi := &file_memory_v1_extraction_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1467,7 +1543,7 @@ func (x *ExtractionAttempt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionAttempt.ProtoReflect.Descriptor instead.
 func (*ExtractionAttempt) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{20}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ExtractionAttempt) GetId() string {
@@ -1604,7 +1680,7 @@ type ExtractionReservation struct {
 
 func (x *ExtractionReservation) Reset() {
 	*x = ExtractionReservation{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[21]
+	mi := &file_memory_v1_extraction_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1616,7 +1692,7 @@ func (x *ExtractionReservation) String() string {
 func (*ExtractionReservation) ProtoMessage() {}
 
 func (x *ExtractionReservation) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[21]
+	mi := &file_memory_v1_extraction_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1629,7 +1705,7 @@ func (x *ExtractionReservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionReservation.ProtoReflect.Descriptor instead.
 func (*ExtractionReservation) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{21}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ExtractionReservation) GetDay() string {
@@ -1709,7 +1785,7 @@ type ExtractionResult struct {
 
 func (x *ExtractionResult) Reset() {
 	*x = ExtractionResult{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[22]
+	mi := &file_memory_v1_extraction_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1721,7 +1797,7 @@ func (x *ExtractionResult) String() string {
 func (*ExtractionResult) ProtoMessage() {}
 
 func (x *ExtractionResult) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[22]
+	mi := &file_memory_v1_extraction_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1734,7 +1810,7 @@ func (x *ExtractionResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionResult.ProtoReflect.Descriptor instead.
 func (*ExtractionResult) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{22}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ExtractionResult) GetAttemptId() string {
@@ -1887,7 +1963,7 @@ type ExtractionIssue struct {
 
 func (x *ExtractionIssue) Reset() {
 	*x = ExtractionIssue{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[23]
+	mi := &file_memory_v1_extraction_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1899,7 +1975,7 @@ func (x *ExtractionIssue) String() string {
 func (*ExtractionIssue) ProtoMessage() {}
 
 func (x *ExtractionIssue) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[23]
+	mi := &file_memory_v1_extraction_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1912,7 +1988,7 @@ func (x *ExtractionIssue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionIssue.ProtoReflect.Descriptor instead.
 func (*ExtractionIssue) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{23}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ExtractionIssue) GetCandidate() int64 {
@@ -1941,7 +2017,7 @@ type ExtractionRelation struct {
 
 func (x *ExtractionRelation) Reset() {
 	*x = ExtractionRelation{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[24]
+	mi := &file_memory_v1_extraction_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1953,7 +2029,7 @@ func (x *ExtractionRelation) String() string {
 func (*ExtractionRelation) ProtoMessage() {}
 
 func (x *ExtractionRelation) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[24]
+	mi := &file_memory_v1_extraction_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1966,7 +2042,7 @@ func (x *ExtractionRelation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractionRelation.ProtoReflect.Descriptor instead.
 func (*ExtractionRelation) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{24}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ExtractionRelation) GetCandidate() int64 {
@@ -2009,7 +2085,7 @@ type ExtractedProposal struct {
 
 func (x *ExtractedProposal) Reset() {
 	*x = ExtractedProposal{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[25]
+	mi := &file_memory_v1_extraction_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2021,7 +2097,7 @@ func (x *ExtractedProposal) String() string {
 func (*ExtractedProposal) ProtoMessage() {}
 
 func (x *ExtractedProposal) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[25]
+	mi := &file_memory_v1_extraction_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2034,7 +2110,7 @@ func (x *ExtractedProposal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtractedProposal.ProtoReflect.Descriptor instead.
 func (*ExtractedProposal) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{25}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ExtractedProposal) GetCandidate() int64 {
@@ -2080,7 +2156,7 @@ type ScanMemoryRefreshRequest struct {
 
 func (x *ScanMemoryRefreshRequest) Reset() {
 	*x = ScanMemoryRefreshRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[26]
+	mi := &file_memory_v1_extraction_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2092,7 +2168,7 @@ func (x *ScanMemoryRefreshRequest) String() string {
 func (*ScanMemoryRefreshRequest) ProtoMessage() {}
 
 func (x *ScanMemoryRefreshRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[26]
+	mi := &file_memory_v1_extraction_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2105,7 +2181,7 @@ func (x *ScanMemoryRefreshRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanMemoryRefreshRequest.ProtoReflect.Descriptor instead.
 func (*ScanMemoryRefreshRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{26}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ScanMemoryRefreshRequest) GetTenant() string {
@@ -2159,7 +2235,7 @@ type ScanMemoryRefreshResponse struct {
 
 func (x *ScanMemoryRefreshResponse) Reset() {
 	*x = ScanMemoryRefreshResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[27]
+	mi := &file_memory_v1_extraction_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2171,7 +2247,7 @@ func (x *ScanMemoryRefreshResponse) String() string {
 func (*ScanMemoryRefreshResponse) ProtoMessage() {}
 
 func (x *ScanMemoryRefreshResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[27]
+	mi := &file_memory_v1_extraction_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2184,7 +2260,7 @@ func (x *ScanMemoryRefreshResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanMemoryRefreshResponse.ProtoReflect.Descriptor instead.
 func (*ScanMemoryRefreshResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{27}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ScanMemoryRefreshResponse) GetVersions() []*VersionReference {
@@ -2210,7 +2286,7 @@ type StartMemoryRefreshSweepRequest struct {
 
 func (x *StartMemoryRefreshSweepRequest) Reset() {
 	*x = StartMemoryRefreshSweepRequest{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[28]
+	mi := &file_memory_v1_extraction_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2222,7 +2298,7 @@ func (x *StartMemoryRefreshSweepRequest) String() string {
 func (*StartMemoryRefreshSweepRequest) ProtoMessage() {}
 
 func (x *StartMemoryRefreshSweepRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[28]
+	mi := &file_memory_v1_extraction_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2235,7 +2311,7 @@ func (x *StartMemoryRefreshSweepRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartMemoryRefreshSweepRequest.ProtoReflect.Descriptor instead.
 func (*StartMemoryRefreshSweepRequest) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{28}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *StartMemoryRefreshSweepRequest) GetTenant() string {
@@ -2296,7 +2372,7 @@ type StartMemoryRefreshSweepResponse struct {
 
 func (x *StartMemoryRefreshSweepResponse) Reset() {
 	*x = StartMemoryRefreshSweepResponse{}
-	mi := &file_memory_v1_extraction_proto_msgTypes[29]
+	mi := &file_memory_v1_extraction_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2308,7 +2384,7 @@ func (x *StartMemoryRefreshSweepResponse) String() string {
 func (*StartMemoryRefreshSweepResponse) ProtoMessage() {}
 
 func (x *StartMemoryRefreshSweepResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_memory_v1_extraction_proto_msgTypes[29]
+	mi := &file_memory_v1_extraction_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2321,7 +2397,7 @@ func (x *StartMemoryRefreshSweepResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartMemoryRefreshSweepResponse.ProtoReflect.Descriptor instead.
 func (*StartMemoryRefreshSweepResponse) Descriptor() ([]byte, []int) {
-	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{29}
+	return file_memory_v1_extraction_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *StartMemoryRefreshSweepResponse) GetResult() *CommitResult {
@@ -2341,7 +2417,13 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"evidenceId\x12\x1d\n" +
 	"\x05start\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x05start\x12\x19\n" +
 	"\x03end\x18\x03 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\x03end:K\xbaHH\x1aF\n" +
-	"\x16extraction_range.order\x12\x15end must exceed start\x1a\x15this.end > this.start\"\xad\x01\n" +
+	"\x16extraction_range.order\x12\x15end must exceed start\x1a\x15this.end > this.start\"\xc7\x01\n" +
+	"\x16ExtractionPayloadRange\x12\x1e\n" +
+	"\x04path\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\x04R\x04path\x12\x1d\n" +
+	"\x05start\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x05start\x12\x19\n" +
+	"\x03end\x18\x03 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\x03end:S\xbaHP\x1aN\n" +
+	"\x1eextraction_payload_range.order\x12\x15end must exceed start\x1a\x15this.end > this.start\"\xad\x01\n" +
 	"\x10PredicateBinding\x12G\n" +
 	"\tpredicate\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\tpredicate\x12P\n" +
 	"\x0eschema_version\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\rschemaVersion\"\xb5\x02\n" +
@@ -2349,7 +2431,7 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12C\n" +
 	"\asubtype\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\asubtype\x12P\n" +
 	"\x0eschema_version\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\rschemaVersion\x12I\n" +
-	"\fdependencies\x18\x04 \x03(\v2\x1b.memory.v1.MemoryDependencyB\b\xbaH\x05\x92\x01\x02\x10@R\fdependencies\"\xd9\b\n" +
+	"\fdependencies\x18\x04 \x03(\v2\x1b.memory.v1.MemoryDependencyB\b\xbaH\x05\x92\x01\x02\x10@R\fdependencies\"\xae\t\n" +
 	"\x16StartExtractionRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
@@ -2365,7 +2447,8 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"\finput_ranges\x18\t \x03(\v2\x1f.memory.v1.ExtractionInputRangeB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\vinputRanges\x12g\n" +
 	"\x15redacted_evidence_ids\x18\n" +
 	" \x03(\tB3\xbaH0\x92\x01-\x10\x80\x01\x18\x01\"&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x13redactedEvidenceIds\x12P\n" +
-	"\x17expected_profile_digest\x18\v \x01(\tB\x18\xbaH\x15r\x132\x11^([a-f0-9]{64})?$R\x15expectedProfileDigest:\xf1\x01\xbaH\xed\x01\x1a\xea\x01\n" +
+	"\x17expected_profile_digest\x18\v \x01(\tB\x18\xbaH\x15r\x132\x11^([a-f0-9]{64})?$R\x15expectedProfileDigest\x12S\n" +
+	"\x0epayload_ranges\x18\f \x03(\v2!.memory.v1.ExtractionPayloadRangeB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\rpayloadRanges:\xf1\x01\xbaH\xed\x01\x1a\xea\x01\n" +
 	"\x0fextraction.mode\x12\x1fselect either facts or memories\x1a\xb5\x01(size(this.memory_targets) > 0 && size(this.subjects) == 0 && size(this.predicates) == 0) || (size(this.memory_targets) == 0 && size(this.subjects) > 0 && size(this.predicates) > 0)\"A\n" +
 	"\x17StartExtractionResponse\x12&\n" +
 	"\x03job\x18\x01 \x01(\v2\x14.memory.v1.JobStatusR\x03job\"\xd0\x04\n" +
@@ -2422,7 +2505,7 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"\x02id\x18\x04 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12.\n" +
 	"\x0eexpected_fence\x18\x05 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\rexpectedFence\":\n" +
 	"\x10RetryJobResponse\x12&\n" +
-	"\x03job\x18\x01 \x01(\v2\x14.memory.v1.JobStatusR\x03job\"\xec\x03\n" +
+	"\x03job\x18\x01 \x01(\v2\x14.memory.v1.JobStatusR\x03job\"\xc1\x04\n" +
 	"\x19StartMemoryRefreshRequest\x12A\n" +
 	"\x06tenant\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x06tenant\x124\n" +
 	"\acommand\x18\x02 \x01(\v2\x12.memory.v1.CommandB\x06\xbaH\x03\xc8\x01\x01R\acommand\x12?\n" +
@@ -2432,7 +2515,8 @@ const file_memory_v1_extraction_proto_rawDesc = "" +
 	"version_id\x18\x05 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\tversionId\x12H\n" +
 	"\n" +
 	"profile_id\x18\x06 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\tprofileId\x129\n" +
-	"\atrigger\x18\a \x01(\v2\x1f.memory.v1.MemoryRefreshTriggerR\atrigger\"\x8e\x01\n" +
+	"\atrigger\x18\a \x01(\v2\x1f.memory.v1.MemoryRefreshTriggerR\atrigger\x12S\n" +
+	"\x0epayload_ranges\x18\b \x03(\v2!.memory.v1.ExtractionPayloadRangeB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\rpayloadRanges\"\x8e\x01\n" +
 	"\x14MemoryRefreshTrigger\x12D\n" +
 	"\bevent_id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\aeventId\x120\n" +
 	"\x0fledger_revision\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\x0eledgerRevision\"D\n" +
@@ -2571,105 +2655,108 @@ func file_memory_v1_extraction_proto_rawDescGZIP() []byte {
 	return file_memory_v1_extraction_proto_rawDescData
 }
 
-var file_memory_v1_extraction_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_memory_v1_extraction_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_memory_v1_extraction_proto_goTypes = []any{
 	(*ExtractionInputRange)(nil),            // 0: memory.v1.ExtractionInputRange
-	(*PredicateBinding)(nil),                // 1: memory.v1.PredicateBinding
-	(*MemoryExtractionTarget)(nil),          // 2: memory.v1.MemoryExtractionTarget
-	(*StartExtractionRequest)(nil),          // 3: memory.v1.StartExtractionRequest
-	(*StartExtractionResponse)(nil),         // 4: memory.v1.StartExtractionResponse
-	(*PlanExtractionChunksRequest)(nil),     // 5: memory.v1.PlanExtractionChunksRequest
-	(*PlanExtractionChunksResponse)(nil),    // 6: memory.v1.PlanExtractionChunksResponse
-	(*ExtractionChunkPlan)(nil),             // 7: memory.v1.ExtractionChunkPlan
-	(*ExtractionChunk)(nil),                 // 8: memory.v1.ExtractionChunk
-	(*GetJobRequest)(nil),                   // 9: memory.v1.GetJobRequest
-	(*GetExtractionRunRequest)(nil),         // 10: memory.v1.GetExtractionRunRequest
-	(*GetJobResponse)(nil),                  // 11: memory.v1.GetJobResponse
-	(*GetExtractionRunResponse)(nil),        // 12: memory.v1.GetExtractionRunResponse
-	(*RetryJobRequest)(nil),                 // 13: memory.v1.RetryJobRequest
-	(*RetryJobResponse)(nil),                // 14: memory.v1.RetryJobResponse
-	(*StartMemoryRefreshRequest)(nil),       // 15: memory.v1.StartMemoryRefreshRequest
-	(*MemoryRefreshTrigger)(nil),            // 16: memory.v1.MemoryRefreshTrigger
-	(*StartMemoryRefreshResponse)(nil),      // 17: memory.v1.StartMemoryRefreshResponse
-	(*JobStatus)(nil),                       // 18: memory.v1.JobStatus
-	(*ExtractionRun)(nil),                   // 19: memory.v1.ExtractionRun
-	(*ExtractionAttempt)(nil),               // 20: memory.v1.ExtractionAttempt
-	(*ExtractionReservation)(nil),           // 21: memory.v1.ExtractionReservation
-	(*ExtractionResult)(nil),                // 22: memory.v1.ExtractionResult
-	(*ExtractionIssue)(nil),                 // 23: memory.v1.ExtractionIssue
-	(*ExtractionRelation)(nil),              // 24: memory.v1.ExtractionRelation
-	(*ExtractedProposal)(nil),               // 25: memory.v1.ExtractedProposal
-	(*ScanMemoryRefreshRequest)(nil),        // 26: memory.v1.ScanMemoryRefreshRequest
-	(*ScanMemoryRefreshResponse)(nil),       // 27: memory.v1.ScanMemoryRefreshResponse
-	(*StartMemoryRefreshSweepRequest)(nil),  // 28: memory.v1.StartMemoryRefreshSweepRequest
-	(*StartMemoryRefreshSweepResponse)(nil), // 29: memory.v1.StartMemoryRefreshSweepResponse
-	(*MemoryDependency)(nil),                // 30: memory.v1.MemoryDependency
-	(*Command)(nil),                         // 31: memory.v1.Command
-	(*timestamppb.Timestamp)(nil),           // 32: google.protobuf.Timestamp
-	(*Caller)(nil),                          // 33: memory.v1.Caller
-	(*AuthorizationDecision)(nil),           // 34: memory.v1.AuthorizationDecision
-	(*VersionReference)(nil),                // 35: memory.v1.VersionReference
-	(*CommitResult)(nil),                    // 36: memory.v1.CommitResult
+	(*ExtractionPayloadRange)(nil),          // 1: memory.v1.ExtractionPayloadRange
+	(*PredicateBinding)(nil),                // 2: memory.v1.PredicateBinding
+	(*MemoryExtractionTarget)(nil),          // 3: memory.v1.MemoryExtractionTarget
+	(*StartExtractionRequest)(nil),          // 4: memory.v1.StartExtractionRequest
+	(*StartExtractionResponse)(nil),         // 5: memory.v1.StartExtractionResponse
+	(*PlanExtractionChunksRequest)(nil),     // 6: memory.v1.PlanExtractionChunksRequest
+	(*PlanExtractionChunksResponse)(nil),    // 7: memory.v1.PlanExtractionChunksResponse
+	(*ExtractionChunkPlan)(nil),             // 8: memory.v1.ExtractionChunkPlan
+	(*ExtractionChunk)(nil),                 // 9: memory.v1.ExtractionChunk
+	(*GetJobRequest)(nil),                   // 10: memory.v1.GetJobRequest
+	(*GetExtractionRunRequest)(nil),         // 11: memory.v1.GetExtractionRunRequest
+	(*GetJobResponse)(nil),                  // 12: memory.v1.GetJobResponse
+	(*GetExtractionRunResponse)(nil),        // 13: memory.v1.GetExtractionRunResponse
+	(*RetryJobRequest)(nil),                 // 14: memory.v1.RetryJobRequest
+	(*RetryJobResponse)(nil),                // 15: memory.v1.RetryJobResponse
+	(*StartMemoryRefreshRequest)(nil),       // 16: memory.v1.StartMemoryRefreshRequest
+	(*MemoryRefreshTrigger)(nil),            // 17: memory.v1.MemoryRefreshTrigger
+	(*StartMemoryRefreshResponse)(nil),      // 18: memory.v1.StartMemoryRefreshResponse
+	(*JobStatus)(nil),                       // 19: memory.v1.JobStatus
+	(*ExtractionRun)(nil),                   // 20: memory.v1.ExtractionRun
+	(*ExtractionAttempt)(nil),               // 21: memory.v1.ExtractionAttempt
+	(*ExtractionReservation)(nil),           // 22: memory.v1.ExtractionReservation
+	(*ExtractionResult)(nil),                // 23: memory.v1.ExtractionResult
+	(*ExtractionIssue)(nil),                 // 24: memory.v1.ExtractionIssue
+	(*ExtractionRelation)(nil),              // 25: memory.v1.ExtractionRelation
+	(*ExtractedProposal)(nil),               // 26: memory.v1.ExtractedProposal
+	(*ScanMemoryRefreshRequest)(nil),        // 27: memory.v1.ScanMemoryRefreshRequest
+	(*ScanMemoryRefreshResponse)(nil),       // 28: memory.v1.ScanMemoryRefreshResponse
+	(*StartMemoryRefreshSweepRequest)(nil),  // 29: memory.v1.StartMemoryRefreshSweepRequest
+	(*StartMemoryRefreshSweepResponse)(nil), // 30: memory.v1.StartMemoryRefreshSweepResponse
+	(*MemoryDependency)(nil),                // 31: memory.v1.MemoryDependency
+	(*Command)(nil),                         // 32: memory.v1.Command
+	(*timestamppb.Timestamp)(nil),           // 33: google.protobuf.Timestamp
+	(*Caller)(nil),                          // 34: memory.v1.Caller
+	(*AuthorizationDecision)(nil),           // 35: memory.v1.AuthorizationDecision
+	(*VersionReference)(nil),                // 36: memory.v1.VersionReference
+	(*CommitResult)(nil),                    // 37: memory.v1.CommitResult
 }
 var file_memory_v1_extraction_proto_depIdxs = []int32{
-	30, // 0: memory.v1.MemoryExtractionTarget.dependencies:type_name -> memory.v1.MemoryDependency
-	31, // 1: memory.v1.StartExtractionRequest.command:type_name -> memory.v1.Command
-	1,  // 2: memory.v1.StartExtractionRequest.predicates:type_name -> memory.v1.PredicateBinding
-	2,  // 3: memory.v1.StartExtractionRequest.memory_targets:type_name -> memory.v1.MemoryExtractionTarget
+	31, // 0: memory.v1.MemoryExtractionTarget.dependencies:type_name -> memory.v1.MemoryDependency
+	32, // 1: memory.v1.StartExtractionRequest.command:type_name -> memory.v1.Command
+	2,  // 2: memory.v1.StartExtractionRequest.predicates:type_name -> memory.v1.PredicateBinding
+	3,  // 3: memory.v1.StartExtractionRequest.memory_targets:type_name -> memory.v1.MemoryExtractionTarget
 	0,  // 4: memory.v1.StartExtractionRequest.input_ranges:type_name -> memory.v1.ExtractionInputRange
-	18, // 5: memory.v1.StartExtractionResponse.job:type_name -> memory.v1.JobStatus
-	0,  // 6: memory.v1.PlanExtractionChunksRequest.input_ranges:type_name -> memory.v1.ExtractionInputRange
-	7,  // 7: memory.v1.PlanExtractionChunksResponse.plan:type_name -> memory.v1.ExtractionChunkPlan
-	8,  // 8: memory.v1.ExtractionChunkPlan.chunks:type_name -> memory.v1.ExtractionChunk
-	0,  // 9: memory.v1.ExtractionChunkPlan.excluded_ranges:type_name -> memory.v1.ExtractionInputRange
-	0,  // 10: memory.v1.ExtractionChunk.input_ranges:type_name -> memory.v1.ExtractionInputRange
-	18, // 11: memory.v1.GetJobResponse.job:type_name -> memory.v1.JobStatus
-	19, // 12: memory.v1.GetExtractionRunResponse.run:type_name -> memory.v1.ExtractionRun
-	31, // 13: memory.v1.RetryJobRequest.command:type_name -> memory.v1.Command
-	18, // 14: memory.v1.RetryJobResponse.job:type_name -> memory.v1.JobStatus
-	31, // 15: memory.v1.StartMemoryRefreshRequest.command:type_name -> memory.v1.Command
-	16, // 16: memory.v1.StartMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
-	18, // 17: memory.v1.StartMemoryRefreshResponse.job:type_name -> memory.v1.JobStatus
-	32, // 18: memory.v1.JobStatus.available_at:type_name -> google.protobuf.Timestamp
-	32, // 19: memory.v1.JobStatus.lease_until:type_name -> google.protobuf.Timestamp
-	20, // 20: memory.v1.ExtractionRun.attempt:type_name -> memory.v1.ExtractionAttempt
-	22, // 21: memory.v1.ExtractionRun.result:type_name -> memory.v1.ExtractionResult
-	33, // 22: memory.v1.ExtractionAttempt.caller:type_name -> memory.v1.Caller
-	32, // 23: memory.v1.ExtractionAttempt.lease_until:type_name -> google.protobuf.Timestamp
-	32, // 24: memory.v1.ExtractionAttempt.started_at:type_name -> google.protobuf.Timestamp
-	34, // 25: memory.v1.ExtractionAttempt.authorization:type_name -> memory.v1.AuthorizationDecision
-	21, // 26: memory.v1.ExtractionAttempt.reservation:type_name -> memory.v1.ExtractionReservation
-	23, // 27: memory.v1.ExtractionResult.issues:type_name -> memory.v1.ExtractionIssue
-	24, // 28: memory.v1.ExtractionResult.relations:type_name -> memory.v1.ExtractionRelation
-	25, // 29: memory.v1.ExtractionResult.proposals:type_name -> memory.v1.ExtractedProposal
-	34, // 30: memory.v1.ExtractionResult.authorization:type_name -> memory.v1.AuthorizationDecision
-	32, // 31: memory.v1.ExtractionResult.completed_at:type_name -> google.protobuf.Timestamp
-	16, // 32: memory.v1.ScanMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
-	35, // 33: memory.v1.ScanMemoryRefreshResponse.versions:type_name -> memory.v1.VersionReference
-	31, // 34: memory.v1.StartMemoryRefreshSweepRequest.command:type_name -> memory.v1.Command
-	32, // 35: memory.v1.StartMemoryRefreshSweepRequest.scheduled_for:type_name -> google.protobuf.Timestamp
-	36, // 36: memory.v1.StartMemoryRefreshSweepResponse.result:type_name -> memory.v1.CommitResult
-	26, // 37: memory.v1.ExtractionService.ScanMemoryRefresh:input_type -> memory.v1.ScanMemoryRefreshRequest
-	28, // 38: memory.v1.ExtractionService.StartMemoryRefreshSweep:input_type -> memory.v1.StartMemoryRefreshSweepRequest
-	3,  // 39: memory.v1.ExtractionService.StartExtraction:input_type -> memory.v1.StartExtractionRequest
-	5,  // 40: memory.v1.ExtractionService.PlanExtractionChunks:input_type -> memory.v1.PlanExtractionChunksRequest
-	9,  // 41: memory.v1.ExtractionService.GetJob:input_type -> memory.v1.GetJobRequest
-	13, // 42: memory.v1.ExtractionService.RetryJob:input_type -> memory.v1.RetryJobRequest
-	10, // 43: memory.v1.ExtractionService.GetExtractionRun:input_type -> memory.v1.GetExtractionRunRequest
-	15, // 44: memory.v1.ExtractionService.StartMemoryRefresh:input_type -> memory.v1.StartMemoryRefreshRequest
-	27, // 45: memory.v1.ExtractionService.ScanMemoryRefresh:output_type -> memory.v1.ScanMemoryRefreshResponse
-	29, // 46: memory.v1.ExtractionService.StartMemoryRefreshSweep:output_type -> memory.v1.StartMemoryRefreshSweepResponse
-	4,  // 47: memory.v1.ExtractionService.StartExtraction:output_type -> memory.v1.StartExtractionResponse
-	6,  // 48: memory.v1.ExtractionService.PlanExtractionChunks:output_type -> memory.v1.PlanExtractionChunksResponse
-	11, // 49: memory.v1.ExtractionService.GetJob:output_type -> memory.v1.GetJobResponse
-	14, // 50: memory.v1.ExtractionService.RetryJob:output_type -> memory.v1.RetryJobResponse
-	12, // 51: memory.v1.ExtractionService.GetExtractionRun:output_type -> memory.v1.GetExtractionRunResponse
-	17, // 52: memory.v1.ExtractionService.StartMemoryRefresh:output_type -> memory.v1.StartMemoryRefreshResponse
-	45, // [45:53] is the sub-list for method output_type
-	37, // [37:45] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	1,  // 5: memory.v1.StartExtractionRequest.payload_ranges:type_name -> memory.v1.ExtractionPayloadRange
+	19, // 6: memory.v1.StartExtractionResponse.job:type_name -> memory.v1.JobStatus
+	0,  // 7: memory.v1.PlanExtractionChunksRequest.input_ranges:type_name -> memory.v1.ExtractionInputRange
+	8,  // 8: memory.v1.PlanExtractionChunksResponse.plan:type_name -> memory.v1.ExtractionChunkPlan
+	9,  // 9: memory.v1.ExtractionChunkPlan.chunks:type_name -> memory.v1.ExtractionChunk
+	0,  // 10: memory.v1.ExtractionChunkPlan.excluded_ranges:type_name -> memory.v1.ExtractionInputRange
+	0,  // 11: memory.v1.ExtractionChunk.input_ranges:type_name -> memory.v1.ExtractionInputRange
+	19, // 12: memory.v1.GetJobResponse.job:type_name -> memory.v1.JobStatus
+	20, // 13: memory.v1.GetExtractionRunResponse.run:type_name -> memory.v1.ExtractionRun
+	32, // 14: memory.v1.RetryJobRequest.command:type_name -> memory.v1.Command
+	19, // 15: memory.v1.RetryJobResponse.job:type_name -> memory.v1.JobStatus
+	32, // 16: memory.v1.StartMemoryRefreshRequest.command:type_name -> memory.v1.Command
+	17, // 17: memory.v1.StartMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
+	1,  // 18: memory.v1.StartMemoryRefreshRequest.payload_ranges:type_name -> memory.v1.ExtractionPayloadRange
+	19, // 19: memory.v1.StartMemoryRefreshResponse.job:type_name -> memory.v1.JobStatus
+	33, // 20: memory.v1.JobStatus.available_at:type_name -> google.protobuf.Timestamp
+	33, // 21: memory.v1.JobStatus.lease_until:type_name -> google.protobuf.Timestamp
+	21, // 22: memory.v1.ExtractionRun.attempt:type_name -> memory.v1.ExtractionAttempt
+	23, // 23: memory.v1.ExtractionRun.result:type_name -> memory.v1.ExtractionResult
+	34, // 24: memory.v1.ExtractionAttempt.caller:type_name -> memory.v1.Caller
+	33, // 25: memory.v1.ExtractionAttempt.lease_until:type_name -> google.protobuf.Timestamp
+	33, // 26: memory.v1.ExtractionAttempt.started_at:type_name -> google.protobuf.Timestamp
+	35, // 27: memory.v1.ExtractionAttempt.authorization:type_name -> memory.v1.AuthorizationDecision
+	22, // 28: memory.v1.ExtractionAttempt.reservation:type_name -> memory.v1.ExtractionReservation
+	24, // 29: memory.v1.ExtractionResult.issues:type_name -> memory.v1.ExtractionIssue
+	25, // 30: memory.v1.ExtractionResult.relations:type_name -> memory.v1.ExtractionRelation
+	26, // 31: memory.v1.ExtractionResult.proposals:type_name -> memory.v1.ExtractedProposal
+	35, // 32: memory.v1.ExtractionResult.authorization:type_name -> memory.v1.AuthorizationDecision
+	33, // 33: memory.v1.ExtractionResult.completed_at:type_name -> google.protobuf.Timestamp
+	17, // 34: memory.v1.ScanMemoryRefreshRequest.trigger:type_name -> memory.v1.MemoryRefreshTrigger
+	36, // 35: memory.v1.ScanMemoryRefreshResponse.versions:type_name -> memory.v1.VersionReference
+	32, // 36: memory.v1.StartMemoryRefreshSweepRequest.command:type_name -> memory.v1.Command
+	33, // 37: memory.v1.StartMemoryRefreshSweepRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	37, // 38: memory.v1.StartMemoryRefreshSweepResponse.result:type_name -> memory.v1.CommitResult
+	27, // 39: memory.v1.ExtractionService.ScanMemoryRefresh:input_type -> memory.v1.ScanMemoryRefreshRequest
+	29, // 40: memory.v1.ExtractionService.StartMemoryRefreshSweep:input_type -> memory.v1.StartMemoryRefreshSweepRequest
+	4,  // 41: memory.v1.ExtractionService.StartExtraction:input_type -> memory.v1.StartExtractionRequest
+	6,  // 42: memory.v1.ExtractionService.PlanExtractionChunks:input_type -> memory.v1.PlanExtractionChunksRequest
+	10, // 43: memory.v1.ExtractionService.GetJob:input_type -> memory.v1.GetJobRequest
+	14, // 44: memory.v1.ExtractionService.RetryJob:input_type -> memory.v1.RetryJobRequest
+	11, // 45: memory.v1.ExtractionService.GetExtractionRun:input_type -> memory.v1.GetExtractionRunRequest
+	16, // 46: memory.v1.ExtractionService.StartMemoryRefresh:input_type -> memory.v1.StartMemoryRefreshRequest
+	28, // 47: memory.v1.ExtractionService.ScanMemoryRefresh:output_type -> memory.v1.ScanMemoryRefreshResponse
+	30, // 48: memory.v1.ExtractionService.StartMemoryRefreshSweep:output_type -> memory.v1.StartMemoryRefreshSweepResponse
+	5,  // 49: memory.v1.ExtractionService.StartExtraction:output_type -> memory.v1.StartExtractionResponse
+	7,  // 50: memory.v1.ExtractionService.PlanExtractionChunks:output_type -> memory.v1.PlanExtractionChunksResponse
+	12, // 51: memory.v1.ExtractionService.GetJob:output_type -> memory.v1.GetJobResponse
+	15, // 52: memory.v1.ExtractionService.RetryJob:output_type -> memory.v1.RetryJobResponse
+	13, // 53: memory.v1.ExtractionService.GetExtractionRun:output_type -> memory.v1.GetExtractionRunResponse
+	18, // 54: memory.v1.ExtractionService.StartMemoryRefresh:output_type -> memory.v1.StartMemoryRefreshResponse
+	47, // [47:55] is the sub-list for method output_type
+	39, // [39:47] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_memory_v1_extraction_proto_init() }
@@ -2686,7 +2773,7 @@ func file_memory_v1_extraction_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_memory_v1_extraction_proto_rawDesc), len(file_memory_v1_extraction_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

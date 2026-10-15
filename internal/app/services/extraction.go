@@ -25,9 +25,9 @@ func configureExtraction(s *Service, o model.ExtractionOptions) error {
 	for _, approved := range o.Profiles {
 		p := approved.Profile
 		if redaction := p.PayloadRedaction; redaction != nil {
-			if !model.ValidID(redaction.PolicyVersion) || !s.redactionPolicies[redaction.PolicyVersion] || (!redaction.DependencyPayloads && !redaction.OriginalMemoryPayload && !redaction.RefreshEvidence) ||
+			if !model.ValidID(redaction.PolicyVersion) || !s.redactionPolicies[redaction.PolicyVersion] || (!redaction.DependencyPayloads && !redaction.OriginalMemoryPayload && !redaction.RefreshEvidence && !redaction.DependencyPayloadRanges && !redaction.OriginalMemoryPayloadRanges && !redaction.RefreshEvidenceRanges) ||
 				(p.ParserVersion != "memory-extraction-json-v1" && p.ParserVersion != "memory-refresh-json-v1") ||
-				(p.ParserVersion != "memory-refresh-json-v1" && (redaction.OriginalMemoryPayload || redaction.RefreshEvidence)) {
+				(p.ParserVersion != "memory-refresh-json-v1" && (redaction.OriginalMemoryPayload || redaction.RefreshEvidence || redaction.OriginalMemoryPayloadRanges || redaction.RefreshEvidenceRanges)) {
 				return model.ErrInvalid
 			}
 			copied := *redaction
@@ -103,6 +103,9 @@ func (s *Service) StartExtraction(ctx context.Context, c model.Caller, r model.E
 	}
 	if !ok || approved.Profile.ParserVersion != parser || (r.ExpectedProfileDigest != "" && r.ExpectedProfileDigest != model.ExtractionProfileDigest(approved.Profile)) {
 		return model.JobStatus{}, model.ErrPrecondition
+	}
+	if len(r.PayloadRanges) > 0 && validatePayloadRanges(r.PayloadRanges, approved.Profile.PayloadRedaction) != nil {
+		return model.JobStatus{}, model.ErrInvalid
 	}
 	conversation, err := s.GetConversation(ctx, c, model.ConversationQuery{ID: r.ConversationID, Scope: r.Scope, Purpose: r.Purpose})
 	if err != nil {
