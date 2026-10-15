@@ -410,6 +410,8 @@ Retain the established make targets, Buf generation, sqlc, goose, mockery, table
 | External calculation lineage | A receipt pins its snapshot and external artifacts; changed input under the same run identity fails and supersession preserves previous receipts |
 | Domain ownership | A second application can supply different schemas and policies without wealth-specific engine code; completeness and allocation remain in the host |
 
+See the [acceptance evidence matrix](spec-acceptance.md) for repository test references and production sign-off owners. Those references show exercised coverage; they are not a claim that every operation/error combination or production integration has been validated.
+
 Use real PostgreSQL integration tests for transactions, row security, ordering, and range invariants; mocks do not establish those guarantees. Test the OpenFGA model with allow and deny assertions. Run adapter contract tests against the pinned CortexDB PostgreSQL backend. Include an extraction evaluation set approved for the bank domain, with unsupported-assertion and missed-conflict rates measured separately from retrieval relevance.
 
 Deliver the work in independently reviewable slices:
