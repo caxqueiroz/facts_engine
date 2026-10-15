@@ -70,9 +70,10 @@ VALUES ($1,$2,$3,$4,$5,$6,0)
 ON CONFLICT DO NOTHING;
 
 -- name: GetVersionPayload :one
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM record_versions v
 LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN fact_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.id=$3;
 
 -- name: InsertVersionHeader :exec

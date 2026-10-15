@@ -296,7 +296,10 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			if err := json.Unmarshal(entry.Payload, &memory); err != nil {
 				return nil, nil, err
 			}
-			if !r.IncludeEvidence {
+			if memory.PayloadDisposed && (memory.ID != entry.ID || memory.Proposer.Tenant != c.Tenant || model.Digest(memory) != model.Digest(model.MemoryVersionTombstone(memory))) {
+				return nil, nil, model.ErrPrecondition
+			}
+			if !r.IncludeEvidence && !memory.PayloadDisposed {
 				gaps = append(gaps, model.AuditGap{Kind: entry.Kind, ID: entry.ID, Reason: "memory_payload_withheld"})
 				continue
 			}
@@ -304,6 +307,9 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 				if d.Scope != r.Scope {
 					include = false
 				}
+			}
+			if include && memory.PayloadDisposed {
+				gaps = append(gaps, model.AuditGap{Kind: "memory_version_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
 			}
 		case "extraction_job", "extraction_attempt", "extraction_result":
 			var artifact struct{ RefreshScopes, ContentScopes []string }
@@ -387,11 +393,17 @@ func (s *Service) prepareAuditEntries(ctx context.Context, c model.Caller, r mod
 			_, output := evidence[calc.Receipt.Output.EvidenceID]
 			include = include && input && output
 		case "version":
-			if !r.IncludeEvidence {
-				var v model.Version
-				if err := json.Unmarshal(entry.Payload, &v); err != nil {
-					return nil, nil, err
+			var v model.Version
+			if err := json.Unmarshal(entry.Payload, &v); err != nil {
+				return nil, nil, err
+			}
+			if v.PayloadDisposed {
+				if v.ID != entry.ID || v.Proposer.Tenant != c.Tenant || model.Digest(v) != model.Digest(model.VersionTombstone(v)) {
+					return nil, nil, model.ErrPrecondition
 				}
+				gaps = append(gaps, model.AuditGap{Kind: "version_content", ID: entry.ID, Reason: "disposed_under_retention_policy"})
+			}
+			if !r.IncludeEvidence && !v.PayloadDisposed {
 				for i := range v.Proposal.Sources {
 					v.Proposal.Sources[i].Quote = ""
 				}

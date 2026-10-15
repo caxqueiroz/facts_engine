@@ -24,9 +24,10 @@ FROM records
 WHERE tenant_id=$1 AND id=$2 FOR UPDATE;
 
 -- name: GetMemoryVersionPayload :one
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM memory_versions v
 LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.id=$3;
 
 -- name: InsertMemoryTypePayload :exec
@@ -49,9 +50,10 @@ INSERT INTO memory_dependencies (tenant_id,memory_version_id,scope_id,record_id,
 VALUES ($1,$2,$3,$4,$5);
 
 -- name: ListMemoryVersionPayloads :many
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM memory_versions v
 LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.ledger_revision<=$3 ORDER BY v.ledger_revision,v.id LIMIT 10001;
 
 -- name: InsertMemoryAttestationIdentity :exec

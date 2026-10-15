@@ -300,6 +300,13 @@ func (t *transaction) SetRevision(ctx context.Context, id string, rev int64) err
 	return err
 }
 func (t *transaction) Version(ctx context.Context, record, id string) (model.Version, error) {
+	v, err := t.retainedVersion(ctx, record, id)
+	if err == nil && v.PayloadDisposed {
+		return model.Version{}, model.ErrPrecondition
+	}
+	return v, err
+}
+func (t *transaction) retainedVersion(ctx context.Context, record, id string) (model.Version, error) {
 	var v model.Version
 	b, err := ledgerdb.New(t.tx).GetVersionPayload(ctx, ledgerdb.GetVersionPayloadParams{TenantID: t.tenant, RecordID: record, ID: id})
 	if err != nil {
@@ -309,9 +316,6 @@ func (t *transaction) Version(ctx context.Context, record, id string) (model.Ver
 		return v, model.ErrPrecondition
 	}
 	err = t.decode(b, &v)
-	if err == nil && v.PayloadDisposed {
-		return model.Version{}, model.ErrPrecondition
-	}
 	return v, err
 }
 func (t *transaction) InsertVersion(ctx context.Context, v model.Version) error {

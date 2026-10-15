@@ -518,9 +518,10 @@ func (q *Queries) ListFactHistoryPayloads(ctx context.Context, arg ListFactHisto
 }
 
 const ListFactVersionPayloads = `-- name: ListFactVersionPayloads :many
-SELECT p.payload
+SELECT coalesce(d.payload,p.payload)::bytea AS payload
 FROM record_versions v
 LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN fact_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 JOIN record_events r ON r.tenant_id=v.tenant_id AND r.record_id=v.record_id AND r.version_id=v.id
 JOIN ledger_events e ON e.tenant_id=r.tenant_id AND e.id=r.event_id
 WHERE v.tenant_id=$1 AND v.record_id=$2 AND e.event_type='propose_fact' AND e.ledger_revision<=$3 ORDER BY e.ledger_revision

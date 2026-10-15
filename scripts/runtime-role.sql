@@ -122,3 +122,8 @@ GRANT DELETE ON context_payloads TO facts_retention;
 GRANT SELECT,INSERT ON fact_version_payloads,memory_version_payloads TO facts_runtime;
 REVOKE UPDATE,DELETE,TRUNCATE ON fact_version_payloads,memory_version_payloads,record_versions,memory_versions FROM facts_runtime;
 GRANT SELECT ON fact_version_payloads,memory_version_payloads TO facts_projector,facts_archiver;
+
+-- Version tombstone storage; policy-authorized disposal commands are not enabled yet.
+GRANT SELECT ON fact_version_disposals,memory_version_disposals TO facts_runtime,facts_projector,facts_archiver;
+GRANT SELECT,INSERT ON fact_version_guards,memory_version_guards TO facts_runtime,facts_archiver;
+GRANT UPDATE(epoch) ON fact_version_guards,memory_version_guards TO facts_runtime,facts_archiver;

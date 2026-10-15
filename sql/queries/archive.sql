@@ -19,9 +19,10 @@ FROM memory_types
 WHERE tenant_id=$1 AND ledger_revision=$2;
 
 -- name: ListArchiveMemoryVersion :many
-SELECT v.id,p.payload
+SELECT v.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM memory_versions v
 LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.ledger_revision=$2;
 
 -- name: ListArchiveExtractionAttempt :many
@@ -127,9 +128,10 @@ FROM memory_types
 WHERE tenant_id=$1 AND scope_id=$2 ORDER BY ledger_revision LIMIT 10001;
 
 -- name: ListAuditMemoryVersion :many
-SELECT v.id,p.payload
+SELECT v.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM memory_versions v
 LEFT JOIN memory_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN memory_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.scope_id=$2 ORDER BY v.ledger_revision LIMIT 10001;
 
 -- name: ListAuditContext :many
@@ -204,9 +206,10 @@ FROM predicate_versions
 WHERE tenant_id=$1 AND scope_id=$2 ORDER BY predicate,version LIMIT 10001;
 
 -- name: ListAuditVersion :many
-SELECT v.id,p.payload
+SELECT v.id,coalesce(d.payload,p.payload)::bytea AS payload
 FROM record_versions v
 LEFT JOIN fact_version_payloads p ON p.tenant_id=v.tenant_id AND p.version_id=v.id
+LEFT JOIN fact_version_disposals d ON d.tenant_id=v.tenant_id AND d.version_id=v.id
 WHERE v.tenant_id=$1 AND v.scope_id=$2 ORDER BY v.id LIMIT 10001;
 
 -- name: ListAuditEvidence :many

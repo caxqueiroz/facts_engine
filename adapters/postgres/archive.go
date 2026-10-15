@@ -72,7 +72,10 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// Every event contains its complete retained envelope. Referenced fact
 		// versions include exact evidence locators, schemas and policy versions.
 		if e.RecordKind != "memory" && e.RecordID != "" && e.VersionID != "" {
-			v, err := tx.Version(ctx, e.RecordID, e.VersionID)
+			if err := t.lockVersionContent(ctx, false, e.VersionID); err != nil {
+				return err
+			}
+			v, err := t.retainedVersion(ctx, e.RecordID, e.VersionID)
 			if err != nil {
 				return err
 			}
@@ -109,7 +112,10 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 			}
 		}
 		if e.RecordKind == "memory" {
-			memory, err := t.MemoryVersion(ctx, e.RecordID, e.VersionID)
+			if err := t.lockVersionContent(ctx, true, e.VersionID); err != nil {
+				return err
+			}
+			memory, err := t.retainedMemoryVersion(ctx, e.RecordID, e.VersionID)
 			if err != nil {
 				return err
 			}
@@ -236,6 +242,31 @@ func (l *Ledger) ArchivePayload(ctx context.Context, d model.Delivery) (model.Ar
 		// worker authorizes disclosure to its external archive destination.
 		for _, entry := range p.Entries {
 			switch entry.Kind {
+			case "version":
+				var v model.Version
+				if err := json.Unmarshal(entry.Payload, &v); err != nil {
+					return err
+				}
+				if v.PayloadDisposed {
+					if v.ID != entry.ID || v.Proposer.Tenant != t.tenant || model.Digest(v) != model.Digest(model.VersionTombstone(v)) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "version_content", ID: v.ID, Reason: "disposed_under_retention_policy"})
+				}
+			case "memory_version":
+				var v model.MemoryVersion
+				if err := json.Unmarshal(entry.Payload, &v); err != nil {
+					return err
+				}
+				for _, d := range v.Proposal.Dependencies {
+					scopes[d.Scope] = true
+				}
+				if v.PayloadDisposed {
+					if v.ID != entry.ID || v.Proposer.Tenant != t.tenant || model.Digest(v) != model.Digest(model.MemoryVersionTombstone(v)) {
+						return model.ErrPrecondition
+					}
+					p.Gaps = append(p.Gaps, model.AuditGap{Kind: "memory_version_content", ID: v.ID, Reason: "disposed_under_retention_policy"})
+				}
 			case "retention":
 				var event model.RetentionEvent
 				if err := json.Unmarshal(entry.Payload, &event); err != nil {

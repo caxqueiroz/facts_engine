@@ -61,6 +61,13 @@ func (t *transaction) StageMemoryVersion(ctx context.Context, v model.MemoryVers
 	return nil
 }
 func (t *transaction) MemoryVersion(ctx context.Context, record, version string) (model.MemoryVersion, error) {
+	v, err := t.retainedMemoryVersion(ctx, record, version)
+	if err == nil && v.PayloadDisposed {
+		return model.MemoryVersion{}, model.ErrPrecondition
+	}
+	return v, err
+}
+func (t *transaction) retainedMemoryVersion(ctx context.Context, record, version string) (model.MemoryVersion, error) {
 	var v model.MemoryVersion
 	payload, err := ledgerdb.New(t.tx).GetMemoryVersionPayload(ctx, ledgerdb.GetMemoryVersionPayloadParams{TenantID: t.tenant, RecordID: record, ID: version})
 	if err != nil {
@@ -70,9 +77,6 @@ func (t *transaction) MemoryVersion(ctx context.Context, record, version string)
 		return v, model.ErrPrecondition
 	}
 	err = t.decode(payload, &v)
-	if err == nil && v.PayloadDisposed {
-		return model.MemoryVersion{}, model.ErrPrecondition
-	}
 	return v, err
 }
 func (t *transaction) flushMemory(ctx context.Context, e model.Event) error {

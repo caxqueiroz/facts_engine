@@ -451,6 +451,19 @@ type FactSnapshotPayload struct {
 	Payload    []byte
 }
 
+type FactVersionDisposal struct {
+	TenantID   string
+	VersionID  string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
+type FactVersionGuard struct {
+	TenantID  string
+	VersionID string
+	Epoch     int64
+}
+
 type FactVersionPayload struct {
 	TenantID  string
 	VersionID string
@@ -565,6 +578,19 @@ type MemoryVersion struct {
 	SchemaVersion  string
 	LedgerRevision int64
 	Kind           string
+}
+
+type MemoryVersionDisposal struct {
+	TenantID   string
+	VersionID  string
+	Payload    []byte
+	DisposedAt pgtype.Timestamptz
+}
+
+type MemoryVersionGuard struct {
+	TenantID  string
+	VersionID string
+	Epoch     int64
 }
 
 type MemoryVersionPayload struct {
