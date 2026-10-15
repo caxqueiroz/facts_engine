@@ -47,7 +47,10 @@ func (s *Service) WaitForProjection(ctx context.Context, c model.Caller, q model
 			return nil
 		}
 		active, err := s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
-		if err != nil || active.Generation != q.Generation {
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return failure
+		}
+		if active.Generation != q.Generation {
 			return model.ErrUnavailable
 		}
 		if pinned.Generation != "" && active != pinned {
@@ -66,11 +69,8 @@ func (s *Service) WaitForProjection(ctx context.Context, c model.Caller, q model
 			return empty, err
 		}
 		progress, err := s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(q.Generation)})
-		if err != nil {
-			if ctx.Err() != nil {
-				return empty, ctx.Err()
-			}
-			return empty, model.ErrUnavailable
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return empty, failure
 		}
 		if progress.AcknowledgedRevision >= q.Revision {
 			if err := authorize(); err != nil {

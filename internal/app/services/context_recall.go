@@ -129,7 +129,10 @@ func (s *Service) recallContext(ctx context.Context, c model.Caller, q model.Rec
 	}
 	if s.retrieval.Registry != nil {
 		current, err := s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
-		if err != nil || current != active {
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return model.RecallResult{}, nil, nil, failure
+		}
+		if current != active {
 			return model.RecallResult{}, nil, nil, model.ErrUnavailable
 		}
 	}

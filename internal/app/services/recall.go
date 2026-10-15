@@ -91,7 +91,10 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 	}
 	if s.retrieval.Registry != nil {
 		now, err := s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
-		if err != nil || now != active {
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return model.RecallResult{}, failure
+		}
+		if now != active {
 			return model.RecallResult{}, model.ErrUnavailable
 		}
 	}
@@ -139,7 +142,10 @@ func (s *Service) searchRecall(ctx context.Context, c model.Caller, q model.Reca
 	if s.retrieval.Registry != nil {
 		var err error
 		active, err = s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
-		if err != nil || active.Generation == "" {
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return out, progress, active, nil, failure
+		}
+		if active.Generation == "" {
 			return out, progress, active, nil, model.ErrUnavailable
 		}
 		out.Generation = active.Generation
@@ -148,8 +154,8 @@ func (s *Service) searchRecall(ctx context.Context, c model.Caller, q model.Reca
 		return out, progress, active, nil, model.ErrUnavailable
 	}
 	progress, err = s.retrieval.Progress.ConsumerStatus(ctx, model.ConsumerKey{Tenant: c.Tenant, Consumer: model.ProjectionConsumer(out.Generation)})
-	if err != nil {
-		return out, progress, active, nil, model.ErrUnavailable
+	if failure := unavailableDependency(ctx, err); failure != nil {
+		return out, progress, active, nil, failure
 	}
 	out.IndexedRevision = progress.AcknowledgedRevision
 	if out.IndexedRevision < q.RequireRevision {
@@ -158,8 +164,8 @@ func (s *Service) searchRecall(ctx context.Context, c model.Caller, q model.Reca
 	candidates := []model.SearchCandidate{}
 	for _, scope := range q.Scopes {
 		hits, err := s.retrieval.Index.Candidates(ctx, c.Tenant, out.Generation, scope, q.Query, min(100, q.Limit*5))
-		if err != nil {
-			return out, progress, active, nil, model.ErrUnavailable
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return out, progress, active, nil, failure
 		}
 		if len(hits) > 100 {
 			return out, progress, active, nil, model.ErrPrecondition

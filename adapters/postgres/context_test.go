@@ -36,6 +36,7 @@ func (l failedContextLedger) Transact(ctx context.Context, tenant string, fn fun
 func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgres.Ledger, store *evidence.Postgres, c model.Caller, index model.RetrievalIndex, q model.RecallRequest) {
 	t.Helper()
 	r := model.ContextRequest{Command: model.Command{Key: "context-one", Purpose: q.Purpose}, Scope: "case1", Query: q}
+	testRetrievalInterruption(t, ctx, l, store, l, index, c, r)
 	m, err := remotePrepareContext(t, ctx, e, c, r)
 	if err != nil {
 		t.Fatal(err)

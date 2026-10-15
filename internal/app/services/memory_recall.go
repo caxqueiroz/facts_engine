@@ -91,7 +91,10 @@ func (s *Service) RecallMemories(ctx context.Context, c model.Caller, q model.Re
 	}
 	if s.retrieval.Registry != nil {
 		current, err := s.retrieval.Registry.ActiveProjection(ctx, c.Tenant)
-		if err != nil || current != active {
+		if failure := unavailableDependency(ctx, err); failure != nil {
+			return model.MemoryRecallResult{}, failure
+		}
+		if current != active {
 			return model.MemoryRecallResult{}, model.ErrUnavailable
 		}
 	}

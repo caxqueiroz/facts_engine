@@ -14,11 +14,8 @@ func (s *Service) checkContextArchive(ctx context.Context, tenant string, minimu
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	progress, err := policy.Progress.ReadOutboxProgress(ctx, model.ConsumerKey{Tenant: tenant, Consumer: model.ArchiveConsumer(policy.Stream)})
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-	if err != nil {
-		return nil, model.ErrUnavailable
+	if failure := unavailableDependency(ctx, err); failure != nil {
+		return nil, failure
 	}
 	if progress.AcknowledgedRevision < 0 || progress.LedgerRevision < minimumRevision || progress.LedgerRevision < progress.AcknowledgedRevision || (progress.State != "pending" && progress.State != "running") {
 		return nil, model.ErrUnavailable
