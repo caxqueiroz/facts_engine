@@ -72,6 +72,22 @@ func testConversationDisposal(t *testing.T, ctx context.Context, admin *pgxpool.
 	if _, err = ingester.GetConversation(ctx, caller, model.ConversationQuery{ID: record.ID, Scope: scope, Purpose: policy.Purpose}); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("disposed conversation was readable", err)
 	}
+	// Exercise the standalone RPC as well as DisposeBatch. They share the same
+	// tombstone implementation, but each public transport must preserve the
+	// command receipt and retry semantics independently.
+	secondMessage, err := store.Put(ctx, tenant, "conversation-disposal-source-2", []byte("second private conversation text"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := ingester.IngestConversation(ctx, caller, model.ConversationRequest{Command: model.Command{Key: "conversation-disposal-ingest-2", Purpose: "retention-test"}, Scope: scope, SourceSystem: "test-chat", ConversationID: "conversation-disposal-2", Revision: "v1", Timezone: "UTC", Messages: []model.ConversationMessage{{ID: "message-2", Revision: "v1", Speaker: "customer", SpeakerRole: "customer", SourceClass: "customer", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "source", Object: secondMessage}}})
+	if err != nil {
+		t.Fatal("ingest second conversation", err)
+	}
+	standalone := model.ConversationDisposalRequest{Command: model.Command{Key: "conversation-disposal-standalone", Purpose: policy.Purpose}, Scope: scope, ConversationID: second.ID, PolicyID: policy.ID, Jurisdiction: policy.Jurisdiction, Purpose: policy.Purpose, Reason: "approved retention schedule"}
+	testRemoteConversationDisposal(t, ctx, engine, caller, standalone)
+	if _, err := ingester.GetConversation(ctx, caller, model.ConversationQuery{ID: second.ID, Scope: scope, Purpose: policy.Purpose}); !errors.Is(err, model.ErrPrecondition) {
+		t.Fatal("standalone disposed conversation was readable", err)
+	}
 	var replay model.CommitResult
 	replay, err = engine.DisposeBatch(ctx, caller, model.DisposalBatchRequest{Command: model.Command{Key: "conversation-disposal-batch", Purpose: policy.Purpose}, Scope: scope, Reason: "approved retention schedule", Conversations: []model.ConversationDisposalRequest{selection}})
 	if err != nil || replay.ID != result.ID {

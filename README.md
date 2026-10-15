@@ -64,7 +64,7 @@ Generated Go messages and Connect/gRPC clients are committed under [gen/memory/v
 | [FactService](proto/memory/v1/facts.proto) | GetFact, ListFacts, paginated GetFactHistory, ProposeFact, ApproveFact, AcceptFact, RejectFact, RetractFact, DisputeFact, ResolveDispute, SupersedeFact |
 | [MemoryService](proto/memory/v1/memories.proto) | ProposeMemory, ApproveMemory, AcceptMemory, RejectMemory, RetractMemory, DisputeMemory, ResolveMemoryDispute, SupersedeMemory, GetMemory, GetMemoryVersion, paginated GetMemoryHistory |
 | [OperationsService](proto/memory/v1/operations.proto) | GetProjectionStatus, RebuildIndex |
-| [RetentionService](proto/memory/v1/retention.proto) | RegisterRetentionPolicy, PlaceLegalHold, ReleaseLegalHold, DisposeEvidence, DisposeOrphanEvidence, DisposeSnapshot, DisposeContext, DisposeAttestation, GetRetentionStatus |
+| [RetentionService](proto/memory/v1/retention.proto) | RegisterRetentionPolicy, PlaceLegalHold, ReleaseLegalHold, DisposeEvidence, DisposeOrphanEvidence, DisposeSnapshot, DisposeContext, DisposeExtraction, DisposeVersion, DisposeAttestation, DisposeConversation, DisposeBatch, CleanupProjection, GetRetentionStatus |
 | [IdentityService](proto/memory/v1/identities.proto) | PutScope, PutSubject, GetScope, GetSubject, LookupSubject |
 | [ContextService](proto/memory/v1/contexts.proto) | PrepareContext, GetContextManifest, RecordDecision, GetDecisionReceipt |
 | [RetrievalService](proto/memory/v1/retrieval.proto) | Recall, RecallMemories, WaitForProjection |
@@ -85,7 +85,7 @@ The main specification API groups, including retention administration and refres
 
 Calculation tests compare full Connect/gRPC receipts and reads, external-run retries/conflicts and artifact-digest failures.
 
-Retention tests exercise governance and disposal RPCs with real grpc-go clients, compare retained receipts/status with Connect, reject ordinary database roles and forged tenants, enforce legal holds and shared-object blockers, and verify atomic derivative-family disposal replay across gRPC, Connect and embedded calls. Changed family membership under the same command key fails over gRPC as well.
+Retention tests exercise governance and disposal RPCs with real grpc-go clients, compare retained receipts/status with Connect, reject ordinary database roles and forged tenants, enforce legal holds and shared-object blockers, and verify atomic derivative-family disposal replay across gRPC, Connect and embedded calls. Standalone conversation disposal also verifies receipt parity and changed-command retry rejection across all three entry points.
 
 Extraction parity tests use generated gRPC clients for immutable conversation ingestion/readback, chunk planning, fact and memory extraction scheduling, failed-job status, authorized retry/fencing, exact retained model artifacts and memory-refresh replay. Planning and scheduling must not invoke the model provider. Refresh administration tests compare paginated scans and sweep receipts across transports and reject forged triggers/tenants, denied permissions, oversized pages, changed command input, subsecond schedule timestamps and future sweeps. Provider execution remains an explicit worker operation; these synthetic fixtures are not bank-approved model evaluations.
 
