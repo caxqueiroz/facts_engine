@@ -57,6 +57,9 @@ func Provision(ctx context.Context, db *sql.DB, c Config) error {
 	if _, err = tx.ExecContext(ctx, retentionSchema); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, disposalGateSchema); err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO facts_projection_identity VALUES(true,$1,$2,$3,$4,$5)`, c.Tenant, c.Generation, c.EmbeddingID, c.Dimensions, Version); err != nil {
 		return err
 	}
@@ -90,7 +93,7 @@ func New(ctx context.Context, db *sql.DB, c Config, embedder model.Embedder) (*I
 		return nil, model.ErrPrecondition
 	}
 	var gate bool
-	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_gate WHERE singleton) AND to_regclass('public.facts_projection_tombstones') IS NOT NULL`).Scan(&gate); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM facts_projection_gate WHERE singleton) AND to_regclass('public.facts_projection_tombstones') IS NOT NULL AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid='public.facts_projection_gate'::regclass AND attname='disposal_fence' AND NOT attisdropped) AND to_regprocedure('public.facts_guard_disposal_gate()') IS NOT NULL`).Scan(&gate); err != nil {
 		return nil, err
 	}
 	if !gate {

@@ -25,7 +25,7 @@ func TestLexicalOnlyGeneration(t *testing.T) {
 	if err = cortex.Provision(ctx, db, config); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='lexical_runtime') THEN CREATE ROLE lexical_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO lexical_runtime; GRANT SELECT ON collections,facts_projection_identity,facts_projection_tombstones TO lexical_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO lexical_runtime; GRANT SELECT,UPDATE ON facts_projection_gate TO lexical_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO lexical_runtime`); err != nil {
+	if _, err = db.ExecContext(ctx, `DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='lexical_runtime') THEN CREATE ROLE lexical_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$; GRANT USAGE ON SCHEMA public TO lexical_runtime; GRANT SELECT ON collections,facts_projection_identity,facts_projection_tombstones TO lexical_runtime; GRANT SELECT,INSERT,UPDATE ON embeddings TO lexical_runtime; GRANT SELECT ON facts_projection_gate TO lexical_runtime; GRANT UPDATE(fence,sealed) ON facts_projection_gate TO lexical_runtime; GRANT SELECT,INSERT ON facts_projection_receipts TO lexical_runtime`); err != nil {
 		t.Fatal(err)
 	}
 	runtime, err := sql.Open("pgx", dsn+"&options=-c%20role%3Dlexical_runtime")

@@ -61,7 +61,8 @@ func (i *Index) DisposeProjection(ctx context.Context, r model.ProjectionDisposa
 	}
 	defer tx.Rollback()
 	var sealed bool
-	if err := tx.QueryRowContext(ctx, `SELECT sealed FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&sealed); err != nil {
+	var disposalFence sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT sealed,disposal_fence FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&sealed, &disposalFence); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, id); err != nil {
@@ -74,7 +75,7 @@ func (i *Index) DisposeProjection(ctx context.Context, r model.ProjectionDisposa
 	if disposed {
 		return tx.Commit()
 	}
-	if sealed {
+	if sealed && !disposalFence.Valid {
 		return model.ErrPrecondition
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO facts_projection_tombstones(id) VALUES($1)`, id); err != nil {

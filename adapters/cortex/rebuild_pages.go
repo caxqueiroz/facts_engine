@@ -63,10 +63,11 @@ func (i *Index) VerifyProjectionPages(ctx context.Context, k model.GenerationKey
 	defer tx.Rollback()
 	var gateFence int64
 	var sealed bool
-	if err = tx.QueryRowContext(ctx, `SELECT fence,sealed FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&gateFence, &sealed); err != nil {
+	var disposalFence sql.NullInt64
+	if err = tx.QueryRowContext(ctx, `SELECT fence,sealed,disposal_fence FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&gateFence, &sealed, &disposalFence); err != nil {
 		return empty, err
 	}
-	if gateFence != fence || !sealed {
+	if gateFence != fence || !sealed || disposalFence.Valid {
 		return empty, model.ErrRevision
 	}
 	var receipts, embeddings int

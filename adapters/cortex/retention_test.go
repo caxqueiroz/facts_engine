@@ -198,4 +198,5 @@ func testProjectionDisposal(t *testing.T, ctx context.Context, writer *cortex.In
 	if err := admin.QueryRowContext(ctx, `SELECT count(*) FROM embeddings`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("late content retained", count, err)
 	}
+	testDisposalGate(t, ctx, writer, retention, admin, doc)
 }

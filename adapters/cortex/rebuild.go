@@ -15,7 +15,7 @@ func (i *Index) SetProjectionGate(ctx context.Context, k model.GenerationKey, fe
 	if fence < 1 {
 		return model.ErrInvalid
 	}
-	result, err := i.db.ExecContext(ctx, `UPDATE facts_projection_gate SET fence=$1,sealed=$2 WHERE singleton AND (fence<$1 OR (fence=$1 AND sealed=$2))`, fence, sealed)
+	result, err := i.db.ExecContext(ctx, `UPDATE facts_projection_gate SET fence=CASE WHEN disposal_fence IS NULL THEN $1 ELSE fence END,sealed=$2 WHERE singleton AND ((disposal_fence IS NULL AND (fence<$1 OR (fence=$1 AND sealed=$2))) OR (disposal_fence=$1 AND $2 AND fence=$1+1))`, fence, sealed)
 	if err != nil {
 		return err
 	}
@@ -69,10 +69,11 @@ func (i *Index) VerifyProjection(ctx context.Context, k model.GenerationKey, fen
 	defer tx.Rollback()
 	var gateFence int64
 	var sealed bool
-	if err = tx.QueryRowContext(ctx, `SELECT fence,sealed FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&gateFence, &sealed); err != nil {
+	var disposalFence sql.NullInt64
+	if err = tx.QueryRowContext(ctx, `SELECT fence,sealed,disposal_fence FROM facts_projection_gate WHERE singleton FOR SHARE`).Scan(&gateFence, &sealed, &disposalFence); err != nil {
 		return check, err
 	}
-	if gateFence != fence || !sealed {
+	if gateFence != fence || !sealed || disposalFence.Valid {
 		return check, model.ErrRevision
 	}
 	var receipts, embeddings int
