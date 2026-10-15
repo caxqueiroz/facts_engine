@@ -123,6 +123,7 @@ func TestPostgresLedger(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("legacy identity adoption", func(t *testing.T) { testIdentityAdoption(t, ctx, ledger, store, admin) })
+	t.Run("attestation disposal", func(t *testing.T) { testAttestationDisposal(t, ctx, admin, store, legacyAttestations) })
 	for _, fixture := range []struct {
 		tenant, scope string
 		subjects      []string

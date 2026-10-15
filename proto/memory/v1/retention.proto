@@ -11,6 +11,7 @@ option go_package = "github.com/caxqueiroz/facts_engine/gen/memory/v1;memoryv1";
 // Disposal covers eligible evidence, orphan uploads, snapshots, contexts and terminal extraction artifacts.
 service RetentionService {
   rpc DisposeBatch(DisposeBatchRequest) returns (DisposeBatchResponse);
+  rpc DisposeAttestation(DisposeAttestationRequest) returns (DisposeAttestationResponse);
   rpc RegisterRetentionPolicy(RegisterRetentionPolicyRequest) returns (RegisterRetentionPolicyResponse);
   rpc PlaceLegalHold(PlaceLegalHoldRequest) returns (PlaceLegalHoldResponse);
   rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
@@ -37,7 +38,8 @@ message RetentionPolicy {
     (buf.validate.field).string.in = "extraction_request_payload",
     (buf.validate.field).string.in = "extraction_response_payload",
     (buf.validate.field).string.in = "fact_payload",
-    (buf.validate.field).string.in = "memory_payload"
+    (buf.validate.field).string.in = "memory_payload",
+    (buf.validate.field).string.in = "attestation_payload"
   ];
   string purpose = 4 [(buf.validate.field).string = {
     min_bytes: 1
@@ -48,6 +50,31 @@ message RetentionPolicy {
     gte: 0
     lte: 3162240000
   }];
+}
+message DisposeAttestationRequest {
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  Command command = 2 [(buf.validate.field).required = true];
+  string kind = 3 [
+    (buf.validate.field).string.in = "fact",
+    (buf.validate.field).string.in = "memory"
+  ];
+  string scope = 4 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string record_id = 5 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string attestation_id = 6 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string policy_id = 7 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string jurisdiction = 8 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string purpose = 9 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  string reason = 10 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  string version_id = 11 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+}
+message DisposeAttestationResponse {
+  CommitResult result = 1;
 }
 message RegisterRetentionPolicyRequest {
   string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];

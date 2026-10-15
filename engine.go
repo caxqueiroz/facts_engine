@@ -427,6 +427,11 @@ func (e *Engine) DisposeContext(ctx context.Context, c Caller, r model.ContextDi
 	return e.service.DisposeContext(ctx, c, r)
 }
 
+// DisposeAttestation removes eligible fact or memory attestation content while retaining its structural tombstone.
+func (e *Engine) DisposeAttestation(ctx context.Context, c Caller, r model.AttestationDisposalRequest) (CommitResult, error) {
+	return e.service.DisposeAttestation(ctx, c, r)
+}
+
 // DisposeExtraction removes eligible terminal-job artifacts and retains provenance.
 func (e *Engine) DisposeExtraction(ctx context.Context, c Caller, r model.ExtractionDisposalRequest) (CommitResult, error) {
 	return e.service.DisposeExtraction(ctx, c, r)

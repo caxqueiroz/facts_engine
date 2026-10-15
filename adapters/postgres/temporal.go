@@ -205,6 +205,10 @@ func (t *transaction) HistoricalAttestations(ctx context.Context, version string
 			return nil, err
 		}
 		if a.PayloadDisposed {
+			if !model.ValidAttestationTombstone(a, t.tenant, a.ID) {
+				return nil, model.ErrPrecondition
+			}
+		} else if a.DisposedPayloadDigest != "" {
 			return nil, model.ErrPrecondition
 		}
 		out = append(out, a)

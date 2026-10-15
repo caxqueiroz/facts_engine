@@ -8,6 +8,7 @@ import (
 
 type RetentionEngine interface {
 	DisposeBatch(context.Context, model.Caller, model.DisposalBatchRequest) (model.CommitResult, error)
+	DisposeAttestation(context.Context, model.Caller, model.AttestationDisposalRequest) (model.CommitResult, error)
 	CleanupProjection(context.Context, model.Caller, model.ProjectionCleanupRequest) (model.CommitResult, error)
 	DisposeVersion(context.Context, model.Caller, model.VersionDisposalRequest) (model.CommitResult, error)
 	DisposeExtraction(context.Context, model.Caller, model.ExtractionDisposalRequest) (model.CommitResult, error)
@@ -20,6 +21,15 @@ type RetentionEngine interface {
 	DisposeEvidence(context.Context, model.Caller, model.EvidenceDisposalRequest) (model.CommitResult, error)
 	GetRetentionStatus(context.Context, model.Caller, model.RetentionStatusQuery) (model.RetentionStatus, error)
 }
+
+func (s *retentionService) DisposeAttestation(ctx context.Context, r *v1.DisposeAttestationRequest) (*v1.DisposeAttestationResponse, error) {
+	out, err := s.engine.DisposeAttestation(ctx, callerFrom(ctx), model.AttestationDisposalRequest{Command: command(r.Command), Kind: r.Kind, Scope: r.Scope, RecordID: r.RecordId, VersionID: r.VersionId, AttestationID: r.AttestationId, PolicyID: r.PolicyId, Jurisdiction: r.Jurisdiction, Purpose: r.Purpose, Reason: r.Reason})
+	if err != nil {
+		return nil, err
+	}
+	return &v1.DisposeAttestationResponse{Result: commit(out)}, nil
+}
+
 type retentionService struct{ engine RetentionEngine }
 
 func (s *retentionService) RegisterRetentionPolicy(ctx context.Context, r *v1.RegisterRetentionPolicyRequest) (*v1.RegisterRetentionPolicyResponse, error) {

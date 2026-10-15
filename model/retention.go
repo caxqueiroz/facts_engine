@@ -114,6 +114,17 @@ type VersionDisposalTx interface {
 	DisposeVersion(context.Context, VersionDisposalRequest) (int64, error)
 }
 
+// AttestationDisposalRequest selects one fact or memory attestation payload.
+// Structural identity and the tombstone remain after disposal.
+type AttestationDisposalRequest struct {
+	Command
+	Kind, Scope, RecordID, VersionID, AttestationID, PolicyID, Jurisdiction, Purpose, Reason string
+}
+
+type AttestationDisposalTx interface {
+	DisposeAttestation(context.Context, AttestationDisposalRequest) (int64, error)
+}
+
 type RetentionEvent struct {
 	DecisionDisposal        *DecisionDisposalRequest    `json:",omitempty"`
 	CalculationDisposal     *CalculationDisposalRequest `json:",omitempty"`
@@ -121,6 +132,7 @@ type RetentionEvent struct {
 	DisposalBatch           *DisposalBatchRequest       `json:",omitempty"`
 	ProjectionCleanup       *ProjectionCleanupRequest   `json:",omitempty"`
 	VersionDisposal         *VersionDisposalRequest     `json:",omitempty"`
+	AttestationDisposal     *AttestationDisposalRequest `json:",omitempty"`
 	ExtractionDisposal      *ExtractionDisposalRequest  `json:",omitempty"`
 	ContextDisposal         *ContextDisposalRequest     `json:",omitempty"`
 	SnapshotDisposal        *SnapshotDisposalRequest    `json:",omitempty"`

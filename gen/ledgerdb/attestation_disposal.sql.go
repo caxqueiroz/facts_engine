@@ -7,7 +7,123 @@ package ledgerdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const AttestationDisposalBlocked = `-- name: AttestationDisposalBlocked :one
+SELECT EXISTS(SELECT 1 FROM audit_export_requests aer WHERE aer.tenant_id=$1::text AND aer.scope_id=$2::text)
+OR EXISTS(SELECT 1 FROM consumer_offsets co WHERE co.tenant_id=$1::text AND co.consumer_id LIKE 'archive-%' AND co.acknowledged_revision<$3::bigint)
+`
+
+type AttestationDisposalBlockedParams struct {
+	TenantID       string
+	ScopeID        string
+	LedgerRevision int64
+}
+
+func (q *Queries) AttestationDisposalBlocked(ctx context.Context, arg AttestationDisposalBlockedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, AttestationDisposalBlocked, arg.TenantID, arg.ScopeID, arg.LedgerRevision)
+	var column_1 pgtype.Bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const DeleteFactAttestationPayload = `-- name: DeleteFactAttestationPayload :execrows
+DELETE FROM fact_attestation_payloads WHERE tenant_id=$1 AND attestation_id=$2
+`
+
+type DeleteFactAttestationPayloadParams struct {
+	TenantID      string
+	AttestationID string
+}
+
+func (q *Queries) DeleteFactAttestationPayload(ctx context.Context, arg DeleteFactAttestationPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteFactAttestationPayload, arg.TenantID, arg.AttestationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const DeleteMemoryAttestationPayload = `-- name: DeleteMemoryAttestationPayload :execrows
+DELETE FROM memory_attestation_payloads WHERE tenant_id=$1 AND attestation_id=$2
+`
+
+type DeleteMemoryAttestationPayloadParams struct {
+	TenantID      string
+	AttestationID string
+}
+
+func (q *Queries) DeleteMemoryAttestationPayload(ctx context.Context, arg DeleteMemoryAttestationPayloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteMemoryAttestationPayload, arg.TenantID, arg.AttestationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const FactAttestationDisposalHeader = `-- name: FactAttestationDisposalHeader :one
+SELECT a.scope_id,a.record_id,a.version_id,a.ledger_revision,e.recorded_at
+FROM attestations a JOIN ledger_events e ON e.tenant_id=a.tenant_id AND e.ledger_revision=a.ledger_revision
+WHERE a.tenant_id=$1 AND a.id=$2
+`
+
+type FactAttestationDisposalHeaderParams struct {
+	TenantID string
+	ID       string
+}
+
+type FactAttestationDisposalHeaderRow struct {
+	ScopeID        string
+	RecordID       string
+	VersionID      string
+	LedgerRevision pgtype.Int8
+	RecordedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) FactAttestationDisposalHeader(ctx context.Context, arg FactAttestationDisposalHeaderParams) (FactAttestationDisposalHeaderRow, error) {
+	row := q.db.QueryRow(ctx, FactAttestationDisposalHeader, arg.TenantID, arg.ID)
+	var i FactAttestationDisposalHeaderRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.RecordID,
+		&i.VersionID,
+		&i.LedgerRevision,
+		&i.RecordedAt,
+	)
+	return i, err
+}
+
+const InsertFactAttestationDisposal = `-- name: InsertFactAttestationDisposal :exec
+INSERT INTO fact_attestation_disposals(tenant_id,attestation_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertFactAttestationDisposalParams struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+}
+
+func (q *Queries) InsertFactAttestationDisposal(ctx context.Context, arg InsertFactAttestationDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertFactAttestationDisposal, arg.TenantID, arg.AttestationID, arg.Payload)
+	return err
+}
+
+const InsertMemoryAttestationDisposal = `-- name: InsertMemoryAttestationDisposal :exec
+INSERT INTO memory_attestation_disposals(tenant_id,attestation_id,payload) VALUES($1,$2,$3)
+`
+
+type InsertMemoryAttestationDisposalParams struct {
+	TenantID      string
+	AttestationID string
+	Payload       []byte
+}
+
+func (q *Queries) InsertMemoryAttestationDisposal(ctx context.Context, arg InsertMemoryAttestationDisposalParams) error {
+	_, err := q.db.Exec(ctx, InsertMemoryAttestationDisposal, arg.TenantID, arg.AttestationID, arg.Payload)
+	return err
+}
 
 const LockAttestationGuard = `-- name: LockAttestationGuard :exec
 INSERT INTO attestation_guards(tenant_id,attestation_id,epoch) VALUES($1,$2,1)
@@ -22,4 +138,36 @@ type LockAttestationGuardParams struct {
 func (q *Queries) LockAttestationGuard(ctx context.Context, arg LockAttestationGuardParams) error {
 	_, err := q.db.Exec(ctx, LockAttestationGuard, arg.TenantID, arg.AttestationID)
 	return err
+}
+
+const MemoryAttestationDisposalHeader = `-- name: MemoryAttestationDisposalHeader :one
+SELECT a.scope_id,a.record_id,a.version_id,a.ledger_revision,e.recorded_at
+FROM memory_attestations a JOIN ledger_events e ON e.tenant_id=a.tenant_id AND e.ledger_revision=a.ledger_revision
+WHERE a.tenant_id=$1 AND a.id=$2
+`
+
+type MemoryAttestationDisposalHeaderParams struct {
+	TenantID string
+	ID       string
+}
+
+type MemoryAttestationDisposalHeaderRow struct {
+	ScopeID        string
+	RecordID       string
+	VersionID      string
+	LedgerRevision int64
+	RecordedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) MemoryAttestationDisposalHeader(ctx context.Context, arg MemoryAttestationDisposalHeaderParams) (MemoryAttestationDisposalHeaderRow, error) {
+	row := q.db.QueryRow(ctx, MemoryAttestationDisposalHeader, arg.TenantID, arg.ID)
+	var i MemoryAttestationDisposalHeaderRow
+	err := row.Scan(
+		&i.ScopeID,
+		&i.RecordID,
+		&i.VersionID,
+		&i.LedgerRevision,
+		&i.RecordedAt,
+	)
+	return i, err
 }

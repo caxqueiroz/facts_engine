@@ -433,7 +433,7 @@ func versionPrerequisites(p model.AcceptancePolicy, versionID, digest string, as
 	for _, req := range p.Required {
 		found := false
 		for _, a := range as {
-			if validConfirmation(a) && (a.Confirmation == nil || !a.Confirmation.RespondedAt.After(now)) && a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && attestationEligible(req, a, now) {
+			if !a.PayloadDisposed && a.DisposedPayloadDigest == "" && validConfirmation(a) && (a.Confirmation == nil || !a.Confirmation.RespondedAt.After(now)) && a.Kind == req.Kind && a.VersionID == versionID && a.ContentDigest == digest && slices.Contains(req.Principals, a.Attestor.Principal) && attestationEligible(req, a, now) {
 				ids = append(ids, a.ID)
 				found = true
 				break

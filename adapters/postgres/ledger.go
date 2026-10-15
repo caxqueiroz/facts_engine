@@ -364,6 +364,10 @@ func (t *transaction) Attestations(ctx context.Context, version string) ([]model
 			return nil, err
 		}
 		if a.PayloadDisposed {
+			if !model.ValidAttestationTombstone(a, t.tenant, a.ID) {
+				return nil, model.ErrPrecondition
+			}
+		} else if a.DisposedPayloadDigest != "" {
 			return nil, model.ErrPrecondition
 		}
 		out = append(out, a)

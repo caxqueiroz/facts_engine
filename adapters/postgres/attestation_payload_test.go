@@ -83,7 +83,7 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 			if err := admin.QueryRow(ctx, "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='payload'", parent).Scan(&count); err != nil || count != 0 {
 				t.Fatal("header retains content", count, err)
 			}
-			read := func(historical bool) error {
+			read := func(historical, disposed bool) error {
 				return ledger.Transact(ctx, "legacy", func(tx model.Tx) error {
 					var attestations []model.Attestation
 					var err error
@@ -98,14 +98,17 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 					} else {
 						attestations, err = tx.Attestations(ctx, version)
 					}
-					if err == nil && (len(attestations) != 1 || attestations[0].ID != id) {
+					if err == nil && (len(attestations) != 1 || attestations[0].ID != id || attestations[0].PayloadDisposed != disposed) {
 						t.Fatal("attestation lost", attestations)
+					}
+					if err == nil && disposed && !model.ValidAttestationTombstone(attestations[0], "legacy", id) {
+						t.Fatal("invalid attestation disposal tombstone", attestations[0])
 					}
 					return err
 				})
 			}
 			for _, historical := range []bool{false, true} {
-				if err := read(historical); err != nil {
+				if err := read(historical, false); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -150,8 +153,8 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 				t.Fatal("disposed attestation content was mutable", err)
 			}
 			for _, historical := range []bool{false, true} {
-				if err := read(historical); !errors.Is(err, model.ErrPrecondition) {
-					t.Fatal("disposal marker did not override live bytes", historical, err)
+				if err := read(historical, true); err != nil {
+					t.Fatal("disposal marker broke lifecycle inventory", historical, err)
 				}
 			}
 			for _, query := range []struct {
@@ -209,7 +212,7 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 				t.Fatal(err)
 			}
 			for _, historical := range []bool{false, true} {
-				if err := read(historical); !errors.Is(err, model.ErrPrecondition) {
+				if err := read(historical, false); !errors.Is(err, model.ErrPrecondition) {
 					t.Fatal("missing attestation silently omitted", historical, err)
 				}
 			}
@@ -253,7 +256,7 @@ func testAttestationPayloadMigration(t *testing.T, ctx context.Context, admin, r
 			if _, err = admin.Exec(ctx, fmt.Sprintf("INSERT INTO %s(tenant_id,attestation_id,payload) VALUES('legacy',$1,$2)", child), id, want[kind]); err != nil {
 				t.Fatal(err)
 			}
-			if err = read(true); err != nil {
+			if err = read(true, false); err != nil {
 				t.Fatal(err)
 			}
 		})
