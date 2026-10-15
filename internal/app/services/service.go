@@ -187,8 +187,28 @@ func (s *Service) verify(ctx context.Context, tenant string, e model.Evidence) (
 }
 
 // The boolean distinguishes a confirmed mismatch from a failed storage read.
+// evidenceInterruption preserves cancellation without exposing storage error text.
+func evidenceInterruption(ctx context.Context, err error) error {
+	if interrupted := ctx.Err(); interrupted != nil {
+		return interrupted
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	return nil
+}
+
 func (s *Service) verifyEvidenceIntegrity(ctx context.Context, tenant string, e model.Evidence) ([]byte, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
 	b, err := s.evidence.Read(ctx, tenant, e.Object)
+	if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+		return nil, false, interrupted
+	}
 	if err != nil {
 		return nil, false, model.ErrPrecondition
 	}

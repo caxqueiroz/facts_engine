@@ -3,6 +3,7 @@ package evidence
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/caxqueiroz/facts_engine/adapters/postgres"
 	"github.com/caxqueiroz/facts_engine/gen/ledgerdb"
@@ -72,16 +73,31 @@ func (s *Postgres) Put(ctx context.Context, tenant, id string, payload []byte) (
 	return ref, nil
 }
 func (s *Postgres) Read(ctx context.Context, tenant string, ref model.ObjectRef) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var b []byte
 	err := s.transaction(ctx, tenant, func(tx pgx.Tx) error {
 		var err error
 		b, err = ledgerdb.New(tx).GetEvidenceObjectPayload(ctx, ledgerdb.GetEvidenceObjectPayloadParams{TenantID: tenant, Locator: ref.Locator, ObjectVersion: ref.Version})
 		return err
 	})
+	if interrupted := ctx.Err(); interrupted != nil {
+		return nil, interrupted
+	}
+	if errors.Is(err, context.Canceled) {
+		return nil, context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, context.DeadlineExceeded
+	}
 	if err != nil {
 		return nil, fmt.Errorf("evidence unavailable: %w", model.ErrPrecondition)
 	}
 	p, err := s.cipher.Open(tenant, b)
+	if interrupted := ctx.Err(); interrupted != nil {
+		return nil, interrupted
+	}
 	if err != nil {
 		return nil, err
 	}

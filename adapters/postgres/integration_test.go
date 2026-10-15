@@ -312,6 +312,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 		testRemoteFactReads(t, ctx, paged, reviewer, q.Key, proposal.RecordID, now)
 	})
+	t.Run("evidence interruption", func(t *testing.T) { testEvidenceInterruption(t, ctx, ledger, store, reviewer, q.Key, now) })
 	t.Run("current value", func(t *testing.T) {
 		r, err := engine.GetFact(ctx, reviewer, model.FactQuery{Key: q.Key, ValidAt: now})
 		if err != nil || r.State != "resolved" || *r.Value.Text != "tea" {

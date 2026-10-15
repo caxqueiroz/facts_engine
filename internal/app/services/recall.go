@@ -79,6 +79,9 @@ func (s *Service) Recall(ctx context.Context, c model.Caller, q model.RecallRequ
 			}
 		}
 		if _, err := s.loadEvidence(ctx, c, item.Selector.Scope, item.EvidenceIDs); err != nil {
+			if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+				return model.RecallResult{}, interrupted
+			}
 			continue
 		}
 		out.Items = append(out.Items, model.RecallItem{Key: item.Selector, Fact: item.Resolution, Score: scores[j]})

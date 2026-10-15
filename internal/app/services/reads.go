@@ -164,6 +164,9 @@ func (s *Service) ListFacts(ctx context.Context, c model.Caller, q model.FactsQu
 		item := &out.Items[i]
 		if len(item.EvidenceIDs) > 0 {
 			if _, err = s.loadEvidence(ctx, c, q.Scope, item.EvidenceIDs); err != nil {
+				if interrupted := evidenceInterruption(ctx, err); interrupted != nil {
+					return model.FactsPage{}, interrupted
+				}
 				item.Resolution.State = "ineligible"
 				item.Resolution.Value = nil
 			}

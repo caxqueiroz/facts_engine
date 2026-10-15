@@ -668,6 +668,8 @@ Repeating a conversation source revision with identical content returns the orig
 `GetConversation` requires current evidence-metadata permission and returns source/object metadata and ordered evidence IDs. Exact message bytes still require `GetEvidenceContent`. Conversation metadata participates in signed audit exports and event archives, and its evidence links block uncoordinated disposal. Integration tests cover rollback without partial message registration, concurrent source deduplication, corrected-message lineage, invalid authority/timezone, tenant isolation and the archive pipeline.
 
 
+Evidence verification preserves `context.Canceled` and `context.DeadlineExceeded`, including wrapped adapter errors, without exposing storage error text. Interrupted fact reads, lists, snapshots, recall and context preparation return errors rather than converting the interruption into an ineligible item or a partial successful result. Audit preparation aborts rather than recording cancellation as an evidence coverage gap. Actual missing/corrupt evidence retains the existing integrity-failure behavior. The PostgreSQL evidence adapter checks cancellation before accessing its pool and after storage work; custom adapters must still honor context deadlines during their own I/O.
+
 ## Offline extraction evaluation
 
 `memoryeval` scores owner-labelled extraction observations without calling a model or modifying the ledger. It measures extraction errors separately from retrieval relevance. Run the intentionally imperfect synthetic fixture with `make eval-example`, or score your own files:

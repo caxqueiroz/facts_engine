@@ -43,6 +43,25 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 	if len(m.Items) == 0 || len(m.Rendered) == 0 || m.RenderedDigest != model.BytesDigest(m.Rendered) || m.Digest != model.ContextDigest(m) || m.CreationRevision <= m.SelectionRevision {
 		t.Fatal("invalid retained context", m)
 	}
+	for _, want := range []error{context.Canceled, context.DeadlineExceeded} {
+		interrupted, err := facts.NewWithRetrieval(l, allow{}, interruptedEvidenceStore{store, want}, model.RetrievalOptions{Index: index, Progress: l, Generation: "g1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recalled, err := interrupted.Recall(ctx, c, q)
+		if !errors.Is(err, want) || len(recalled.Items) != 0 {
+			t.Fatal("interrupted recall returned partial results", recalled, err)
+		}
+		for _, mixed := range []bool{false, true} {
+			request := r
+			request.Key = "interrupted-context"
+			request.IncludeMemories = mixed
+			manifest, err := interrupted.PrepareContext(ctx, c, request)
+			if !errors.Is(err, want) || manifest.ID != "" || len(manifest.Rendered) != 0 {
+				t.Fatal("interrupted context delivered", manifest, err)
+			}
+		}
+	}
 	broken, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: unavailableIndex{index}, Progress: l, Generation: "g1"})
 	if err != nil {
 		t.Fatal(err)
