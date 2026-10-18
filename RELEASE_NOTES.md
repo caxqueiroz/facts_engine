@@ -1,6 +1,18 @@
-# Unreleased
+# v0.2.0-rc.3
+
+**Release date:** 2026-10-18  
+**Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
+
+This release candidate lets a host keep the ledger in a named PostgreSQL schema of its own database and run the migrations from the module. The consumer contract of v0.2.0-rc.2 below is otherwise unchanged.
+
+## Changes
 
 - PostgreSQL ledger in a named schema: `postgres.WithSchema` runs the startup checks against a configured schema (default `public`) and requires the connection `search_path` to resolve to it; `facts.Migrations()` exposes the embedded goose migrations; `scripts/runtime-role.sql` grants usage on the current schema. Behaviour without the option is unchanged.
+- The table-owner refusal now holds in a named schema too: with `WithSchema`, a login that owns `ledger_events` in that schema is refused, as it is in `public`.
+
+## Verification
+
+GitHub-hosted CI did not start for this release (account billing). The release source passed `sh scripts/check.sh` with the Makefile's pinned tools, `make vuln`, and `sh scripts/integration.sh` against disposable PostgreSQL 17.6, OpenFGA and CortexDB services, including the logical restore and fresh search rebuild drill.
 
 # v0.2.0-rc.2
 

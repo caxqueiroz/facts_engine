@@ -1,6 +1,6 @@
 # Facts engine setup manual
 
-This manual describes the consumer contract for `v0.2.0-rc.2`. It covers an embedded Go integration and the optional Connect/gRPC service. The release is a pre-1.0 release candidate: pin the exact version, and expect the Go and protobuf APIs to change before v1.
+This manual describes the consumer contract for `v0.2.0-rc.3`. It covers an embedded Go integration and the optional Connect/gRPC service. The release is a pre-1.0 release candidate: pin the exact version, and expect the Go and protobuf APIs to change before v1.
 
 ## What the consuming application owns
 
@@ -23,7 +23,7 @@ Engine constructors do not migrate databases, start workers/listeners, create au
 ```sh
 export GOPRIVATE=github.com/caxqueiroz/facts_engine
 gh auth setup-git
-go get github.com/caxqueiroz/facts_engine@v0.2.0-rc.2
+go get github.com/caxqueiroz/facts_engine@v0.2.0-rc.3
 ```
 
 In CI, configure an approved GitHub credential with read access to this repository and set the same `GOPRIVATE` pattern; do not put a token in the module URL or commit it. The package import path is `github.com/caxqueiroz/facts_engine`. Generated Connect and gRPC contracts are under `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
