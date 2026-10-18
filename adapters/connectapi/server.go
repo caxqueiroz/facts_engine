@@ -61,7 +61,7 @@ func NewHandlerWithOptions(engine Engine, verify IdentityVerifier, limits Limits
 		&v1.RecallRequest{}, &v1.RecallMemoriesRequest{}, &v1.WaitForProjectionRequest{},
 		&v1.RecordCalculationRequest{}, &v1.GetCalculationReceiptRequest{}, &v1.ListChangesRequest{}, &v1.StartAuditExportRequest{}, &v1.GetAuditExportRequest{},
 		&v1.IngestConversationRequest{}, &v1.GetConversationRequest{}, &v1.StartExtractionRequest{}, &v1.PlanExtractionChunksRequest{}, &v1.GetJobRequest{}, &v1.RetryJobRequest{}, &v1.GetExtractionRunRequest{}, &v1.StartMemoryRefreshRequest{},
-		&v1.RegisterMemoryTypeRequest{}, &v1.GetMemoryRequest{}, &v1.ProposeMemoryRequest{}, &v1.ApproveMemoryRequest{}, &v1.AcceptMemoryRequest{}, &v1.RejectMemoryRequest{}, &v1.RetractMemoryRequest{}, &v1.DisputeMemoryRequest{}, &v1.ResolveMemoryDisputeRequest{}, &v1.SupersedeMemoryRequest{}, &v1.GetMemoryVersionRequest{}, &v1.GetMemoryHistoryRequest{},
+		&v1.RegisterMemoryTypeRequest{}, &v1.GetMemoryRequest{}, &v1.ProposeMemoryRequest{}, &v1.ApproveMemoryRequest{}, &v1.AcceptMemoryRequest{}, &v1.RejectMemoryRequest{}, &v1.RetractMemoryRequest{}, &v1.DisputeMemoryRequest{}, &v1.ResolveMemoryDisputeRequest{}, &v1.SupersedeMemoryRequest{}, &v1.GetMemoryVersionRequest{}, &v1.GetMemoryHistoryRequest{}, &v1.ListMemoriesRequest{},
 		&v1.RegisterAcceptancePolicyRequest{}, &v1.RegisterPredicateVersionRequest{}, &v1.RecordAttestationRequest{}, &v1.RecordDelegatedAttestationRequest{}, &v1.WithdrawAttestationRequest{},
 		&v1.RegisterEvidenceRequest{}, &v1.RegisterRedactedEvidenceRequest{}, &v1.GetEvidenceMetadataRequest{}, &v1.GetEvidenceContentRequest{},
 		&v1.ListFactsRequest{}, &v1.GetFactHistoryRequest{},

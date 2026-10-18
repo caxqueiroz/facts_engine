@@ -26,6 +26,16 @@ FROM record_events re
 JOIN ledger_events e ON e.tenant_id=re.tenant_id AND e.id=re.event_id
 WHERE re.tenant_id=r.tenant_id AND re.record_id=r.id AND e.ledger_revision<=$6) ORDER BY r.id LIMIT $7;
 
+-- name: ListMemoryRecords :many
+SELECT r.id,r.scope_id,r.discriminator
+FROM records r
+WHERE r.kind='memory' AND r.tenant_id=$1 AND r.scope_id=$2 AND r.id>$3 AND EXISTS(SELECT 1
+FROM memory_record_events re
+JOIN ledger_events e ON e.tenant_id=re.tenant_id AND e.id=re.event_id
+WHERE re.tenant_id=r.tenant_id AND re.record_id=r.id AND e.ledger_revision<=$4) AND EXISTS(SELECT 1
+FROM memory_versions v
+WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.ledger_revision<=$4 AND ($5::text='' OR v.subtype=$5)) ORDER BY r.id LIMIT $6;
+
 -- name: ListFactHistoryPage :many
 SELECT e.payload,e.recorded_at
 FROM record_events r

@@ -171,6 +171,24 @@ func testRemoteMemories(t *testing.T, ctx context.Context, ledger model.Ledger, 
 	if err != nil || !proto.Equal(after, grpcafter) {
 		t.Fatal("gRPC replacement", grpcafter, err)
 	}
+	list := &v1.ListMemoriesRequest{Tenant: author.Tenant, Scope: "case", Purpose: "memory-review", ValidAt: request.Proposal.Valid.From, Limit: 100}
+	listed, err := client.ListMemories(ctx, list)
+	if err != nil || len(listed.Items) != 1 || !proto.Equal(listed.Items[0].Key, request.Proposal.Key) || !proto.Equal(listed.Items[0].Memory, after.Result) || listed.NextPageToken != "" {
+		t.Fatalf("listed replacement: %v, %v", listed, err)
+	}
+	// Each first page evaluates eligibility at its own instant and signs its own expiring token.
+	sameListing := func(a, b *v1.ListMemoriesResponse) bool {
+		if a.EvaluatedAt == nil || b.EvaluatedAt == nil || (a.NextPageToken == "") != (b.NextPageToken == "") {
+			return false
+		}
+		a, b = proto.Clone(a).(*v1.ListMemoriesResponse), proto.Clone(b).(*v1.ListMemoriesResponse)
+		a.EvaluatedAt, b.EvaluatedAt, a.NextPageToken, b.NextPageToken = nil, nil, "", ""
+		return proto.Equal(a, b)
+	}
+	grpcListed, err := grpcClient.ListMemories(ctx, list)
+	if err != nil || !sameListing(listed, grpcListed) {
+		t.Fatal("gRPC/Connect ListMemories", grpcListed, err)
+	}
 	// A fact dependency change must suppress the current body without rewriting history.
 	factChange := model.LifecycleChange{Approval: model.Approval{Command: cmd("fact-dispute"), Scope: "case", RecordID: fact.RecordID, VersionID: fact.VersionID, ExpectedRevision: acceptedFact.StreamRevision}, Valid: model.Interval{From: &at}, Reason: "review"}
 	changed, err := engine.DisputeFact(ctx, reviewer, factChange)
@@ -286,6 +304,56 @@ func testRemoteMemories(t *testing.T, ctx context.Context, ledger model.Ledger, 
 	autoRead, err := client.GetMemory(ctx, &v1.GetMemoryRequest{Tenant: author.Tenant, Purpose: "memory-review", Key: automaticRequest.Proposal.Key, ValidAt: request.Proposal.Valid.From})
 	if err != nil || autoRead.Result.State != "resolved" || autoRead.Result.Body != automaticRequest.Proposal.Body {
 		t.Fatalf("automatic memory: %v, %v", autoRead, err)
+	}
+	// The retracted summary and the rejected candidate are not current memories.
+	current, err = client.GetMemory(ctx, query)
+	if err != nil || current.Result.State != "retracted" {
+		t.Fatalf("retracted summary: %v, %v", current, err)
+	}
+	listed, err = client.ListMemories(ctx, list)
+	if err != nil || len(listed.Items) != 1 || listed.Items[0].Key.Id != "automatic" || !proto.Equal(listed.Items[0].Memory, autoRead.Result) {
+		t.Fatalf("listed current memories: %v, %v", listed, err)
+	}
+	grpcListed, err = grpcClient.ListMemories(ctx, list)
+	if err != nil || !sameListing(listed, grpcListed) {
+		t.Fatal("gRPC/Connect ListMemories after retraction", grpcListed, err)
+	}
+	paged := proto.Clone(list).(*v1.ListMemoriesRequest)
+	paged.Limit = 1
+	keys := []string{}
+	var firstToken string
+	for pages := 0; ; pages++ {
+		if pages > 10 {
+			t.Fatal("remote pagination did not terminate")
+		}
+		page, err := client.ListMemories(ctx, paged)
+		if err != nil {
+			t.Fatal(err)
+		}
+		grpcPage, err := grpcClient.ListMemories(ctx, paged)
+		if err != nil || !sameListing(page, grpcPage) || paged.PageToken != "" && !proto.Equal(page.EvaluatedAt, grpcPage.EvaluatedAt) {
+			t.Fatal("gRPC/Connect ListMemories page", page, grpcPage, err)
+		}
+		for _, item := range page.Items {
+			keys = append(keys, item.Key.Id)
+		}
+		if firstToken == "" {
+			firstToken = page.NextPageToken
+		}
+		if page.NextPageToken == "" {
+			break
+		}
+		paged.PageToken = page.NextPageToken
+	}
+	if len(keys) != 1 || keys[0] != "automatic" || firstToken == "" {
+		t.Fatal("remote paged listing", keys, firstToken)
+	}
+	paged.PageToken = firstToken
+	if _, err := review.ListMemories(ctx, paged); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("list cursor actor: %v", err)
+	}
+	if result, err := grpcReview.ListMemories(ctx, paged); result != nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatal("gRPC list cursor actor binding", result, err)
 	}
 
 }

@@ -76,7 +76,7 @@ Generated Go messages and Connect/gRPC clients are committed under [gen/memory/v
 | Service | Operations |
 | --- | --- |
 | [FactService](proto/memory/v1/facts.proto) | GetFact, ListFacts, paginated GetFactHistory, ProposeFact, ApproveFact, AcceptFact, RejectFact, RetractFact, DisputeFact, ResolveDispute, SupersedeFact |
-| [MemoryService](proto/memory/v1/memories.proto) | ProposeMemory, ApproveMemory, AcceptMemory, RejectMemory, RetractMemory, DisputeMemory, ResolveMemoryDispute, SupersedeMemory, GetMemory, GetMemoryVersion, paginated GetMemoryHistory |
+| [MemoryService](proto/memory/v1/memories.proto) | ProposeMemory, ApproveMemory, AcceptMemory, RejectMemory, RetractMemory, DisputeMemory, ResolveMemoryDispute, SupersedeMemory, GetMemory, GetMemoryVersion, paginated GetMemoryHistory, paginated ListMemories |
 | [OperationsService](proto/memory/v1/operations.proto) | GetProjectionStatus, RebuildIndex |
 | [RetentionService](proto/memory/v1/retention.proto) | RegisterRetentionPolicy, PlaceLegalHold, ReleaseLegalHold, DisposeEvidence, DisposeOrphanEvidence, DisposeSnapshot, DisposeContext, DisposeExtraction, DisposeVersion, DisposeAttestation, DisposeConversation, DisposeBatch, CleanupProjection, GetRetentionStatus |
 | [IdentityService](proto/memory/v1/identities.proto) | PutScope, PutSubject, GetScope, GetSubject, LookupSubject |
@@ -125,7 +125,7 @@ Requests pass Protobuf validation and explicit timestamp component checks before
 
 Listing and history require an engine constructed with `NewWithReads` and a securely provisioned 32-byte pagination key. Page sizes are explicit (1–100); page tokens pass unchanged to the shared engine and bind the authenticated identity, filters, page size and selected revision. Remote `GetFactHistory` uses the paginated engine method, with typed events carrying actor and authorization provenance. It does not invoke the unbounded embedded history method.
 
-Memory proposals use an application-issued scope/ID, registered subtype/version, nonempty body (up to 64 KiB), source spans and up to 64 exact fact dependencies. Dependency labels preserve `assertion`, `uncertain` and `disputed`. Immutable version reads return retained content, proposer, content digest and authorization provenance. Retained content is distinct from a proposal request; original write-command identity is available through event history. Current reads enforce dependency eligibility and withhold stale, disputed or retracted bodies; revision-bound reads retain the historical view. Manual and automated acceptance remain distinct policy-controlled operations. Memory history is paginated with the same identity-bound cursor rules as fact history.
+Memory proposals use an application-issued scope/ID, registered subtype/version, nonempty body (up to 64 KiB), source spans and up to 64 exact fact dependencies. Dependency labels preserve `assertion`, `uncertain` and `disputed`. Immutable version reads return retained content, proposer, content digest and authorization provenance. Retained content is distinct from a proposal request; original write-command identity is available through event history. Current reads enforce dependency eligibility and withhold stale, disputed or retracted bodies; revision-bound reads retain the historical view. Manual and automated acceptance remain distinct policy-controlled operations. Memory history is paginated with the same identity-bound cursor rules as fact history. `ListMemories` pages through one scope's current memories with the same cursor rules as `ListFacts`.
 
 Snapshots accept 1–128 ordered, distinct selectors and return typed values, resolution states, source/evidence/attestation references, retained authorization receipts, the selection and creation revisions, and the engine's versioned content digest. The digest uses the engine's canonical snapshot format, not serialized Protobuf bytes. Remote and embedded retries share the same command identity and return the original persisted snapshot.
 
@@ -1306,6 +1306,25 @@ Continuation tokens are bound to the authenticated caller, tenant, scope, record
 
 Real PostgreSQL tests verify that a concurrent proposal stays outside an existing page sequence, a fresh traversal includes it, withdrawals remain visible, and tokens cannot cross caller or fact/memory boundaries.
 
+
+### Listing a scope's memories
+
+`ListMemories` returns every current memory in one scope, for example so a consolidation step can see what is already remembered before proposing more. It takes `MemoriesQuery` and returns `MemoriesPage`, and needs the same `EngineOptions.Reads` signing key as `ListFacts`.
+
+```go
+page, err := engine.ListMemories(ctx, caller, model.MemoriesQuery{
+    Scope: scope, Subtype: "summary", // Subtype is optional
+    Purpose: "memory_consolidation", ValidAt: time.Now(), Limit: 100,
+})
+for _, item := range page.Items {
+    // item.Key is the MemoryKey; item.Memory is what GetMemory returns for it.
+}
+// Pass page.NextPageToken as PageToken, with the query otherwise unchanged, for the next page.
+```
+
+Each item is the `MemoryResult` that `GetMemory` would return for that key at `ValidAt` and the page's revision. The listing leaves out records with no version selected at `ValidAt` (pending, rejected or expired proposals) and retracted memories. Disputed, stale and ineligible memories stay in the list with their state and no body. A memory whose dependency scopes or evidence the caller may not read is left out of the page, as in `RecallMemories`, rather than failing it. Because records are skipped after they are read, a page can hold fewer than `Limit` items, or none, and still return a `NextPageToken`; keep paging until the token is empty.
+
+Authorization matches `ListFacts`: `can_read` on the scope, plus `can_read_history` when `KnowledgeRevision` or `KnownAt` selects a historical view. It is checked before reading and again before disclosure. `KnownAt` and `KnowledgeRevision` are mutually exclusive, and a `KnownAt` before the tenant's first event returns an empty page. The first page pins the tenant revision and evaluation time; later pages keep them, so memories created after the first page appear only in a fresh listing. Tokens (`memories-page-v1`) are signed and bound to the caller, tenant and the whole query (scope, subtype, purpose, valid time, historical selection and page size). They are rejected by `ListFacts` and by other callers. No database migration or new OpenFGA relation is required.
 
 ### Memory projection and recall
 

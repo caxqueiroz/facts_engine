@@ -201,6 +201,59 @@ func (q *Queries) ListMemoryHistoryPage(ctx context.Context, arg ListMemoryHisto
 	return items, nil
 }
 
+const ListMemoryRecords = `-- name: ListMemoryRecords :many
+SELECT r.id,r.scope_id,r.discriminator
+FROM records r
+WHERE r.kind='memory' AND r.tenant_id=$1 AND r.scope_id=$2 AND r.id>$3 AND EXISTS(SELECT 1
+FROM memory_record_events re
+JOIN ledger_events e ON e.tenant_id=re.tenant_id AND e.id=re.event_id
+WHERE re.tenant_id=r.tenant_id AND re.record_id=r.id AND e.ledger_revision<=$4) AND EXISTS(SELECT 1
+FROM memory_versions v
+WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.ledger_revision<=$4 AND ($5::text='' OR v.subtype=$5)) ORDER BY r.id LIMIT $6
+`
+
+type ListMemoryRecordsParams struct {
+	TenantID       string
+	ScopeID        string
+	ID             string
+	LedgerRevision int64
+	Column5        string
+	Limit          int32
+}
+
+type ListMemoryRecordsRow struct {
+	ID            string
+	ScopeID       string
+	Discriminator string
+}
+
+func (q *Queries) ListMemoryRecords(ctx context.Context, arg ListMemoryRecordsParams) ([]ListMemoryRecordsRow, error) {
+	rows, err := q.db.Query(ctx, ListMemoryRecords,
+		arg.TenantID,
+		arg.ScopeID,
+		arg.ID,
+		arg.LedgerRevision,
+		arg.Column5,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMemoryRecordsRow{}
+	for rows.Next() {
+		var i ListMemoryRecordsRow
+		if err := rows.Scan(&i.ID, &i.ScopeID, &i.Discriminator); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListMemoryRefreshDependents = `-- name: ListMemoryRefreshDependents :many
 SELECT DISTINCT v.record_id,v.id
 FROM memory_versions v

@@ -54,6 +54,8 @@ const (
 	// MemoryServiceGetMemoryHistoryProcedure is the procedure name of the MemoryService's
 	// GetMemoryHistory RPC.
 	MemoryServiceGetMemoryHistoryProcedure = "/memory.v1.MemoryService/GetMemoryHistory"
+	// MemoryServiceListMemoriesProcedure is the procedure name of the MemoryService's ListMemories RPC.
+	MemoryServiceListMemoriesProcedure = "/memory.v1.MemoryService/ListMemories"
 )
 
 var (
@@ -134,6 +136,13 @@ var (
 			Procedure:  MemoryServiceGetMemoryHistoryProcedure,
 		}
 	})
+	memoryServiceListMemoriesSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_memory_v1_memories_proto.Services().ByName("MemoryService").Methods().ByName("ListMemories"),
+			Procedure:  MemoryServiceListMemoriesProcedure,
+		}
+	})
 )
 
 // MemoryServiceClient is a client for the memory.v1.MemoryService service.
@@ -149,6 +158,7 @@ type MemoryServiceClient interface {
 	SupersedeMemory(context.Context, *v1.SupersedeMemoryRequest) (*v1.SupersedeMemoryResponse, error)
 	GetMemoryVersion(context.Context, *v1.GetMemoryVersionRequest) (*v1.GetMemoryVersionResponse, error)
 	GetMemoryHistory(context.Context, *v1.GetMemoryHistoryRequest) (*v1.GetMemoryHistoryResponse, error)
+	ListMemories(context.Context, *v1.ListMemoriesRequest) (*v1.ListMemoriesResponse, error)
 }
 
 // NewMemoryServiceClient constructs a client for the memory.v1.MemoryService service. Multiple
@@ -170,6 +180,7 @@ type MemoryServiceHandler interface {
 	SupersedeMemory(context.Context, *v1.SupersedeMemoryRequest) (*v1.SupersedeMemoryResponse, error)
 	GetMemoryVersion(context.Context, *v1.GetMemoryVersionRequest) (*v1.GetMemoryVersionResponse, error)
 	GetMemoryHistory(context.Context, *v1.GetMemoryHistoryRequest) (*v1.GetMemoryHistoryResponse, error)
+	ListMemories(context.Context, *v1.ListMemoriesRequest) (*v1.ListMemoriesResponse, error)
 }
 
 // RegisterMemoryServiceHandler registers svc as the memory.v1.MemoryService implementation on
@@ -188,6 +199,7 @@ func RegisterMemoryServiceHandler(server *connect.Server, svc MemoryServiceHandl
 		connect.Method{Spec: memoryServiceSupersedeMemorySpec(), Handler: adapter.supersedeMemory},
 		connect.Method{Spec: memoryServiceGetMemoryVersionSpec(), Handler: adapter.getMemoryVersion},
 		connect.Method{Spec: memoryServiceGetMemoryHistorySpec(), Handler: adapter.getMemoryHistory},
+		connect.Method{Spec: memoryServiceListMemoriesSpec(), Handler: adapter.listMemories},
 	)
 }
 
@@ -236,6 +248,10 @@ func (UnimplementedMemoryServiceHandler) GetMemoryVersion(context.Context, *v1.G
 
 func (UnimplementedMemoryServiceHandler) GetMemoryHistory(context.Context, *v1.GetMemoryHistoryRequest) (*v1.GetMemoryHistoryResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.MemoryService.GetMemoryHistory is not implemented")
+}
+
+func (UnimplementedMemoryServiceHandler) ListMemories(context.Context, *v1.ListMemoriesRequest) (*v1.ListMemoriesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "memory.v1.MemoryService.ListMemories is not implemented")
 }
 
 type memoryServiceClient struct {
@@ -325,6 +341,14 @@ func (c *memoryServiceClient) GetMemoryVersion(ctx context.Context, req *v1.GetM
 func (c *memoryServiceClient) GetMemoryHistory(ctx context.Context, req *v1.GetMemoryHistoryRequest) (*v1.GetMemoryHistoryResponse, error) {
 	var res v1.GetMemoryHistoryResponse
 	if err := c.client.CallUnary(ctx, memoryServiceGetMemoryHistorySpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *memoryServiceClient) ListMemories(ctx context.Context, req *v1.ListMemoriesRequest) (*v1.ListMemoriesResponse, error) {
+	var res v1.ListMemoriesResponse
+	if err := c.client.CallUnary(ctx, memoryServiceListMemoriesSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -458,6 +482,18 @@ func (h memoryServiceHandler) getMemoryHistory(ctx context.Context, _ connect.Sp
 		return err
 	}
 	res, err := h.svc.GetMemoryHistory(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h memoryServiceHandler) listMemories(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListMemoriesRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListMemories(ctx, &req)
 	if err != nil {
 		return err
 	}

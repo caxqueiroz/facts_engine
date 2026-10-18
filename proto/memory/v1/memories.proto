@@ -19,6 +19,7 @@ service MemoryService {
   rpc SupersedeMemory(SupersedeMemoryRequest) returns (SupersedeMemoryResponse);
   rpc GetMemoryVersion(GetMemoryVersionRequest) returns (GetMemoryVersionResponse);
   rpc GetMemoryHistory(GetMemoryHistoryRequest) returns (GetMemoryHistoryResponse);
+  rpc ListMemories(ListMemoriesRequest) returns (ListMemoriesResponse);
 }
 message GetMemoryRequest {
   option (buf.validate.message).cel = {
@@ -152,6 +153,39 @@ message GetMemoryHistoryResponse {
   repeated Event events = 1;
   int64 ledger_revision = 2;
   int64 stream_revision = 3;
+  string next_page_token = 4;
+}
+// Tokens are opaque and bound by the engine to identity, filters and revision.
+message ListMemoriesRequest {
+  option (buf.validate.message).cel = {
+    id: "list_memories.knowledge_boundary"
+    message: "known_at and knowledge_revision cannot both be specified"
+    expression: "!has(this.known_at) || this.knowledge_revision == 0"
+  };
+  string tenant = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string scope = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"];
+  string subtype = 3 [(buf.validate.field).string.pattern = "^([A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$"];
+  string purpose = 4 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 256
+  }];
+  google.protobuf.Timestamp valid_at = 5 [(buf.validate.field).required = true];
+  int64 knowledge_revision = 6 [(buf.validate.field).int64.gte = 0];
+  google.protobuf.Timestamp known_at = 7;
+  int32 limit = 8 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  string page_token = 9 [(buf.validate.field).string.max_bytes = 4096];
+}
+message MemoryListItem {
+  MemoryKey key = 1;
+  MemoryResult memory = 2;
+}
+message ListMemoriesResponse {
+  repeated MemoryListItem items = 1;
+  int64 ledger_revision = 2;
+  google.protobuf.Timestamp evaluated_at = 3;
   string next_page_token = 4;
 }
 // Memory identity is application-issued and independent of fact selectors.
