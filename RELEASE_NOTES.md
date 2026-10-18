@@ -1,3 +1,7 @@
+# Unreleased
+
+- PostgreSQL ledger in a named schema: `postgres.WithSchema` runs the startup checks against a configured schema (default `public`) and requires the connection `search_path` to resolve to it; `facts.Migrations()` exposes the embedded goose migrations; `scripts/runtime-role.sql` grants usage on the current schema. Behaviour without the option is unchanged.
+
 # v0.2.0-rc.2
 
 **Release date:** 2026-10-15  
