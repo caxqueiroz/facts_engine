@@ -28,7 +28,7 @@ func (t *transaction) PrepareProjectionCleanup(ctx context.Context, r model.Proj
 		}
 	}
 	q := ledgerdb.New(t.tx)
-	capable, err := q.CanAcknowledgeProjectionCleanup(ctx)
+	capable, err := q.CanAcknowledgeProjectionCleanup(ctx, t.schema)
 	if err != nil {
 		return empty, err
 	}

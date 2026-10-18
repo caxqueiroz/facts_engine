@@ -49,7 +49,7 @@ func (l *Ledger) BackfillExtractionInputInventories(ctx context.Context, tenant 
 	}
 	attempts := []model.ExtractionAttempt{}
 	total := 0
-	t := &transaction{tx: tx, tenant: tenant, cipher: l.cipher}
+	t := &transaction{tx: tx, tenant: tenant, cipher: l.cipher, schema: l.schema}
 	for rows.Next() {
 		var id, job, scope string
 		var payload []byte

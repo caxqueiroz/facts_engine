@@ -12,33 +12,61 @@ import (
 	"github.com/caxqueiroz/facts_engine/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"regexp"
 )
 
 type Ledger struct {
 	pool   *pgxpool.Pool
 	cipher Cipher
+	schema string
 }
 
-func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher) (*Ledger, error) {
-	if pool == nil || cipher == nil {
+// Option configures New.
+type Option func(*options)
+
+type options struct{ schema string }
+
+// WithSchema names the PostgreSQL schema that holds the ledger tables. The
+// default is "public". The pool's search_path must resolve to the same schema,
+// because runtime queries use unqualified table names.
+func WithSchema(name string) Option {
+	return func(o *options) { o.schema = name }
+}
+
+var schemaName = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
+
+func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher, opts ...Option) (*Ledger, error) {
+	o := options{schema: "public"}
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if pool == nil || cipher == nil || !schemaName.MatchString(o.schema) {
 		return nil, model.ErrInvalid
 	}
+	var current pgtype.Text
+	if err := pool.QueryRow(ctx, "SELECT current_schema()").Scan(&current); err != nil {
+		return nil, fmt.Errorf("check current schema: %w", err)
+	}
+	if !current.Valid || current.String != o.schema {
+		return nil, fmt.Errorf("connection search_path must resolve to schema %q: %w", o.schema, model.ErrPrecondition)
+	}
 	var safe bool
-	if err := pool.QueryRow(ctx, ledgerdb.IsSafeLedgerRole).Scan(&safe); err != nil {
+	if err := pool.QueryRow(ctx, ledgerdb.IsSafeLedgerRole, o.schema).Scan(&safe); err != nil {
 		return nil, fmt.Errorf("check runtime role: %w", err)
 	}
 	if !safe {
 		return nil, fmt.Errorf("runtime role must not own ledger tables or bypass RLS: %w", model.ErrPrecondition)
 	}
 	var exists bool
-	if err := pool.QueryRow(ctx, ledgerdb.IsLedgerSchemaReady).Scan(&exists); err != nil {
+	if err := pool.QueryRow(ctx, ledgerdb.IsLedgerSchemaReady, o.schema).Scan(&exists); err != nil {
 		return nil, err
 	}
 	if !exists {
 		return nil, fmt.Errorf("apply migrations explicitly: %w", model.ErrPrecondition)
 	}
-	return &Ledger{pool, cipher}, nil
+	return &Ledger{pool: pool, cipher: cipher, schema: o.schema}, nil
 }
 
 type transaction struct {
@@ -74,6 +102,7 @@ type transaction struct {
 	tx                       pgx.Tx
 	tenant                   string
 	cipher                   Cipher
+	schema                   string
 }
 
 func (l *Ledger) Transact(ctx context.Context, tenant string, fn func(model.Tx) error) error {
@@ -92,7 +121,7 @@ func (l *Ledger) transact(ctx context.Context, tenant string, fn func(model.Tx) 
 	if err = ledgerdb.New(tx).BindTenant(ctx, tenant); err != nil {
 		return translate(err)
 	}
-	if err = fn(&transaction{tx: tx, tenant: tenant, cipher: l.cipher}); err != nil {
+	if err = fn(&transaction{tx: tx, tenant: tenant, cipher: l.cipher, schema: l.schema}); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
