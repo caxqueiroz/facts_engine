@@ -130,7 +130,7 @@ func TestLedgerInNamedSchema(t *testing.T) {
 		message string
 	}{
 		{name: "runtime role in named schema", pool: runtime, opts: []postgres.Option{postgres.WithSchema("facts")}},
-		{name: "default schema refused on facts search path", pool: runtime, want: model.ErrPrecondition, message: "search_path must resolve"},
+		{name: "default checks public only", pool: runtime, want: model.ErrPrecondition, message: "apply migrations explicitly"},
 		{name: "public search path refused for facts schema", pool: connect("facts_runtime", "public"), opts: []postgres.Option{postgres.WithSchema("facts")}, want: model.ErrPrecondition, message: "search_path must resolve"},
 		{name: "table owner refused", pool: connect(schemaOwnerTestRole, "facts"), opts: []postgres.Option{postgres.WithSchema("facts")}, want: model.ErrPrecondition, message: "must not own ledger tables"},
 		{name: "invalid schema name", pool: runtime, opts: []postgres.Option{postgres.WithSchema("Bad-Name")}, want: model.ErrInvalid},

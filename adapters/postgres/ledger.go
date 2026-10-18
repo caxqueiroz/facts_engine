@@ -26,13 +26,17 @@ type Ledger struct {
 // Option configures New.
 type Option func(*options)
 
-type options struct{ schema string }
+type options struct {
+	schema   string
+	explicit bool
+}
 
 // WithSchema names the PostgreSQL schema that holds the ledger tables. The
-// default is "public". The pool's search_path must resolve to the same schema,
-// because runtime queries use unqualified table names.
+// default is "public". With this option the pool's search_path must resolve to
+// the same schema, because runtime queries use unqualified table names; without
+// it New behaves as before and checks public only.
 func WithSchema(name string) Option {
-	return func(o *options) { o.schema = name }
+	return func(o *options) { o.schema, o.explicit = name, true }
 }
 
 var schemaName = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
@@ -45,12 +49,14 @@ func New(ctx context.Context, pool *pgxpool.Pool, cipher Cipher, opts ...Option)
 	if pool == nil || cipher == nil || !schemaName.MatchString(o.schema) {
 		return nil, model.ErrInvalid
 	}
-	var current pgtype.Text
-	if err := pool.QueryRow(ctx, "SELECT current_schema()").Scan(&current); err != nil {
-		return nil, fmt.Errorf("check current schema: %w", err)
-	}
-	if !current.Valid || current.String != o.schema {
-		return nil, fmt.Errorf("connection search_path must resolve to schema %q: %w", o.schema, model.ErrPrecondition)
+	if o.explicit {
+		var current pgtype.Text
+		if err := pool.QueryRow(ctx, "SELECT current_schema()").Scan(&current); err != nil {
+			return nil, fmt.Errorf("check current schema: %w", err)
+		}
+		if !current.Valid || current.String != o.schema {
+			return nil, fmt.Errorf("connection search_path must resolve to schema %q: %w", o.schema, model.ErrPrecondition)
+		}
 	}
 	var safe bool
 	if err := pool.QueryRow(ctx, ledgerdb.IsSafeLedgerRole, o.schema).Scan(&safe); err != nil {
