@@ -57,6 +57,18 @@ The [embedded example](examples/go/embedded/main.go) composes the adapters and p
 
 Run `go run ./examples/go/embedded`. The example prints only the resolution state and ledger revision, not fact content. The integration test demonstrates policy/schema publication, evidence registration, proposal, confirmation, acceptance, withdrawal, historical reads, interval corrections, and immutable snapshots.
 
+### Ledger in a named schema
+
+A host can keep the ledger tables in a dedicated schema of its own database, for example `facts`:
+
+1. A superuser pre-creates the extension and schema: `CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA public; CREATE SCHEMA facts AUTHORIZATION <migration owner>;`.
+2. Run the embedded migrations from `facts.Migrations()` (an `fs.FS` of the goose SQL files) with the host's own goose provider and a separate version table, on a connection whose `search_path` is `facts`:
+   `goose.NewProvider(goose.DialectPostgres, db, facts.Migrations(), goose.WithTableName("facts.goose_db_version"))`.
+3. Run `scripts/runtime-role.sql` as the migration owner with `search_path=facts`; it grants schema usage on the current schema.
+4. Runtime logins connect with `search_path=facts` and construct the adapter with `postgres.New(ctx, pool, cipher, postgres.WithSchema("facts"))`. `New` refuses to start unless `current_schema()` is the configured schema, then runs the role-safety and migration-readiness checks against that schema.
+
+Without `WithSchema` the adapter uses `public`, as before.
+
 ## Remote APIs
 
 Generated Go messages and Connect/gRPC clients are committed under [gen/memory/v1](gen/memory/v1). The following services call the same engine as embedded users:
@@ -666,7 +678,7 @@ Tests cover exact copied bytes, malformed mappings, UTF-8 boundaries, policy/per
 | `sql/queries/retention.sql` | Retention locks/policies, legal holds, reference blockers, age checks and atomic unreferenced-evidence disposal |
 | `sql/queries/archive.sql` | Revision-bound event archives and scope-qualified audit enumeration, including retained artifact links |
 | `sql/queries/evidence.sql` | Encrypted development evidence-object storage and reads |
-| `sql/queries/runtime.sql` | Runtime role safety and migration readiness checks against explicitly qualified PostgreSQL catalogs |
+| `sql/queries/runtime.sql` | Runtime role safety and migration readiness checks against explicitly qualified PostgreSQL catalogs in the configured ledger schema |
 
 Streaming readers use exported sqlc query constants to preserve incremental decoding and existing count/byte limits. The shared outbox update path uses generated constants for complete fencing statements. Typed writes retain encrypted payloads, explicit tenant predicates and transaction-owned locks. Ledger and PostgreSQL evidence-store SQL is now centralized in these sources. Adapter orchestration still owns encryption, streaming limits, transaction ordering and authorization-related checks. CortexDB index SQL uses its separate upstream-managed schema and is outside this ledger query set.
 
