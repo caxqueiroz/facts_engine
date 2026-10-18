@@ -1,6 +1,7 @@
--- Run explicitly as the migration owner. Set authentication outside this file.
+-- Run explicitly as the migration owner, with search_path set to the ledger
+-- schema (public by default). Set authentication outside this file.
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_runtime') THEN CREATE ROLE facts_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
-GRANT USAGE ON SCHEMA public TO facts_runtime;
+DO $$ BEGIN EXECUTE format('GRANT USAGE ON SCHEMA %I TO facts_runtime', current_schema()); END $$;
 GRANT SELECT, INSERT ON tenant_revisions,policy_versions,predicate_versions,evidence,records,record_versions,version_evidence,attestations,attestation_events,ledger_events,record_events,accepted_intervals,command_receipts,outbox TO facts_runtime;
 GRANT UPDATE(revision) ON tenant_revisions TO facts_runtime;
 GRANT UPDATE(stream_revision) ON records TO facts_runtime;
@@ -20,7 +21,7 @@ GRANT SELECT,INSERT ON calculation_receipts,calculation_snapshots,calculation_ar
 GRANT UPDATE ON audit_export_jobs TO facts_runtime;
 -- Dedicated worker credentials cannot append business events or change facts.
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='facts_worker') THEN CREATE ROLE facts_worker NOLOGIN NOSUPERUSER NOBYPASSRLS; END IF; END $$;
-GRANT USAGE ON SCHEMA public TO facts_worker;
+DO $$ BEGIN EXECUTE format('GRANT USAGE ON SCHEMA %I TO facts_worker', current_schema()); END $$;
 GRANT SELECT ON ledger_events,outbox,tenant_revisions TO facts_worker;
 GRANT SELECT,INSERT,UPDATE ON consumer_offsets TO facts_worker;
 GRANT SELECT,INSERT ON consumer_retry_commands TO facts_worker;
