@@ -16,7 +16,7 @@ AND NOT EXISTS(SELECT 1 FROM projection_cleanup_acknowledgements a WHERE a.tenan
 SELECT scope_id,kind,target_id,ledger_revision,payload FROM retention_events WHERE tenant_id=$1 AND id=$2;
 
 -- name: CanAcknowledgeProjectionCleanup :one
-SELECT has_table_privilege(current_user,'public.projection_cleanup_acknowledgements','INSERT');
+SELECT has_table_privilege(current_user,format('%I.projection_cleanup_acknowledgements', sqlc.arg(schema)::text),'INSERT');
 
 -- name: InsertProjectionCleanupAcknowledgement :exec
 INSERT INTO projection_cleanup_acknowledgements(tenant_id,kind,version_id,generation,acknowledgement_id)

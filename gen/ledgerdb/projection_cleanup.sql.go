@@ -12,11 +12,11 @@ import (
 )
 
 const CanAcknowledgeProjectionCleanup = `-- name: CanAcknowledgeProjectionCleanup :one
-SELECT has_table_privilege(current_user,'public.projection_cleanup_acknowledgements','INSERT')
+SELECT has_table_privilege(current_user,format('%I.projection_cleanup_acknowledgements', $1::text),'INSERT')
 `
 
-func (q *Queries) CanAcknowledgeProjectionCleanup(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, CanAcknowledgeProjectionCleanup)
+func (q *Queries) CanAcknowledgeProjectionCleanup(ctx context.Context, schema string) (bool, error) {
+	row := q.db.QueryRow(ctx, CanAcknowledgeProjectionCleanup, schema)
 	var has_table_privilege bool
 	err := row.Scan(&has_table_privilege)
 	return has_table_privilege, err
