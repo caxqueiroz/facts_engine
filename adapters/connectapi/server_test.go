@@ -338,6 +338,30 @@ func TestMemoryRequestValidation(t *testing.T) {
 	if _, err := client.GetMemoryVersion(context.Background(), &v1.GetMemoryVersionRequest{Tenant: "other", Scope: "scope", RecordId: "record", VersionId: "version", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("version tenant: %v", err)
 	}
+	list := func() *v1.ListMemoriesRequest {
+		return &v1.ListMemoriesRequest{Tenant: "tenant", Scope: "scope", Purpose: "review", ValidAt: timestamppb.Now(), Limit: 1}
+	}
+	for name, change := range map[string]func(*v1.ListMemoriesRequest){
+		"limit high":   func(r *v1.ListMemoriesRequest) { r.Limit = 101 },
+		"limit zero":   func(r *v1.ListMemoriesRequest) { r.Limit = 0 },
+		"scope":        func(r *v1.ListMemoriesRequest) { r.Scope = "" },
+		"subtype":      func(r *v1.ListMemoriesRequest) { r.Subtype = "bad subtype" },
+		"purpose":      func(r *v1.ListMemoriesRequest) { r.Purpose = "" },
+		"valid at":     func(r *v1.ListMemoriesRequest) { r.ValidAt = nil },
+		"both history": func(r *v1.ListMemoriesRequest) { r.KnowledgeRevision = 1; r.KnownAt = timestamppb.Now() },
+		"page token":   func(r *v1.ListMemoriesRequest) { r.PageToken = strings.Repeat("a", 4097) },
+	} {
+		r := list()
+		change(r)
+		if _, err := client.ListMemories(context.Background(), r); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("list memories %s: %v", name, err)
+		}
+	}
+	other := list()
+	other.Tenant = "other"
+	if _, err := client.ListMemories(context.Background(), other); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("list memories tenant: %v", err)
+	}
 }
 
 func TestIngestionAndExtractionValidation(t *testing.T) {

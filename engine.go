@@ -340,6 +340,16 @@ func (e *Engine) RecallMemories(ctx context.Context, c Caller, q model.RecallReq
 
 type MemoryRecallResult = model.MemoryRecallResult
 
+// ListMemories pages through one scope's current memories. It requires an
+// engine configured with a pagination key (NewWithReads or EngineOptions.Reads).
+func (e *Engine) ListMemories(ctx context.Context, c Caller, q model.MemoriesQuery) (model.MemoriesPage, error) {
+	return e.service.ListMemories(ctx, c, q)
+}
+
+type MemoriesQuery = model.MemoriesQuery
+type MemoriesPage = model.MemoriesPage
+type MemoryListItem = model.MemoryListItem
+
 func (e *Engine) StartMemoryRefresh(ctx context.Context, c Caller, r model.MemoryRefreshRequest) (model.JobStatus, error) {
 	return e.service.StartMemoryRefresh(ctx, c, r)
 }

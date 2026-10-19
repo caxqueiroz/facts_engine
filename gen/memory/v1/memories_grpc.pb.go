@@ -30,6 +30,7 @@ const (
 	MemoryService_SupersedeMemory_FullMethodName      = "/memory.v1.MemoryService/SupersedeMemory"
 	MemoryService_GetMemoryVersion_FullMethodName     = "/memory.v1.MemoryService/GetMemoryVersion"
 	MemoryService_GetMemoryHistory_FullMethodName     = "/memory.v1.MemoryService/GetMemoryHistory"
+	MemoryService_ListMemories_FullMethodName         = "/memory.v1.MemoryService/ListMemories"
 )
 
 // MemoryServiceClient is the client API for MemoryService service.
@@ -47,6 +48,7 @@ type MemoryServiceClient interface {
 	SupersedeMemory(ctx context.Context, in *SupersedeMemoryRequest, opts ...grpc.CallOption) (*SupersedeMemoryResponse, error)
 	GetMemoryVersion(ctx context.Context, in *GetMemoryVersionRequest, opts ...grpc.CallOption) (*GetMemoryVersionResponse, error)
 	GetMemoryHistory(ctx context.Context, in *GetMemoryHistoryRequest, opts ...grpc.CallOption) (*GetMemoryHistoryResponse, error)
+	ListMemories(ctx context.Context, in *ListMemoriesRequest, opts ...grpc.CallOption) (*ListMemoriesResponse, error)
 }
 
 type memoryServiceClient struct {
@@ -167,6 +169,16 @@ func (c *memoryServiceClient) GetMemoryHistory(ctx context.Context, in *GetMemor
 	return out, nil
 }
 
+func (c *memoryServiceClient) ListMemories(ctx context.Context, in *ListMemoriesRequest, opts ...grpc.CallOption) (*ListMemoriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMemoriesResponse)
+	err := c.cc.Invoke(ctx, MemoryService_ListMemories_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MemoryServiceServer is the server API for MemoryService service.
 // All implementations must embed UnimplementedMemoryServiceServer
 // for forward compatibility.
@@ -182,6 +194,7 @@ type MemoryServiceServer interface {
 	SupersedeMemory(context.Context, *SupersedeMemoryRequest) (*SupersedeMemoryResponse, error)
 	GetMemoryVersion(context.Context, *GetMemoryVersionRequest) (*GetMemoryVersionResponse, error)
 	GetMemoryHistory(context.Context, *GetMemoryHistoryRequest) (*GetMemoryHistoryResponse, error)
+	ListMemories(context.Context, *ListMemoriesRequest) (*ListMemoriesResponse, error)
 	mustEmbedUnimplementedMemoryServiceServer()
 }
 
@@ -224,6 +237,9 @@ func (UnimplementedMemoryServiceServer) GetMemoryVersion(context.Context, *GetMe
 }
 func (UnimplementedMemoryServiceServer) GetMemoryHistory(context.Context, *GetMemoryHistoryRequest) (*GetMemoryHistoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMemoryHistory not implemented")
+}
+func (UnimplementedMemoryServiceServer) ListMemories(context.Context, *ListMemoriesRequest) (*ListMemoriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMemories not implemented")
 }
 func (UnimplementedMemoryServiceServer) mustEmbedUnimplementedMemoryServiceServer() {}
 func (UnimplementedMemoryServiceServer) testEmbeddedByValue()                       {}
@@ -444,6 +460,24 @@ func _MemoryService_GetMemoryHistory_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MemoryService_ListMemories_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMemoriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).ListMemories(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_ListMemories_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).ListMemories(ctx, req.(*ListMemoriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MemoryService_ServiceDesc is the grpc.ServiceDesc for MemoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -494,6 +528,10 @@ var MemoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMemoryHistory",
 			Handler:    _MemoryService_GetMemoryHistory_Handler,
+		},
+		{
+			MethodName: "ListMemories",
+			Handler:    _MemoryService_ListMemories_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -18,6 +18,7 @@ type MemoryEngine interface {
 	SupersedeMemory(context.Context, model.Caller, model.Supersession) (model.CommitResult, error)
 	GetMemoryVersion(context.Context, model.Caller, model.MemoryVersionQuery) (model.MemoryVersion, error)
 	GetMemoryHistory(context.Context, model.Caller, model.HistoryPageQuery) (model.HistoryPage, error)
+	ListMemories(context.Context, model.Caller, model.MemoriesQuery) (model.MemoriesPage, error)
 }
 type memoryService struct{ engine MemoryEngine }
 
@@ -126,6 +127,19 @@ func (s *memoryService) GetMemoryHistory(ctx context.Context, r *v1.GetMemoryHis
 	response := &v1.GetMemoryHistoryResponse{LedgerRevision: out.LedgerRevision, StreamRevision: out.StreamRevision, NextPageToken: out.NextPageToken}
 	for _, event := range out.Events {
 		response.Events = append(response.Events, c.event(event))
+	}
+	return response, c.err
+}
+func (s *memoryService) ListMemories(ctx context.Context, r *v1.ListMemoriesRequest) (*v1.ListMemoriesResponse, error) {
+	q := model.MemoriesQuery{Scope: r.Scope, Subtype: r.Subtype, Purpose: r.Purpose, ValidAt: r.ValidAt.AsTime(), KnowledgeRevision: r.KnowledgeRevision, KnownAt: optionalTime(r.KnownAt), Limit: int(r.Limit), PageToken: r.PageToken}
+	out, err := s.engine.ListMemories(ctx, callerFrom(ctx), q)
+	if err != nil {
+		return nil, err
+	}
+	c := responseConverter{}
+	response := &v1.ListMemoriesResponse{LedgerRevision: out.LedgerRevision, EvaluatedAt: c.timestamp(out.EvaluatedAt), NextPageToken: out.NextPageToken}
+	for _, item := range out.Items {
+		response.Items = append(response.Items, &v1.MemoryListItem{Key: &v1.MemoryKey{Scope: item.Key.Scope, Id: item.Key.ID}, Memory: memoryResult(item.Memory)})
 	}
 	return response, c.err
 }

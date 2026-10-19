@@ -27,3 +27,19 @@ func (t *transaction) FactRecords(ctx context.Context, q model.FactsQuery, revis
 	}
 	return out, rows.Err()
 }
+func (t *transaction) MemoryRecords(ctx context.Context, q model.MemoriesQuery, revision int64, after string, limit int) ([]model.Record, error) {
+	rows, err := t.tx.Query(ctx, ledgerdb.ListMemoryRecords, t.tenant, q.Scope, after, revision, q.Subtype, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.Record{}
+	for rows.Next() {
+		r := model.Record{Kind: "memory"}
+		if err = rows.Scan(&r.ID, &r.Key.Scope, &r.Key.Discriminator); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

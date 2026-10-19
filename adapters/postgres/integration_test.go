@@ -169,6 +169,7 @@ func TestPostgresLedger(t *testing.T) {
 	run("delegated attestations", func(t *testing.T) { testDelegatedAttestations(t, ctx, ledger, store, admin) })
 	run("confirmation artifacts", func(t *testing.T) { testConfirmations(t, ctx, ledger, store) })
 	run("fact listing", func(t *testing.T) { testFactListing(t, ctx, ledger, store) })
+	run("memory listing", func(t *testing.T) { testMemoryListing(t, ctx, ledger, store) })
 	run("projection destination inventory", func(t *testing.T) { testProjectionDestinations(t, ctx, admin, runtime) })
 	run("context disposal", func(t *testing.T) { testContextDisposal(t, ctx, engine, store, admin) })
 	run("version disposal", func(t *testing.T) { testVersionDisposal(t, ctx, engine, store, admin, runtime) })

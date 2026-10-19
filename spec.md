@@ -279,7 +279,7 @@ type Extractor interface {
 | Ingestion | IngestConversation, StartExtraction, GetJob | Immutable message revisions; extraction returns a durable job ID |
 | Facts | ProposeFact, AcceptFact, ApproveFact, RejectFact, SupersedeFact, RetractFact, DisputeFact, ResolveDispute | Expected revision, idempotency, reason, evidence, and policy validation |
 | Fact reads | GetFact, ListFacts, GetFactHistory | Tenant/scope, valid time, knowledge revision, deterministic pagination |
-| Memories | ProposeMemory, AcceptMemory, ApproveMemory, RejectMemory, SupersedeMemory, RetractMemory, DisputeMemory, ResolveMemoryDispute, GetMemory, GetMemoryHistory | Shared lifecycle ledger with distinct memory semantics |
+| Memories | ProposeMemory, AcceptMemory, ApproveMemory, RejectMemory, SupersedeMemory, RetractMemory, DisputeMemory, ResolveMemoryDispute, GetMemory, GetMemoryHistory, ListMemories | Shared lifecycle ledger with distinct memory semantics |
 | Snapshots | CreateFactSnapshot, GetFactSnapshot | Explicit keys, one selection revision, typed values or resolution states, immutable persisted output |
 | Calculations | RecordCalculation, GetCalculationReceipt | External computation identity and artifacts linked to a snapshot; no calculation execution |
 | Context | Recall, PrepareContext, RecordDecision | Authorized results; PrepareContext persists supplied context; RecordDecision appends actual-use receipt |
