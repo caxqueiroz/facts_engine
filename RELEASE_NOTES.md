@@ -1,3 +1,19 @@
+# v0.2.0-rc.4
+
+**Release date:** 2026-10-19
+**Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
+
+This release candidate adds a paged listing of a scope's current memories. The consumer contract of v0.2.0-rc.3 below is otherwise unchanged.
+
+## Changes
+
+- `ListMemories` (Go `Engine.ListMemories`, RPC `MemoryService.ListMemories`): the current memories of one scope, optionally of one subtype, at a valid time and knowledge revision, with the same authorization and signed page tokens as `ListFacts` (`memories-page-v1`). A page can hold fewer items than its limit, even none, and still carry a next token; page until the token is empty.
+- `model.ReadTx` gains `MemoryRecords`; ledger implementations outside this module must add it.
+
+## Verification
+
+GitHub-hosted CI did not start for this release (account billing). The source passed `make check` and `make ci-integration` against disposable PostgreSQL, OpenFGA and CortexDB services.
+
 # v0.2.0-rc.3
 
 **Release date:** 2026-10-18  
