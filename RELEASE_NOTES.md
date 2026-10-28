@@ -1,3 +1,23 @@
+# v0.2.0
+
+**Release date:** 2026-10-28
+**Status:** Pre-1.0 release of the v0.2 specification. Production acceptance still requires the external owner sign-off listed in [spec-acceptance.md](spec-acceptance.md).
+
+This release promotes v0.2.0-rc.5. The consumer contract of v0.2.0-rc.5 below is unchanged: no API, protobuf, migration or authorization-model changes. Consumers on rc.5 can move to v0.2.0 without code or database changes.
+
+## Changes
+
+- Toolchain: the repository is verified with Go 1.27.3, which fixes GO-2026-6809 in `crypto/x509` (reported as reachable under Go 1.27.2). The module minimum stays Go 1.26.0; build with a patched toolchain.
+- Tests: the version and extraction disposal integration tests truncate their valid-time boundaries to microseconds. They previously failed on Linux, where `time.Now()` has nanosecond resolution; engine behaviour is unchanged.
+
+## Compatibility
+
+Pin `v0.2.0` exactly. Later 0.x releases may change Go and protobuf APIs and add migrations; upgrade the application, service, workers and migration set together.
+
+## Verification
+
+GitHub-hosted CI passed for this release: code and generation checks, the race-enabled PostgreSQL, OpenFGA and CortexDB integration suite (including the logical restore and fresh search rebuild drill), and reachable Go vulnerability scanning.
+
 # v0.2.0-rc.5
 
 **Release date:** 2026-10-28

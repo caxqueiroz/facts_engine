@@ -2,7 +2,7 @@
 
 An embeddable Go engine for evidence-backed, policy-governed facts. PostgreSQL is the authoritative ledger; OpenFGA authorizes callers. This repository implements the **ledger foundation, temporal fact lifecycle, immutable fact snapshots, external calculation receipts, signed audit exports, durable outbox workers, CortexDB projection/recall, managed index rebuilds, signed event archive chains, immutable conversation ingestion, and durable fact and memory extraction**. The complete v0.2 specification and production release remain in progress.
 
-The current tagged contract is [v0.2.0-rc.5](RELEASE_NOTES.md). Start with the [consumer setup manual](SETUP.md); the release is pre-1.0 and production acceptance still requires external owner sign-off.
+The current tagged contract is [v0.2.0](RELEASE_NOTES.md). Start with the [consumer setup manual](SETUP.md); the release is pre-1.0 and production acceptance still requires external owner sign-off.
 
 The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. Constructors do not run migrations, start workers/listeners, or change global logging. The host owns the PostgreSQL pools, authentication boundary, encryption keys, OpenFGA provisioning, and shutdown.
 
