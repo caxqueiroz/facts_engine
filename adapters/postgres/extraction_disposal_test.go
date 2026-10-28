@@ -124,7 +124,7 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 	}
 	exported := start("exported", true)
 	value := "tea"
-	from := time.Now().UTC().Add(-time.Hour)
+	from := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
 	response, err = json.Marshal(model.ExtractionOutput{Candidates: []model.ExtractionCandidate{{Subject: "subject", Predicate: "value", SchemaVersion: "v1", Value: model.Value{Kind: model.Text, Text: &value}, Valid: model.Interval{From: &from}, Sources: []model.SourceSpan{{EvidenceID: conversation.EvidenceIDs[0], Start: 0, End: 3, Quote: "tea"}}, Uncertainty: "asserted"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -326,7 +326,7 @@ func extractionDisposalCrossScopeFixture(t *testing.T, ctx context.Context, norm
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now().UTC().Add(-time.Hour)
+	now := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
 	if _, err = normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd("evidence"), Evidence: model.Evidence{ID: "cross-source", Scope: scope, SourceSystem: "test", SourceObject: "source", SourceRevision: "v1", Speaker: "customer", SourceClass: "customer", SourceTime: now, MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "source-policy", Object: object}}); err != nil {
 		t.Fatal(err)
 	}
