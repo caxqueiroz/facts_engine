@@ -68,7 +68,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	reviewer := c
 	reviewer.Principal = "reviewer"
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "retention"} }
-	now := time.Now().UTC().Add(-time.Hour)
+	now := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
 	secret := "private retained value"
 	var sourceRef model.ObjectRef
 	for _, scope := range []string{"a", "z"} {
@@ -114,7 +114,7 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		t.Fatal(err)
 	}
 	attestationID := "review-fact"
-	attestationExpiry := time.Now().UTC().Add(time.Hour)
+	attestationExpiry := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
 	if _, err = normal.RecordAttestation(ctx, reviewer, model.AttestationRequest{Command: cmd("fact-review"), Attestation: model.Attestation{ID: attestationID, Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, ContentDigest: fact.ContentDigest, Kind: "human_review", EvidenceID: "a-source", Attestor: reviewer, ExpiresAt: &attestationExpiry}}); err != nil {
 		t.Fatal("record review attestation", err)
 	}
