@@ -34,7 +34,7 @@ The public entry point is `factsengine.New(ledger, authorizer, evidenceStore)`. 
 
 ## Local setup
 
-The module minimum is Go 1.26 (required by the Connect and protovalidate dependencies); use a currently patched, supported toolchain (verified with Go 1.27.2), Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
+The module minimum is Go 1.26 (required by the Connect and protovalidate dependencies); use a currently patched, supported toolchain (verified with Go 1.27.3), Docker, and PostgreSQL client tools. The checked-in development containers bind only to loopback. OpenFGA's development datastore is ephemeral.
 
 ```sh
 docker compose up -d
@@ -449,7 +449,7 @@ make generate
 
 `make generate` uses sqlc v1.31.1, regenerates the OpenFGA JSON model from its restricted DSL, and generates the typed remote API with Buf v1.74.0. The pinned Protobuf generators are protoc-gen-go v1.36.12, protoc-gen-connect-go v2.0.1 and protoc-gen-go-grpc v1.6.2. `buf.lock` pins the protovalidate schema dependency. `make check` checks Protobuf formatting, schema/rule lint and generated-code drift. Run `make tools` and put its installation directory (`$(go env GOPATH)/bin` by default) first on PATH. Goose v3.28.0 is the migration tool. Lint configuration is for golangci-lint v2 (validated with v2.14.0). `make vuln` pins govulncheck v1.9.0 and requires Go 1.26 or newer. The pgx driver is pinned to v5.10.0; its dependency graph no longer includes the earlier vulnerable x/crypto version.
 
-The [CI workflow](.github/workflows/ci.yml) runs on pushes to `master`, pull requests and manual dispatch. It uses Go 1.27.2 from [.go-version](.go-version), Ubuntu 24.04, commit-pinned GitHub Actions, read-only repository permissions and no deployment secrets. Three independent checks run: source/migration/generated-file checks, the full race-enabled integration suite, and reachable Go vulnerability scanning. Duplicate runs for the same branch or pull request are cancelled. Each job uses a distinct cache key; changes to pinned build tools also invalidate the code-check cache.
+The [CI workflow](.github/workflows/ci.yml) runs on pushes to `master`, pull requests and manual dispatch. It uses Go 1.27.3 from [.go-version](.go-version), Ubuntu 24.04, commit-pinned GitHub Actions, read-only repository permissions and no deployment secrets. Three independent checks run: source/migration/generated-file checks, the full race-enabled integration suite, and reachable Go vulnerability scanning. Duplicate runs for the same branch or pull request are cancelled. Each job uses a distinct cache key; changes to pinned build tools also invalidate the code-check cache.
 
 Reproduce the checks locally from the repository root:
 

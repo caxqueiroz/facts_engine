@@ -15,7 +15,7 @@ Engine constructors do not migrate databases, start workers/listeners, create au
 
 ## Requirements and version pin
 
-- Go 1.26 or later; the repository has been verified with Go 1.27.2.
+- Go 1.26 or later; the repository has been verified with Go 1.27.3.
 - PostgreSQL 17 is used by the checked-in integration environment. Use a currently supported PostgreSQL version and test the migration plan for your deployment.
 - OpenFGA with the repository's generated model, a PostgreSQL-backed CortexDB database if vector/lexical retrieval is enabled, and an evidence store appropriate to the data policy.
 - The module is public and fetched through the standard Go module proxy and checksum database; no credentials or `GOPRIVATE` setting are needed. Pin an exact version:
