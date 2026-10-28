@@ -1,8 +1,22 @@
-# Unreleased
+# v0.2.0-rc.5
+
+**Release date:** 2026-10-28
+**Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
+
+This release candidate prepares the repository for public release under the MIT license: the module is fetched through the public Go proxy, and the specification, documentation and fixtures are deployment-neutral. The consumer contract of v0.2.0-rc.4 below is otherwise unchanged, except for the rename below.
 
 ## Breaking changes
 
 - The conversation source class `bank_record` is renamed `organization_record`, and the OpenFGA relation `can_ingest_bank_record` is renamed `can_ingest_organization_record`. The relation is computed (`administrator and tenant_member`), so no tuples change; publish the regenerated authorization model and pin its new model ID before ingesting `organization_record` messages. Ingestion requests, including retries of earlier commands, must send the new source class; stored conversation records are unchanged. Applications that use only `customer`, `assistant`, `system` and `staff` sources are unaffected.
+
+## Changes
+
+- Repository access: the module is public. No `GOPRIVATE` setting or Git credential is needed; existing private-access settings keep working.
+- The evidence disposal worker deletes object versions in request order (root, then derivatives), so retries after a partial failure replay the same sequence.
+
+## Verification
+
+GitHub-hosted CI did not start for this release (account billing). The source passed `make check`, `make vuln` and `make ci-integration` against disposable PostgreSQL, OpenFGA and CortexDB services.
 
 # v0.2.0-rc.4
 
