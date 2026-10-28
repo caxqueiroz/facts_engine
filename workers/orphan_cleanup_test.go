@@ -20,8 +20,8 @@ func (e cleanupEngine) DisposeOrphanEvidence(_ context.Context, _ model.Caller, 
 	return e.dispose(r)
 }
 func TestOrphanCleanupBoundaries(t *testing.T) {
-	config := OrphanCleanupConfig{Tenant: "bank", Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []OrphanCleanupBinding{{Scope: "case", PolicyID: "policy", Jurisdiction: "SG"}}, PageSize: 1, MaxPages: 2, IntervalMinutes: 1}
-	caller := model.Caller{Tenant: "bank", Principal: "worker", Service: true}
+	config := OrphanCleanupConfig{Tenant: "org", Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []OrphanCleanupBinding{{Scope: "case", PolicyID: "policy", Jurisdiction: "XX"}}, PageSize: 1, MaxPages: 2, IntervalMinutes: 1}
+	caller := model.Caller{Tenant: "org", Principal: "worker", Service: true}
 	a := model.ObjectRef{Locator: "a", Version: model.BytesDigest([]byte("a")), Digest: model.BytesDigest([]byte("a")), Size: 1}
 	b := a
 	b.Locator = "b"
@@ -91,8 +91,8 @@ func TestOrphanCleanupLateCancellation(t *testing.T) {
 		t.Fatal("unexpected deletion")
 		return model.CommitResult{}, nil
 	}}
-	config := OrphanCleanupConfig{Tenant: "bank", Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []OrphanCleanupBinding{{Scope: "case", PolicyID: "policy", Jurisdiction: "SG"}}, PageSize: 1, MaxPages: 1, IntervalMinutes: 1}
-	worker, err := NewOrphanCleanup(engine, model.Caller{Tenant: "bank", Principal: "worker", Service: true}, config)
+	config := OrphanCleanupConfig{Tenant: "org", Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []OrphanCleanupBinding{{Scope: "case", PolicyID: "policy", Jurisdiction: "XX"}}, PageSize: 1, MaxPages: 1, IntervalMinutes: 1}
+	worker, err := NewOrphanCleanup(engine, model.Caller{Tenant: "org", Principal: "worker", Service: true}, config)
 	if err != nil {
 		t.Fatal(err)
 	}

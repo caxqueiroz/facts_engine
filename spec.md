@@ -2,7 +2,7 @@ Version 0.2 · 14 October 2026 · Specification for implementation planning
 
 Build a Go engine that turns conversations and documents into evidence-backed memories and fact proposals, governs their acceptance and supersession, and supplies authorized context to applications. The same engine runs inside a Go application or behind a separate Connect-RPC service supporting gRPC. PostgreSQL holds the authoritative ledger; CortexDB provides a rebuildable retrieval index.
 
-The initial setting is a Singapore bank. The engine must explain what was asserted, where it came from, who accepted or changed it, and which versions an application actually received. An accepted fact means accepted under a recorded bank policy; it does not mean the engine has independently established objective truth.
+The engine targets regulated, multi-tenant deployments. It must explain what was asserted, where it came from, who accepted or changed it, and which versions an application actually received. An accepted fact means accepted under a recorded deployment policy; it does not mean the engine has independently established objective truth.
 
 # Scope and architecture decisions
 
@@ -17,11 +17,11 @@ The initial setting is a Singapore bank. The engine must explain what was assert
 | Background execution | Explicit Go workers using PostgreSQL leases and a transactional outbox; Dapr is excluded |
 | Database tooling | goose migrations and sqlc queries |
 | Observability | OpenTelemetry with structured slog logs |
-| Evidence storage | Configurable encrypted evidence store; PostgreSQL payload storage for development and a bank-managed versioned object store for production |
+| Evidence storage | Configurable encrypted evidence store; PostgreSQL payload storage for development and an operator-managed versioned object store for production |
 
 The first release includes conversation ingestion, evidence registration, fact and memory proposals, policy-governed acceptance, attestations, immutable fact snapshots, external calculation receipts, rejection, dispute, retraction, supersession, current and historical reads, authorized retrieval, context manifests, decision receipts, and audit export. It supports manual proposals and asynchronous model extraction through the same validation path.
 
-Wealth onboarding is an integration use case for this reusable engine. The wealth application owns its fact catalogue, required fields, onboarding questions, business validation, client-profile construction, deterministic allocation methodology, and recalculation decisions. The engine owns evidence, typed facts, lifecycle enforcement, immutable snapshots, and provenance. Automated credit, KYC, payment, and investment decisions, a reviewer UI, a general workflow platform, unrestricted graph query endpoints, cross-tenant search, and autonomous modification of bank systems remain outside this implementation.
+Consuming applications integrate with this reusable engine. Each application owns its fact catalogue, required fields, intake questions, business validation, profile construction, deterministic calculation methodology, and recalculation decisions. The engine owns evidence, typed facts, lifecycle enforcement, immutable snapshots, and provenance. Automated business decisions, a reviewer UI, a general workflow platform, unrestricted graph query endpoints, cross-tenant search, and autonomous modification of host systems remain outside this implementation.
 
 Three approaches were considered. Extending CortexDB's internal tables would couple audit guarantees to its update and migration behavior. A service-only implementation would prevent direct embedding. The selected design places an independent ledger and policy layer around a CortexDB adapter and exposes the same engine through both deployment modes.
 
@@ -59,7 +59,7 @@ Use separate credentials for ledger migration, ledger application access, Cortex
 | - | - |
 | Tenant | Security, retention, and ledger ordering boundary |
 | Scope | An authorization collection within a tenant, such as a customer case, team, or user workspace |
-| Subject | A stable bank-issued reference to the person, account, organization, or other entity discussed |
+| Subject | A stable application-issued reference to the person, account, organization, or other entity discussed |
 | Fact | An atomic assertion identified by tenant, scope, subject, predicate, and an explicit discriminator where needed |
 | Memory | A contextual item such as an episode, summary, lesson, or decision narrative; it remains distinct from a typed fact |
 | Record | The common ledger identity for a fact or memory |
@@ -72,13 +72,13 @@ Use separate credentials for ledger migration, ledger application access, Cortex
 | Attestation | An identified principal's confirmation, source-verification report, or application-validation report bound to exact version IDs |
 | Calculation receipt | An external application's calculation identity and artifact references linked to an exact fact snapshot |
 
-Facts use registered predicates with a value schema, cardinality, sensitivity classification, review policy, and temporal precision. Example: `customer:123 / residential_address / primary`. Version 1 supports single-valued predicates per key; concurrent memberships or roles are represented as separate keyed facts with explicit discriminators. Do not infer fact identity from vector similarity or an LLM-generated slug. The owning application publishes versioned predicate schemas and acceptance policies through authorized administration. The engine enforces type, cardinality, provenance, and lifecycle contracts; the application decides business completeness and cross-field business validity. The engine contains no built-in wealth catalogue, onboarding questionnaire, risk scoring, or allocation logic.
+Facts use registered predicates with a value schema, cardinality, sensitivity classification, review policy, and temporal precision. Example: `customer:123 / residential_address / primary`. Version 1 supports single-valued predicates per key; concurrent memberships or roles are represented as separate keyed facts with explicit discriminators. Do not infer fact identity from vector similarity or an LLM-generated slug. The owning application publishes versioned predicate schemas and acceptance policies through authorized administration. The engine enforces type, cardinality, provenance, and lifecycle contracts; the application decides business completeness and cross-field business validity. The engine contains no built-in domain catalogue, intake questionnaire, scoring, or allocation logic.
 
 Values use a typed union: text, boolean, integer, decimal with unit or currency, date, instant, or entity reference. Decimals use canonical decimal strings rather than binary floating point. Unknown, absent, disputed, and false are separate states. Predicate schema changes receive a new schema version and explicit migration rules.
 
-A memory has a subtype, body, scope, evidence references, and links to any fact versions used to derive it. Stable preferences that drive bank behavior should be modeled as typed facts. A summary may quote a disputed assertion, but its label must preserve that uncertainty. Corrections to source material or derived summaries create new versions; they do not overwrite accepted content.
+A memory has a subtype, body, scope, evidence references, and links to any fact versions used to derive it. Stable preferences that drive application behavior should be modeled as typed facts. A summary may quote a disputed assertion, but its label must preserve that uncertainty. Corrections to source material or derived summaries create new versions; they do not overwrite accepted content.
 
-Each source contribution records speaker role and source authority. Customer statements, assistant-generated text, staff attestations, and bank records must remain distinguishable. A customer's statement about an address is a customer assertion until the applicable verification policy accepts it. An extractor's confidence is diagnostic metadata, never an authorization or acceptance decision. Client confirmation, source verification, application validation, and engine acceptance are separate recorded claims; none is inferred from another. An evidence digest verifies retained bytes, not the truth of their contents.
+Each source contribution records speaker role and source authority. Customer statements, assistant-generated text, staff attestations, and organization records must remain distinguishable. A customer's statement about an address is a customer assertion until the applicable verification policy accepts it. An extractor's confidence is diagnostic metadata, never an authorization or acceptance decision. Client confirmation, source verification, application validation, and engine acceptance are separate recorded claims; none is inferred from another. An evidence digest verifies retained bytes, not the truth of their contents.
 
 # Evidence and extraction
 
@@ -102,7 +102,7 @@ Extraction follows this sequence:
 
 6. Append proposals with extraction provenance. Review and acceptance are separate commands.
 
-The extraction interface is provider-neutral and accepts typed request and response structures. A deployment supplies an approved model provider or submits manually constructed proposals. The engine does not assume that CortexDB's CLI or coding-agent hooks implement bank extraction policy. Calls have timeouts, bounded retries, input/output size limits, and per-tenant concurrency and cost quotas.
+The extraction interface is provider-neutral and accepts typed request and response structures. A deployment supplies an approved model provider or submits manually constructed proposals. The engine does not assume that CortexDB's CLI or coding-agent hooks implement the deployment's extraction policy. Calls have timeouts, bounded retries, input/output size limits, and per-tenant concurrency and cost quotas.
 
 An extraction run stores provider, reported model identity, requested model version, prompt template version and digest, exact request and response payload references, generation parameters, parser/schema version, application build, evidence IDs, actor, timestamps, token usage when supplied, and outcome. Preserve provider aliases as aliases if no immutable version is available. Retained artifacts support inspection; model re-execution is not promised to produce identical output. Store concise rationale where supplied, not unavailable internal model reasoning.
 
@@ -233,7 +233,7 @@ Persist the snapshot ID, tenant, caller, purpose, selection parameters, ordered 
 
 `RecordCalculation` accepts an accessible snapshot ID, application ID, external run ID, method/version and executable identity, configuration identity, optional reference-data snapshot references, actual normalized input artifact and digest, result artifact and digest, execution timestamps, outcome, and reason/trace references. The application owns and executes the calculation and any normalization. These artifacts are registered, versioned, access-controlled evidence references; recording does not trigger fetching arbitrary URLs. The engine validates tenant/reference integrity, authorization, and idempotency, and preserves the application's attested provenance. It does not certify the algorithm or guarantee reproducibility from a version label alone.
 
-Calculation receipts are append-only and indexed by snapshot and selected fact-version dependencies. The same tenant/application/run ID with the same canonical request returns the same receipt; a different payload is a conflict. Earlier snapshots and receipts remain addressable when a new fact version arrives. The existing outbox and ListChanges feed provide replayable fact-change events; the application determines impact and creates any new run. No wealth-specific calculation endpoint, scoring rule, or recalculation worker is introduced.
+Calculation receipts are append-only and indexed by snapshot and selected fact-version dependencies. The same tenant/application/run ID with the same canonical request returns the same receipt; a different payload is a conflict. Earlier snapshots and receipts remain addressable when a new fact version arrives. The existing outbox and ListChanges feed provide replayable fact-change events; the application determines impact and creates any new run. No domain-specific calculation endpoint, scoring rule, or recalculation worker is introduced.
 
 # Public Go and RPC contracts
 
@@ -296,7 +296,7 @@ Pagination tokens are opaque, integrity-protected, and bind tenant, principal, f
 
 # OpenFGA and isolation
 
-The bank owns the OpenFGA store and relationship provisioning. This engine ships a tested authorization model and an adapter. Pin `store_id` and `authorization_model_id`; OpenFGA models are immutable versions, while relationship tuples can change. Persist the actual model ID with every authorization receipt. [Immutable OpenFGA models](https://openfga.dev/docs/getting-started/immutable-models).
+The deploying operator owns the OpenFGA store and relationship provisioning. This engine ships a tested authorization model and an adapter. Pin `store_id` and `authorization_model_id`; OpenFGA models are immutable versions, while relationship tuples can change. Persist the actual model ID with every authorization receipt. [Immutable OpenFGA models](https://openfga.dev/docs/getting-started/immutable-models).
 
 Use tenant-qualified opaque object identifiers. A scope has relations for tenant membership and reader, proposer, approver, attestor, policy-bound accepting service, auditor, operator, and definition-administrator assignments. Every permission requires both appropriate scope access and tenant membership; neither a cross-tenant relation nor a broad administrative grant bypasses the engine's tenant checks. A service principal is explicit and carries the initiating principal when acting on a user's behalf.
 
@@ -320,21 +320,21 @@ Use tenant-qualified opaque object identifiers. A scope has relations for tenant
 
 Document and test the concrete OpenFGA model, including tenant membership intersections, before implementation is released. Use fresh checks with `HIGHER_CONSISTENCY` for approvals, evidence access, context disclosure, and exports; fail closed on authorization outages. OpenFGA documents that this mode bypasses its query cache. Batch checks can reduce request overhead. [Consistency modes](https://openfga.dev/docs/interacting/consistency), [Check API](https://openfga.dev/docs/getting-started/perform-check).
 
-Record principal, action, resource, model ID, checked context digest, decision, consistency mode, correlation ID when supplied, and check time. Model ID alone does not reconstruct historical access because tuples change. Full historical authorization replay also requires the bank's tuple-change archive and relevant contextual inputs; the engine's receipt establishes the check it observed, not a frozen OpenFGA database snapshot.
+Record principal, action, resource, model ID, checked context digest, decision, consistency mode, correlation ID when supplied, and check time. Model ID alone does not reconstruct historical access because tuples change. Full historical authorization replay also requires the operator's tuple-change archive and relevant contextual inputs; the engine's receipt establishes the check it observed, not a frozen OpenFGA database snapshot.
 
 # Audit, decision provenance, and retention
 
-PrepareContext records ordered fact/memory version IDs, the exact rendered context bytes, redaction version, query reference, tenant knowledge revision, valid time, retrieval configuration, embedding/reranker identities where applicable, authorization receipts, and purpose. The manifest ID is returned alongside the context. In the banking profile, failure to persist the manifest prevents context delivery through this operation. Fact snapshots are a separate structured contract: deterministic consumers select explicit fact keys through CreateFactSnapshot rather than obtaining inputs from ranked recall results.
+PrepareContext records ordered fact/memory version IDs, the exact rendered context bytes, redaction version, query reference, tenant knowledge revision, valid time, retrieval configuration, embedding/reranker identities where applicable, authorization receipts, and purpose. The manifest ID is returned alongside the context. In regulated deployments, failure to persist the manifest prevents context delivery through this operation. Fact snapshots are a separate structured contract: deterministic consumers select explicit fact keys through CreateFactSnapshot rather than obtaining inputs from ranked recall results.
 
 RecordDecision links a context manifest or fact snapshot to the host's business decision ID, model request/response or deterministic rule version, selected and actually used items, final input/output references, executing/initiating actors, and any external action receipt. RecordCalculation captures an external calculation run against a fact snapshot and may be referenced by that decision receipt. A prepared manifest or snapshot establishes what the engine supplied, not what the host ultimately used. Hosts that transform inputs must preserve the actual final input artifact and transformation version. Decisions or calculations outside this integration cannot be claimed as fully traced.
 
 Audit export creates a scoped bundle containing record identities, every relevant version and event, evidence and exact source locators, extraction artifacts, policy versions, version-bound attestations and withdrawals, authorization receipts, fact snapshots, external calculation receipts, context manifests, decision receipts, and a machine-readable integrity manifest. Include ordering, encoding and schema versions, content digests, archive object versions, and signature key identifiers. Permission and retention rules may produce explicit redactions; the bundle lists their reasons and coverage gaps.
 
-Append-only privileges protect normal application behavior, not a malicious database administrator. Periodically export full ledger batches and evidence manifests to separately controlled immutable storage and sign batch digests using a bank-managed key. Chained batch manifests bind tenant revision ranges, counts, previous batch digests, and object versions. Verification checks signatures, payload digests, revision coverage, and missing batches. Cryptographic integrity does not establish that an extracted assertion is true.
+Append-only privileges protect normal application behavior, not a malicious database administrator. Periodically export full ledger batches and evidence manifests to separately controlled immutable storage and sign batch digests using an operator-managed key. Chained batch manifests bind tenant revision ranges, counts, previous batch digests, and object versions. Verification checks signatures, payload digests, revision coverage, and missing batches. Cryptographic integrity does not establish that an extracted assertion is true.
 
 Retention is policy-based by record class, purpose, jurisdiction, and legal hold. Do not impose one blanket period on all conversations, facts, attestations, snapshots, calculation artifacts, model payloads, or decisions. Legal holds prevent scheduled disposal; ordinary runtime actors cannot override them. Approved disposal removes authorized payloads, index copies, caches, and derivatives according to the policy and records a structural retention event. Backups and immutable archives expire under their corresponding policies; do not promise immediate erasure from locked archives. After disposal, exports explicitly report that payload reconstruction is unavailable. Avoid treating digests of low-entropy personal data as anonymization.
 
-The design provides controls relevant to MAS expectations around AI documentation, monitoring, remediation records, and access control. The MAS AI Risk Management Guidelines discuss retaining relevant generative-AI prompts, responses, and model versions where appropriate. The bank must map its particular use case and retention schedule to applicable obligations; this architecture itself is not a compliance certification. [MAS AI Risk Management Guidelines, especially section 5.23](https://www.mas.gov.sg/-/media/mas-media-library/regulation/guidelines/bd/guidelines-on-artificial-intelligence-risk-management-for-financial-institutions/guidelines-on-artificial-intelligence-risk-management.pdf).
+The design provides controls relevant to common AI governance expectations around documentation, monitoring, remediation records, access control, and retention of prompts, responses, and model versions. Each deployment must map its particular use case and retention schedule to applicable obligations; this architecture itself is not a compliance certification.
 
 # Operations and failure behavior
 
@@ -346,14 +346,14 @@ The design provides controls relevant to MAS expectations around AI documentatio
 | PostgreSQL unavailable | Return Unavailable; do not acknowledge an uncommitted write |
 | Evidence missing or digest mismatch | Quarantine affected proposals; accepted content is flagged and excluded when its policy requires available verified evidence |
 | Duplicate or out-of-order delivery | Deduplicate/reconcile using immutable IDs and revisions; never roll back the ledger timeline |
-| Audit archive delayed | Alert and expose coverage; bank policy can halt high-risk context delivery past its configured maximum lag |
+| Audit archive delayed | Alert and expose coverage; deployment policy can halt high-risk context delivery past its configured maximum lag |
 | Rebuild interrupted | Retain the active generation; resume or discard the incomplete generation |
 
 Inject OpenTelemetry providers and slog loggers. Trace ingestion, authorization, evidence access, extraction, proposal validation, approval, transaction commit, projection, recall, and export using verb.noun span names. Propagate context through RPC, database, and provider calls. Logs contain opaque IDs, trace IDs, outcomes, and timings; they exclude evidence text, fact values, prompts, responses, credentials, and personal identifiers. Upstream CortexDB log output must also pass the application's redaction review.
 
 Expose low-cardinality metrics for request rates/latency, authorization denials/errors, extraction outcomes, queue age, retries, projection and archive lag, stale candidates filtered, conflicts, and export integrity failures. Do not use customer, record, or subject IDs as metric labels. Provide liveness and readiness endpoints, with component degradation visible separately from the core process health.
 
-Use PostgreSQL backups with point-in-time recovery, encrypted evidence backups, key recovery procedures, and restore drills. Recovery restores the ledger and evidence references first, then rebuilds derived search state. Required RPO/RTO, capacity, and latency budgets are deployment configuration approved for the chosen bank workload, not unmeasured performance claims. Before production, benchmark expected tenant count, corpus size, read/write mix, connection limits, and the per-tenant append-lock contention.
+Use PostgreSQL backups with point-in-time recovery, encrypted evidence backups, key recovery procedures, and restore drills. Recovery restores the ledger and evidence references first, then rebuilds derived search state. Required RPO/RTO, capacity, and latency budgets are deployment configuration approved for the chosen workload, not unmeasured performance claims. Before production, benchmark expected tenant count, corpus size, read/write mix, connection limits, and the per-tenant append-lock contention.
 
 # Repository organization and engineering conventions
 
@@ -408,11 +408,11 @@ Retain the established make targets, Buf generation, sqlc, goose, mockery, table
 | Missing and inaccessible inputs | Missing, unknown, disputed, and unresolved selections never become defaults; unauthorized selectors fail without an existence leak |
 | Confirmation binding | Confirming version A cannot satisfy acceptance of replacement B; expired or withdrawn required attestations are enforced |
 | External calculation lineage | A receipt pins its snapshot and external artifacts; changed input under the same run identity fails and supersession preserves previous receipts |
-| Domain ownership | A second application can supply different schemas and policies without wealth-specific engine code; completeness and allocation remain in the host |
+| Domain ownership | A second application can supply different schemas and policies without domain-specific engine code; completeness and allocation remain in the host |
 
 See the [acceptance evidence matrix](spec-acceptance.md) for repository test references and production sign-off owners. Those references show exercised coverage; they are not a claim that every operation/error combination or production integration has been validated.
 
-Use real PostgreSQL integration tests for transactions, row security, ordering, and range invariants; mocks do not establish those guarantees. Test the OpenFGA model with allow and deny assertions. Run adapter contract tests against the pinned CortexDB PostgreSQL backend. Include an extraction evaluation set approved for the bank domain, with unsupported-assertion and missed-conflict rates measured separately from retrieval relevance.
+Use real PostgreSQL integration tests for transactions, row security, ordering, and range invariants; mocks do not establish those guarantees. Test the OpenFGA model with allow and deny assertions. Run adapter contract tests against the pinned CortexDB PostgreSQL backend. Include an extraction evaluation set approved for the deployment's domain, with unsupported-assertion and missed-conflict rates measured separately from retrieval relevance.
 
 Deliver the work in independently reviewable slices:
 

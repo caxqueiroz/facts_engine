@@ -12,7 +12,7 @@ import (
 
 func TestMemoriesPageTokenBinding(t *testing.T) {
 	s := &Service{reads: model.ReadOptions{PaginationKey: bytes.Repeat([]byte{9}, 32)}}
-	c := model.Caller{Tenant: "bank", Principal: "reader"}
+	c := model.Caller{Tenant: "org", Principal: "reader"}
 	now := time.Now().UTC()
 	q := model.MemoriesQuery{Scope: "case", Purpose: "consolidate", ValidAt: now, Limit: 1}
 	p := factPageToken{Version: memoriesPageVersion, CallerDigest: model.Digest(c), QueryDigest: memoriesQueryDigest(q), After: "record", Revision: 5, EvaluatedAt: now, ExpiresAt: now.Add(time.Minute)}
@@ -67,7 +67,7 @@ func TestMemoriesPageTokenBinding(t *testing.T) {
 
 func TestListMemoriesValidation(t *testing.T) {
 	s := &Service{reads: model.ReadOptions{PaginationKey: bytes.Repeat([]byte{9}, 32)}}
-	c := model.Caller{Tenant: "bank", Principal: "reader"}
+	c := model.Caller{Tenant: "org", Principal: "reader"}
 	now := time.Now().UTC()
 	valid := model.MemoriesQuery{Scope: "case", Purpose: "consolidate", ValidAt: now, Limit: 1}
 	zero := time.Time{}

@@ -25,7 +25,7 @@ func fixture(t *testing.T) (config, model.ObjectRef) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := config{Directory: t.TempDir(), Tenant: "bank", Stream: "events", ExpectedRevision: 2, MaxBatches: 2, TimeoutSeconds: 10, TrustedKeys: map[string]string{}}
+	c := config{Directory: t.TempDir(), Tenant: "org", Stream: "events", ExpectedRevision: 2, MaxBatches: 2, TimeoutSeconds: 10, TrustedKeys: map[string]string{}}
 	store, err := archive.NewFiles(c.Directory, cipher)
 	if err != nil {
 		t.Fatal(err)

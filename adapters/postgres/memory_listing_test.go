@@ -21,7 +21,7 @@ func testMemoryListing(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if err != nil {
 		t.Fatal(err)
 	}
-	author := model.Caller{Tenant: "memory-listing-bank", Principal: "author"}
+	author := model.Caller{Tenant: "memory-listing-org", Principal: "author"}
 	reviewer := model.Caller{Tenant: author.Tenant, Principal: "reviewer"}
 	registerTestIdentities(t, ctx, engine, author.Tenant, "case", nil)
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "memory-listing"} }
@@ -165,7 +165,7 @@ func testMemoryListing(t *testing.T, ctx context.Context, l model.Ledger, store 
 		t.Fatal("cursor replayed by another principal", err)
 	}
 	other := author
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.ListMemories(ctx, other, cursor); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("cursor replayed by another tenant", err)
 	}

@@ -1,3 +1,9 @@
+# Unreleased
+
+## Breaking changes
+
+- The conversation source class `bank_record` is renamed `organization_record`, and the OpenFGA relation `can_ingest_bank_record` is renamed `can_ingest_organization_record`. The relation is computed (`administrator and tenant_member`), so no tuples change; publish the regenerated authorization model and pin its new model ID before ingesting `organization_record` messages. Ingestion requests, including retries of earlier commands, must send the new source class; stored conversation records are unchanged. Applications that use only `customer`, `assistant`, `system` and `staff` sources are unaffected.
+
 # v0.2.0-rc.4
 
 **Release date:** 2026-10-19
@@ -35,7 +41,7 @@ GitHub-hosted CI did not start for this release (account billing). The release s
 **Release date:** 2026-10-15  
 **Status:** Pre-1.0 release candidate for consuming-application integration and acceptance testing.
 
-This release candidate updates the consumer setup instructions for the private GitHub repository. It gives consumers a pin-able Go module and protobuf contract for the v0.2 specification. It is not a production banking approval or a v1 compatibility promise.
+This release candidate updates the consumer setup instructions for the private GitHub repository. It gives consumers a pin-able Go module and protobuf contract for the v0.2 specification. It is not a production approval or a v1 compatibility promise.
 
 ## Consumer contract
 
@@ -59,7 +65,7 @@ This release candidate updates the consumer setup instructions for the private G
 
 The host supplies trusted identity-to-tenant mapping, OpenFGA tuples, evidence and immutable archive stores, production key management, approved extraction/embedding providers, worker supervision, telemetry collection, and backup/recovery. The host also owns the domain catalogue, business validation, and confirmation presentation. External evidence deletion requires an idempotent versioned-store deleter and a running `evidence-disposal` outbox consumer.
 
-This release ships development/reference key and local storage integrations, not bank-managed envelope encryption or a production immutable archive. Search, cache, export, backup and archive copies follow their own retention controls. Extraction quality, capacity, retrieval quality, RPO/RTO, and compliance require consuming-application evaluation and owner approval. The engine does not implement wealth onboarding, profile completeness, allocation, or business decisions.
+This release ships development/reference key and local storage integrations, not operator-managed envelope encryption or a production immutable archive. Search, cache, export, backup and archive copies follow their own retention controls. Extraction quality, capacity, retrieval quality, RPO/RTO, and compliance require consuming-application evaluation and owner approval. The engine does not implement onboarding, profile completeness, allocation, or business decisions.
 
 See [SETUP.md](SETUP.md) for installation, configuration, the first application workflow, worker setup, upgrades, and the production acceptance gates. See [spec-acceptance.md](spec-acceptance.md) for test evidence and external sign-off owners.
 

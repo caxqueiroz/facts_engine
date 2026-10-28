@@ -6,7 +6,7 @@
   "identities": [
     {
       "URI": "spiffe://example.test/facts-client",
-      "Tenant": "bank1",
+      "Tenant": "org1",
       "Principal": "facts-client"
     }
   ],
@@ -25,7 +25,7 @@
   "operations_scope": "",
   "attestation_identity": {
     "url": "https://identity.example.test/facts/verify-attestation",
-    "authority": "bank-identity-v1",
+    "authority": "identity-authority-v1",
     "token_env": "MEMORY_IDENTITY_AUTHORITY_TOKEN",
     "timeout_seconds": 5,
     "max_authentication_age_seconds": 900

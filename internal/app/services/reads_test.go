@@ -10,7 +10,7 @@ import (
 
 func TestPageTokenBindingAndExpiry(t *testing.T) {
 	s := &Service{reads: model.ReadOptions{PaginationKey: bytes.Repeat([]byte{9}, 32)}}
-	c := model.Caller{Tenant: "bank", Principal: "reader"}
+	c := model.Caller{Tenant: "org", Principal: "reader"}
 	now := time.Now().UTC()
 	q := model.FactsQuery{Scope: "case", Purpose: "review", ValidAt: now, Limit: 1}
 	p := factPageToken{Version: "facts-page-v1", CallerDigest: model.Digest(c), QueryDigest: pageQueryDigest(q), After: "record", Revision: 5, EvaluatedAt: now, ExpiresAt: now.Add(time.Minute)}

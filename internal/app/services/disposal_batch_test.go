@@ -25,12 +25,12 @@ func TestDisposalBatchReauthorizesAndNormalizesSelection(t *testing.T) {
 			e.Reason = ""
 			r := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "z", Reason: "expired", Extractions: []model.ExtractionDisposalRequest{e}}
 			for _, kind := range []string{"fact", "memory"} {
-				r.Versions = append(r.Versions, model.VersionDisposalRequest{Kind: kind, Scope: "z", RecordID: kind + "-record", VersionID: kind + "-version", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}})
+				r.Versions = append(r.Versions, model.VersionDisposalRequest{Kind: kind, Scope: "z", RecordID: kind + "-record", VersionID: kind + "-version", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}})
 			}
-			r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
-			r.Contexts = []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}}}}
-			r.Calculations = []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
-			r.Decisions = []model.DecisionDisposalRequest{{DecisionID: "decision", Bindings: []model.DecisionRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}
+			r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}}
+			r.Contexts = []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}}}}
+			r.Calculations = []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}}
+			r.Decisions = []model.DecisionDisposalRequest{{DecisionID: "decision", Bindings: []model.DecisionRetentionBinding{{Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}}
 			revoke := func() { a.denied = "a" }
 			switch phase {
 			case "before":
@@ -67,7 +67,7 @@ func TestDisposalBatchReauthorizesAndNormalizesSelection(t *testing.T) {
 	}
 }
 func TestDisposalBatchRejectsAmbiguousSelections(t *testing.T) {
-	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "scope", Reason: "expired", Versions: []model.VersionDisposalRequest{{Kind: "fact", Scope: "scope", RecordID: "record", VersionID: "version", Bindings: []model.VersionRetentionBinding{{Scope: "scope", PolicyID: "policy", Jurisdiction: "SG"}}}}}
+	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "scope", Reason: "expired", Versions: []model.VersionDisposalRequest{{Kind: "fact", Scope: "scope", RecordID: "record", VersionID: "version", Bindings: []model.VersionRetentionBinding{{Scope: "scope", PolicyID: "policy", Jurisdiction: "XX"}}}}}
 	for _, change := range []func(*model.DisposalBatchRequest){
 		func(r *model.DisposalBatchRequest) { r.Versions = nil },
 		func(r *model.DisposalBatchRequest) { r.Versions = append(r.Versions, r.Versions[0]) },
@@ -96,8 +96,8 @@ func TestDisposalBatchRejectsAmbiguousSelections(t *testing.T) {
 
 func TestDisposalBatchSnapshotContextNormalization(t *testing.T) {
 	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired",
-		Snapshots: []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshots", Jurisdiction: "SG"}}}},
-		Contexts:  []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "contexts", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "contexts", Jurisdiction: "SG"}}}}}
+		Snapshots: []model.SnapshotDisposalRequest{{SnapshotID: "snapshot", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshots", Jurisdiction: "XX"}}}},
+		Contexts:  []model.ContextDisposalRequest{{ContextID: "context", Bindings: []model.ContextRetentionBinding{{Scope: "z", PolicyID: "contexts", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "contexts", Jurisdiction: "XX"}}}}}
 	normalized, err := normalizeDisposalBatch(base)
 	if err != nil || normalized.SelectionCount() != 2 || normalized.Snapshots[0].Command != base.Command || normalized.Contexts[0].Reason != base.Reason || normalized.Contexts[0].Bindings[0].Scope != "a" {
 		t.Fatal(normalized, err)
@@ -112,7 +112,7 @@ func TestDisposalBatchSnapshotContextNormalization(t *testing.T) {
 		func(r *model.DisposalBatchRequest) { r.Snapshots[0].Reason = "other" },
 		func(r *model.DisposalBatchRequest) { r.Contexts[0].Bindings = nil },
 		func(r *model.DisposalBatchRequest) {
-			r.Snapshots[0].Bindings = []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "", Jurisdiction: "SG"}}
+			r.Snapshots[0].Bindings = []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "", Jurisdiction: "XX"}}
 		},
 		func(r *model.DisposalBatchRequest) {
 			for i := 0; i < 31; i++ {
@@ -135,7 +135,7 @@ func TestDisposalBatchSnapshotContextNormalization(t *testing.T) {
 }
 
 func TestDisposalBatchCalculationNormalization(t *testing.T) {
-	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired", Calculations: []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}}
+	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired", Calculations: []model.CalculationDisposalRequest{{CalculationID: "calculation", Bindings: []model.CalculationRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}}}
 	normalized, err := normalizeDisposalBatch(base)
 	if err != nil || normalized.SelectionCount() != 1 || normalized.Calculations[0].Command != base.Command || normalized.Calculations[0].Bindings[0].Scope != "a" || base.Calculations[0].Bindings[0].Scope != "z" {
 		t.Fatal(normalized, err)
@@ -160,7 +160,7 @@ func TestDisposalBatchCalculationNormalization(t *testing.T) {
 }
 
 func TestDisposalBatchDecisionNormalization(t *testing.T) {
-	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired", Decisions: []model.DecisionDisposalRequest{{DecisionID: "decision", Bindings: []model.DecisionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}}}
+	base := model.DisposalBatchRequest{Command: model.Command{Key: "batch", Purpose: "retention"}, Scope: "a", Reason: "expired", Decisions: []model.DecisionDisposalRequest{{DecisionID: "decision", Bindings: []model.DecisionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}}}
 	normalized, err := normalizeDisposalBatch(base)
 	if err != nil || normalized.SelectionCount() != 1 || normalized.Decisions[0].Command != base.Command || normalized.Decisions[0].Bindings[0].Scope != "a" || base.Decisions[0].Bindings[0].Scope != "z" {
 		t.Fatal(normalized, err)

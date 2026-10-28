@@ -34,7 +34,7 @@ func (d denyIdentityCaller) Check(ctx context.Context, r model.AuthorizationRequ
 }
 func testDelegatedAttestations(t *testing.T, ctx context.Context, l *postgres.Ledger, store *evidence.Postgres, admin *pgxpool.Pool) {
 	base, _ := facts.New(l, allow{}, store)
-	client := model.Caller{Tenant: "delegation-bank", Principal: "client"}
+	client := model.Caller{Tenant: "delegation-org", Principal: "client"}
 	recorder := model.Caller{Tenant: client.Tenant, Principal: "confirmation-service", Service: true}
 	registerTestIdentities(t, ctx, base, client.Tenant, "case", []string{"customer"})
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "client-confirmation"} }

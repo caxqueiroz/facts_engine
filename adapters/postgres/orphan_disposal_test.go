@@ -18,7 +18,7 @@ import (
 func testOrphanDisposal(t *testing.T, ctx context.Context, normal, engine *facts.Engine, ledger *postgres.Ledger, store *evidence.Postgres, admin *pgxpool.Pool, c model.Caller) {
 	t.Helper()
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "cleanup"} }
-	policy := model.RetentionPolicy{ID: "orphan-immediate", Scope: "case", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "SG"}
+	policy := model.RetentionPolicy{ID: "orphan-immediate", Scope: "case", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "XX"}
 	if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd("orphan-immediate"), Policy: policy}); err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func testOrphanDisposal(t *testing.T, ctx context.Context, normal, engine *facts
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := model.OrphanEvidenceDisposalRequest{Command: cmd("orphan-delete"), Scope: "case", PolicyID: policy.ID, Jurisdiction: "SG", Reason: "expired upload", Object: ref}
+	request := model.OrphanEvidenceDisposalRequest{Command: cmd("orphan-delete"), Scope: "case", PolicyID: policy.ID, Jurisdiction: "XX", Reason: "expired upload", Object: ref}
 	reject := func(e *facts.Engine, r model.OrphanEvidenceDisposalRequest, want error) {
 		t.Helper()
 		if _, err := e.DisposeOrphanEvidence(ctx, c, r); !errors.Is(err, want) {
@@ -71,7 +71,7 @@ func testOrphanDisposal(t *testing.T, ctx context.Context, normal, engine *facts
 		t.Fatal(err)
 	}
 	register := func(ref model.ObjectRef, id string) error {
-		_, err := normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd(id), Evidence: model.Evidence{ID: id, Scope: "case", SourceSystem: "test", SourceObject: id, SourceRevision: "v1", Speaker: "staff", SourceClass: "bank_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "short-lived", Object: ref}})
+		_, err := normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd(id), Evidence: model.Evidence{ID: id, Scope: "case", SourceSystem: "test", SourceObject: id, SourceRevision: "v1", Speaker: "staff", SourceClass: "organization_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "short-lived", Object: ref}})
 		return err
 	}
 	if err := register(registered, "orphan-registered"); err != nil {

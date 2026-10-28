@@ -122,7 +122,7 @@ func testAutomaticMemoryRefresh(t *testing.T, ctx context.Context, engine *facts
 		t.Fatal("unrelated event fixture missing")
 	}
 	other := c
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.ScanMemoryRefresh(ctx, other, scan); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross-tenant trigger accepted", err)
 	}

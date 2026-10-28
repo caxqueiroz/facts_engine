@@ -50,8 +50,8 @@ func TestMemoryRefreshOutputValidation(t *testing.T) {
 }
 
 func TestMemoryRefreshDependencyAuthorization(t *testing.T) {
-	job := model.ExtractionJob{Caller: model.Caller{Tenant: "bank", Principal: "requester"}, Request: model.ExtractionRequest{Command: model.Command{Purpose: "review"}, Scope: "own", Refresh: &model.VersionReference{RecordID: "record", VersionID: "version"}}, RefreshScopes: []string{"own", "dependency"}}
-	worker := model.Caller{Tenant: "bank", Principal: "worker", Service: true}
+	job := model.ExtractionJob{Caller: model.Caller{Tenant: "org", Principal: "requester"}, Request: model.ExtractionRequest{Command: model.Command{Purpose: "review"}, Scope: "own", Refresh: &model.VersionReference{RecordID: "record", VersionID: "version"}}, RefreshScopes: []string{"own", "dependency"}}
+	worker := model.Caller{Tenant: "org", Principal: "worker", Service: true}
 	for _, permission := range []string{"can_read", "can_read_history", "can_read_evidence"} {
 		s := &Service{auth: contextPermissionAuthorizer{denyScope: "dependency", denyPermission: permission}}
 		if _, err := s.extractionAuthorizations(context.Background(), worker, job); !errors.Is(err, model.ErrDenied) {

@@ -52,13 +52,13 @@ func TestLiveModel(t *testing.T) {
 	tuple := func(user, relation, object string) map[string]string {
 		return map[string]string{"user": user, "relation": relation, "object": object}
 	}
-	scope := "scope:" + ObjectID("bank1", "case1")
-	tenant := "tenant:bank1"
-	alice := "user:" + ObjectID("bank1", "alice")
-	bob := "user:" + ObjectID("bank1", "bob")
-	foreign := "user:" + ObjectID("bank2", "mallory")
-	svc := "service:" + ObjectID("bank1", "acceptor")
-	tuples := []map[string]string{tuple(tenant, "tenant", scope), tuple(alice, "member", tenant), tuple(alice, "reader", scope), tuple(alice, "approver", scope), tuple(bob, "reader", scope), tuple(bob, "administrator", scope), tuple(svc, "administrator", scope), tuple(foreign, "reader", scope), tuple(svc, "member", tenant), tuple(svc, "acceptor", scope), tuple(svc, "confirmation_recorder", scope), tuple("service:"+ObjectID("bank1", "orphan"), "confirmation_recorder", scope)}
+	scope := "scope:" + ObjectID("org1", "case1")
+	tenant := "tenant:org1"
+	alice := "user:" + ObjectID("org1", "alice")
+	bob := "user:" + ObjectID("org1", "bob")
+	foreign := "user:" + ObjectID("org2", "mallory")
+	svc := "service:" + ObjectID("org1", "acceptor")
+	tuples := []map[string]string{tuple(tenant, "tenant", scope), tuple(alice, "member", tenant), tuple(alice, "reader", scope), tuple(alice, "approver", scope), tuple(bob, "reader", scope), tuple(bob, "administrator", scope), tuple(svc, "administrator", scope), tuple(foreign, "reader", scope), tuple(svc, "member", tenant), tuple(svc, "acceptor", scope), tuple(svc, "confirmation_recorder", scope), tuple("service:"+ObjectID("org1", "orphan"), "confirmation_recorder", scope)}
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "writes": map[string]any{"tuple_keys": tuples}})
 	a, err := New(Config{URL: endpoint, StoreID: store, ModelID: modelID})
 	if err != nil {
@@ -67,7 +67,7 @@ func TestLiveModel(t *testing.T) {
 	cases := []struct {
 		name, tenant, principal, permission string
 		service, want                       bool
-	}{{"member reader", "bank1", "alice", "can_read", false, true}, {"member approver", "bank1", "alice", "can_approve", false, true}, {"reader without membership", "bank1", "bob", "can_read", false, false}, {"foreign relation", "bank2", "mallory", "can_read", false, false}, {"no admin escalation", "bank1", "alice", "can_manage_definitions", false, false}, {"identity admin needs membership", "bank1", "bob", "can_manage_identities", false, false}, {"reader cannot manage identities", "bank1", "alice", "can_manage_identities", false, false}, {"identity administrator", "bank1", "acceptor", "can_manage_identities", true, true}, {"delegated confirmation recorder", "bank1", "acceptor", "can_record_delegated_attestation", true, true}, {"delegated recorder needs membership", "bank1", "orphan", "can_record_delegated_attestation", true, false}, {"human cannot gain recorder permission", "bank1", "alice", "can_record_delegated_attestation", false, false}, {"accepting service", "bank1", "acceptor", "can_accept", true, true}, {"service lacks content grant", "bank1", "acceptor", "can_read", true, false}}
+	}{{"member reader", "org1", "alice", "can_read", false, true}, {"member approver", "org1", "alice", "can_approve", false, true}, {"reader without membership", "org1", "bob", "can_read", false, false}, {"foreign relation", "org2", "mallory", "can_read", false, false}, {"no admin escalation", "org1", "alice", "can_manage_definitions", false, false}, {"identity admin needs membership", "org1", "bob", "can_manage_identities", false, false}, {"reader cannot manage identities", "org1", "alice", "can_manage_identities", false, false}, {"identity administrator", "org1", "acceptor", "can_manage_identities", true, true}, {"delegated confirmation recorder", "org1", "acceptor", "can_record_delegated_attestation", true, true}, {"delegated recorder needs membership", "org1", "orphan", "can_record_delegated_attestation", true, false}, {"human cannot gain recorder permission", "org1", "alice", "can_record_delegated_attestation", false, false}, {"accepting service", "org1", "acceptor", "can_accept", true, true}, {"service lacks content grant", "org1", "acceptor", "can_read", true, false}}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			d, err := a.Check(context.Background(), model.AuthorizationRequest{Caller: model.Caller{Tenant: c.tenant, Principal: c.principal, Service: c.service}, Scope: "case1", Permission: c.permission})
@@ -78,7 +78,7 @@ func TestLiveModel(t *testing.T) {
 	}
 	// A fresh check sees tuple removal even though the model ID remains unchanged.
 	post("/stores/"+store+"/write", map[string]any{"authorization_model_id": modelID, "deletes": map[string]any{"tuple_keys": []map[string]string{tuple(alice, "member", tenant)}}})
-	d, err := a.Check(context.Background(), model.AuthorizationRequest{Caller: model.Caller{Tenant: "bank1", Principal: "alice"}, Scope: "case1", Permission: "can_read"})
+	d, err := a.Check(context.Background(), model.AuthorizationRequest{Caller: model.Caller{Tenant: "org1", Principal: "alice"}, Scope: "case1", Permission: "can_read"})
 	if err != nil || d.Allowed {
 		t.Fatal("revocation", d, err)
 	}

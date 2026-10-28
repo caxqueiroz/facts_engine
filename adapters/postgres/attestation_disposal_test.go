@@ -44,7 +44,7 @@ func testAttestationDisposal(t *testing.T, ctx context.Context, admin *pgxpool.P
 			if kind == "memory" {
 				record = "payload-memory-record"
 			}
-			policy := model.RetentionPolicy{ID: "attestation-retention-" + kind, Scope: "scope", RecordClass: "attestation_payload", Purpose: "retention-test", Jurisdiction: "SG"}
+			policy := model.RetentionPolicy{ID: "attestation-retention-" + kind, Scope: "scope", RecordClass: "attestation_payload", Purpose: "retention-test", Jurisdiction: "XX"}
 			if _, err := engine.RegisterRetentionPolicy(ctx, caller, model.RetentionPolicyRequest{Command: model.Command{Key: "policy-" + kind, Purpose: policy.Purpose}, Policy: policy}); err != nil {
 				t.Fatal(err)
 			}

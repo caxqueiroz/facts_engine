@@ -93,12 +93,12 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		if scope == "a" {
 			sourceRef = ref
 		}
-		if _, err = engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(scope + "-source-policy"), Policy: model.RetentionPolicy{ID: "source-policy", Scope: scope, RecordClass: "evidence_bytes", Purpose: "retention", Jurisdiction: "SG"}}); err != nil {
+		if _, err = engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(scope + "-source-policy"), Policy: model.RetentionPolicy{ID: "source-policy", Scope: scope, RecordClass: "evidence_bytes", Purpose: "retention", Jurisdiction: "XX"}}); err != nil {
 			t.Fatal(err)
 		}
 		for _, kind := range []string{"fact", "memory", "snapshot", "attestation"} {
 			for _, young := range []bool{false, true} {
-				p := model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: kind + "_payload", Purpose: "retention", Jurisdiction: "SG"}
+				p := model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: kind + "_payload", Purpose: "retention", Jurisdiction: "XX"}
 				if young {
 					p.ID += "-young"
 					p.MinimumAgeSeconds = 3600
@@ -130,9 +130,9 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		t.Fatal(err)
 	}
 	request := func(kind, scope string, v model.CommitResult) model.VersionDisposalRequest {
-		r := model.VersionDisposalRequest{Command: cmd("dispose-" + kind), Kind: kind, Scope: scope, RecordID: v.RecordID, VersionID: v.VersionID, Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: scope, PolicyID: kind, Jurisdiction: "SG"}}}
+		r := model.VersionDisposalRequest{Command: cmd("dispose-" + kind), Kind: kind, Scope: scope, RecordID: v.RecordID, VersionID: v.VersionID, Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: scope, PolicyID: kind, Jurisdiction: "XX"}}}
 		if kind == "memory" {
-			r.Bindings = append(r.Bindings, model.VersionRetentionBinding{Scope: "a", PolicyID: kind, Jurisdiction: "SG"})
+			r.Bindings = append(r.Bindings, model.VersionRetentionBinding{Scope: "a", PolicyID: kind, Jurisdiction: "XX"})
 		}
 		return r
 	}
@@ -253,19 +253,19 @@ func testVersionDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	m.Bindings[0], m.Bindings[1] = m.Bindings[1], m.Bindings[0]
 	testVersionDisposalRemote(t, ctx, engine, c, m, first)
 	reject(engine, f, model.ErrPrecondition) // The snapshot still retains a copy after memory disposal.
-	if _, err = engine.DisposeSnapshot(ctx, c, model.SnapshotDisposalRequest{Command: cmd("dispose-snapshot"), SnapshotID: snapshot.ID, Reason: "expired", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshot", Jurisdiction: "SG"}}}); err != nil {
+	if _, err = engine.DisposeSnapshot(ctx, c, model.SnapshotDisposalRequest{Command: cmd("dispose-snapshot"), SnapshotID: snapshot.ID, Reason: "expired", Bindings: []model.SnapshotRetentionBinding{{Scope: "a", PolicyID: "snapshot", Jurisdiction: "XX"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = engine.DisposeVersion(ctx, c, f); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("live attestation did not block version disposal", err)
 	}
-	attestation := model.AttestationDisposalRequest{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "SG", Purpose: "retention"}
+	attestation := model.AttestationDisposalRequest{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "XX", Purpose: "retention"}
 	batchVersion := f
 	batchVersion.Command = model.Command{}
 	batchVersion.Reason = ""
 	batchCommand := cmd("dispose-fact-batch")
-	batchRequest := model.DisposalBatchRequest{Command: batchCommand, Scope: "a", Reason: "expired", Attestations: []model.AttestationDisposalRequest{attestation}, Versions: []model.VersionDisposalRequest{batchVersion}, Evidence: []model.EvidenceDisposalRequest{{Command: batchCommand, Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "SG"}}}
-	evidenceOnly := model.DisposalBatchRequest{Command: cmd("dispose-evidence-alone"), Scope: "a", Reason: "expired", Evidence: []model.EvidenceDisposalRequest{{Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "SG"}}}
+	batchRequest := model.DisposalBatchRequest{Command: batchCommand, Scope: "a", Reason: "expired", Attestations: []model.AttestationDisposalRequest{attestation}, Versions: []model.VersionDisposalRequest{batchVersion}, Evidence: []model.EvidenceDisposalRequest{{Command: batchCommand, Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "XX"}}}
+	evidenceOnly := model.DisposalBatchRequest{Command: cmd("dispose-evidence-alone"), Scope: "a", Reason: "expired", Evidence: []model.EvidenceDisposalRequest{{Scope: "a", EvidenceID: "a-source", PolicyID: "source-policy", Jurisdiction: "XX"}}}
 	if _, err = engine.DisposeBatch(ctx, c, evidenceOnly); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("evidence references did not block partial batch", err)
 	}

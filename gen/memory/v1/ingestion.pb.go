@@ -543,13 +543,13 @@ var File_memory_v1_ingestion_proto protoreflect.FileDescriptor
 
 const file_memory_v1_ingestion_proto_rawDesc = "" +
 	"\n" +
-	"\x19memory/v1/ingestion.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/evidence.proto\"\xc5\x06\n" +
+	"\x19memory/v1/ingestion.proto\x12\tmemory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16memory/v1/common.proto\x1a\x18memory/v1/evidence.proto\"\xcd\x06\n" +
 	"\x13ConversationMessage\x129\n" +
 	"\x02id\x18\x01 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\x02id\x12E\n" +
 	"\brevision\x18\x02 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\brevision\x12C\n" +
 	"\aspeaker\x18\x03 \x01(\tB)\xbaH&r$2\"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$R\aspeaker\x12L\n" +
-	"\fspeaker_role\x18\x04 \x01(\tB)\xbaH&r$R\bcustomerR\tassistantR\x06systemR\x05staffR\vspeakerRole\x12Y\n" +
-	"\fsource_class\x18\x05 \x01(\tB6\xbaH3r1R\bcustomerR\tassistantR\x06systemR\x05staffR\vbank_recordR\vsourceClass\x12C\n" +
+	"\fspeaker_role\x18\x04 \x01(\tB)\xbaH&r$R\bcustomerR\tassistantR\x06systemR\x05staffR\vspeakerRole\x12a\n" +
+	"\fsource_class\x18\x05 \x01(\tB>\xbaH;r9R\bcustomerR\tassistantR\x06systemR\x05staffR\x13organization_recordR\vsourceClass\x12C\n" +
 	"\vsource_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"sourceTime\x12?\n" +
 	"\n" +

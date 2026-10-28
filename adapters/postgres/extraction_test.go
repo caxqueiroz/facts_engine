@@ -48,7 +48,7 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 	if err != nil {
 		t.Fatal(err)
 	}
-	conversation, err := base.IngestConversation(ctx, c, model.ConversationRequest{Command: cmd("extract-conversation"), Scope: scope, SourceSystem: "approved-chat", ConversationID: "extract-chat", Revision: "v1", Timezone: "Asia/Singapore", Messages: []model.ConversationMessage{
+	conversation, err := base.IngestConversation(ctx, c, model.ConversationRequest{Command: cmd("extract-conversation"), Scope: scope, SourceSystem: "approved-chat", ConversationID: "extract-chat", Revision: "v1", Timezone: "Europe/Lisbon", Messages: []model.ConversationMessage{
 		{ID: "one", Revision: "v1", Speaker: "customer", SpeakerRole: "customer", SourceClass: "customer", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "retain", Object: original},
 		{ID: "two", Revision: "v1", Speaker: "assistant", SpeakerRole: "assistant", SourceClass: "assistant", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "retain", Object: injected},
 	}})
@@ -200,7 +200,7 @@ func testExtraction(t *testing.T, ctx context.Context, l model.Ledger, store *ev
 		t.Fatal("terminal replay counted as new result", totals)
 	}
 	other := worker
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.GetJob(ctx, other, model.JobQuery{ID: job.ID, Scope: scope, Purpose: "review"}); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross tenant job", err)
 	}

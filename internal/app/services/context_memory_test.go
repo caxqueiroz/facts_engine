@@ -18,7 +18,7 @@ func (a contextPermissionAuthorizer) Check(_ context.Context, r model.Authorizat
 }
 func TestMemoryContextDependencyDisclosure(t *testing.T) {
 	ctx := context.Background()
-	c := model.Caller{Tenant: "bank", Principal: "reader"}
+	c := model.Caller{Tenant: "org", Principal: "reader"}
 	m := model.ContextManifest{ID: "manifest", Request: model.ContextRequest{Query: model.RecallRequest{Scopes: []string{"case"}}}, Memories: []model.MemoryRecallItem{{Key: model.MemoryKey{Scope: "case", ID: "summary"}, Memory: model.MemoryResult{Body: "private body", Dependencies: []model.MemoryDependency{{Scope: "dependency"}}}}}}
 	if !slices.Equal(model.ContextScopes(m), []string{"case", "dependency"}) {
 		t.Fatal("dependency missing from retained scopes")

@@ -46,7 +46,7 @@ func testRetentionLineage(t *testing.T, ctx context.Context, ledger *postgres.Le
 			t.Fatal(err)
 		}
 	}
-	request := model.EvidenceDisposalRequest{Command: cmd("lineage-dispose"), Scope: "case", EvidenceID: "lineage-root", PolicyID: "short-lived", Jurisdiction: "SG", Reason: "expired", DerivativeEvidenceIDs: ids}
+	request := model.EvidenceDisposalRequest{Command: cmd("lineage-dispose"), Scope: "case", EvidenceID: "lineage-root", PolicyID: "short-lived", Jurisdiction: "XX", Reason: "expired", DerivativeEvidenceIDs: ids}
 	intact := func() {
 		t.Helper()
 		for _, ref := range refs {

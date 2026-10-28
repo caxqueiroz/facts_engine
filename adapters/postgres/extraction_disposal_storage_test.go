@@ -31,7 +31,7 @@ func testExtractionDisposalStorage(t *testing.T, ctx context.Context, admin, run
  JOIN extraction_job_state s ON s.tenant_id=j.tenant_id AND s.id=j.id
  JOIN extraction_attempts a ON a.tenant_id=j.tenant_id AND a.job_id=j.id
  JOIN extraction_results r ON r.tenant_id=a.tenant_id AND r.attempt_id=a.id
- WHERE j.tenant_id='bank1' AND s.state='completed' AND j.conversation_id IS NOT NULL
+ WHERE j.tenant_id='org1' AND s.state='completed' AND j.conversation_id IS NOT NULL
  AND NOT EXISTS(SELECT 1 FROM extraction_memory_targets t WHERE t.tenant_id=j.tenant_id AND t.job_id=j.id)
  AND (SELECT count(*) FROM extraction_attempts x WHERE x.tenant_id=j.tenant_id AND x.job_id=j.id)=1
  ORDER BY j.id LIMIT 1`).Scan(&tenant, &jobID, &attemptID); err != nil {

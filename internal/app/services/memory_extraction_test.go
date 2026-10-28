@@ -65,8 +65,8 @@ func TestMemoryExtractionCandidateBoundaries(t *testing.T) {
 
 func TestMemoryExtractionArtifactScopes(t *testing.T) {
 	ctx := context.Background()
-	caller := model.Caller{Tenant: "bank", Principal: "reader"}
-	worker := model.Caller{Tenant: "bank", Principal: "worker", Service: true}
+	caller := model.Caller{Tenant: "org", Principal: "reader"}
+	worker := model.Caller{Tenant: "org", Principal: "worker", Service: true}
 	job := model.ExtractionJob{Caller: caller, Request: model.ExtractionRequest{Command: model.Command{Purpose: "review"}, Scope: "own", MemoryTargets: []model.MemoryExtractionTarget{{ID: "summary"}}}, ContentScopes: []string{"own", "dependency"}}
 	for _, permission := range []string{"can_read", "can_read_history", "can_read_evidence"} {
 		s := &Service{auth: contextPermissionAuthorizer{denyScope: "dependency", denyPermission: permission}}

@@ -1,5 +1,5 @@
 // Package audit supplies a development Ed25519 signer and standalone verification.
-// Production deployments inject a signer backed by a separately managed bank key.
+// Production deployments inject a signer backed by a separately managed operator key.
 package audit
 
 import (

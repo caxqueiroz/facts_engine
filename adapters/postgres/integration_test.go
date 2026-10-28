@@ -144,14 +144,14 @@ func TestPostgresLedger(t *testing.T) {
 		tenant, scope string
 		subjects      []string
 	}{
-		{"bank1", "case1", []string{"subject1", "subject2", "subject-race", "subject-new", "temporal-subject", "missing-subject", "created-during-snapshot", "absent"}},
-		{"bank1", "case2", []string{"absent"}},
-		{"bank1", "extraction-case", []string{"extract-customer", "assistant-claim", "negated-claim"}},
-		{"bank1", "refresh-case", []string{"customer"}},
-		{"listing-bank", "case", []string{"one", "two", "three"}},
-		{"retention-bank", "case", []string{"subject"}},
-		{"retention-bank", "other-scope", nil},
-		{"conversation-retention-bank", "conversation-retention-case", nil},
+		{"org1", "case1", []string{"subject1", "subject2", "subject-race", "subject-new", "temporal-subject", "missing-subject", "created-during-snapshot", "absent"}},
+		{"org1", "case2", []string{"absent"}},
+		{"org1", "extraction-case", []string{"extract-customer", "assistant-claim", "negated-claim"}},
+		{"org1", "refresh-case", []string{"customer"}},
+		{"listing-org", "case", []string{"one", "two", "three"}},
+		{"retention-org", "case", []string{"subject"}},
+		{"retention-org", "other-scope", nil},
+		{"conversation-retention-org", "conversation-retention-case", nil},
 	} {
 		registerTestIdentities(t, ctx, engine, fixture.tenant, fixture.scope, fixture.subjects)
 	}
@@ -177,8 +177,8 @@ func TestPostgresLedger(t *testing.T) {
 	run("snapshot disposal", func(t *testing.T) { testSnapshotDisposal(t, ctx, engine, store, admin) })
 	run("retention governance", func(t *testing.T) { testRetention(t, ctx, engine, store, admin) })
 	run("outbox delivery recovery", func(t *testing.T) { testOutbox(t, ctx, ledger, admin) })
-	caller := model.Caller{Tenant: "bank1", Principal: "proposer"}
-	reviewer := model.Caller{Tenant: "bank1", Principal: "reviewer"}
+	caller := model.Caller{Tenant: "org1", Principal: "proposer"}
+	reviewer := model.Caller{Tenant: "org1", Principal: "reviewer"}
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "integration"} }
 	p := model.PolicyRequest{Command: cmd("policy"), Policy: model.AcceptancePolicy{Scope: "case1", ID: "manual1", Mode: "manual", SourceClasses: []string{"customer"}}}
 	if _, err := engine.RegisterAcceptancePolicy(ctx, caller, p); err != nil {
@@ -332,7 +332,7 @@ func TestPostgresLedger(t *testing.T) {
 		if _, err := engine.ApproveFact(ctx, caller, approval); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal(err)
 		}
-		delegated := model.Caller{Tenant: "bank1", Principal: "delegate", Initiator: "proposer", Service: true}
+		delegated := model.Caller{Tenant: "org1", Principal: "delegate", Initiator: "proposer", Service: true}
 		if _, err := engine.ApproveFact(ctx, delegated, approval); !errors.Is(err, model.ErrPrecondition) {
 			t.Fatal(err)
 		}
@@ -386,15 +386,15 @@ func TestPostgresLedger(t *testing.T) {
 	})
 	run("cross tenant", func(t *testing.T) {
 		other := reviewer
-		other.Tenant = "bank2"
+		other.Tenant = "org2"
 		r, err := engine.GetFact(ctx, other, model.FactQuery{Key: q.Key, ValidAt: now})
 		if err != nil || r.State != "missing" {
 			t.Fatal(r, err)
 		}
-		if _, err := store.Read(ctx, "bank2", ref); err == nil {
+		if _, err := store.Read(ctx, "org2", ref); err == nil {
 			t.Fatal("evidence leaked")
 		}
-		if err := ledger.Transact(ctx, "bank2", func(tx model.Tx) error { _, err := tx.Version(ctx, proposal.RecordID, proposal.VersionID); return err }); !errors.Is(err, model.ErrNotFound) {
+		if err := ledger.Transact(ctx, "org2", func(tx model.Tx) error { _, err := tx.Version(ctx, proposal.RecordID, proposal.VersionID); return err }); !errors.Is(err, model.ErrNotFound) {
 			t.Fatal(err)
 		}
 	})
@@ -426,10 +426,10 @@ func TestPostgresLedger(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer tx.Rollback(ctx)
-		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id','bank2',true)`); err != nil {
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id','org2',true)`); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO version_evidence(tenant_id,version_id,evidence_id,scope_id) VALUES('bank2',$1,'ev1','case1')`, proposal.VersionID); err == nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO version_evidence(tenant_id,version_id,evidence_id,scope_id) VALUES('org2',$1,'ev1','case1')`, proposal.VersionID); err == nil {
 			t.Fatal("cross-tenant reference allowed")
 		}
 	})
@@ -473,7 +473,7 @@ func TestPostgresLedger(t *testing.T) {
 		}
 	})
 	run("automated attestations and withdrawal", func(t *testing.T) {
-		auto := model.Caller{Tenant: "bank1", Principal: "acceptor", Service: true}
+		auto := model.Caller{Tenant: "org1", Principal: "acceptor", Service: true}
 		policy := model.PolicyRequest{Command: cmd("auto-policy"), Policy: model.AcceptancePolicy{Scope: "case1", ID: "auto1", Mode: "automated", SourceClasses: []string{"customer"}, AcceptingServices: []string{"acceptor"}, Required: []model.AttestationRequirement{{Kind: "client_confirmation", Principals: []string{"proposer"}}}}}
 		if _, err := engine.RegisterAcceptancePolicy(ctx, caller, policy); err != nil {
 			t.Fatal(err)
@@ -856,11 +856,11 @@ func TestPostgresLedger(t *testing.T) {
 	run("extraction disposal storage", func(t *testing.T) { testExtractionDisposalStorage(t, ctx, admin, runtime, store) })
 	run("atomic ordering", func(t *testing.T) {
 		var count, maxRev int64
-		if err := admin.QueryRow(ctx, `SELECT count(*),max(ledger_revision) FROM ledger_events WHERE tenant_id='bank1'`).Scan(&count, &maxRev); err != nil || count != maxRev {
+		if err := admin.QueryRow(ctx, `SELECT count(*),max(ledger_revision) FROM ledger_events WHERE tenant_id='org1'`).Scan(&count, &maxRev); err != nil || count != maxRev {
 			t.Fatal(count, maxRev, err)
 		}
 		var outbox int64
-		admin.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE tenant_id='bank1'`).Scan(&outbox)
+		admin.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE tenant_id='org1'`).Scan(&outbox)
 		if outbox != count {
 			t.Fatal("lost outbox event")
 		}

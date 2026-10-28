@@ -193,7 +193,7 @@
             ]
           }
         },
-        "can_ingest_bank_record": {
+        "can_ingest_organization_record": {
           "intersection": {
             "child": [
               {

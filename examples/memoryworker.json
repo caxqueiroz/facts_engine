@@ -2,7 +2,7 @@
   "mode": "projection",
   "principal": "facts-projector",
   "projection": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "generation": "lexical-v1",
     "database_env": "MEMORY_INDEX_DATABASE_URL",
     "max_connections": 4

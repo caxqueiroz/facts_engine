@@ -65,10 +65,10 @@ func TestPostgresContract(t *testing.T) {
 		}
 		return index, db
 	}
-	a, admin := setup(dsn, "bank-a")
-	b, otherAdmin := setup(dsn2, "bank-b")
+	a, admin := setup(dsn, "org-a")
+	b, otherAdmin := setup(dsn2, "org-b")
 	text := "canonical accepted fact"
-	d := model.ProjectionDocument{Tenant: "bank-a", Generation: "g1", RecordID: "record", VersionID: "version", VersionDigest: model.BytesDigest([]byte(text)), PolicyID: "policy", Classification: "confidential", Key: model.FactKey{Scope: "scope1", Subject: "subject", Predicate: "predicate"}, Value: model.Value{Kind: model.Text, Text: &text}}
+	d := model.ProjectionDocument{Tenant: "org-a", Generation: "g1", RecordID: "record", VersionID: "version", VersionDigest: model.BytesDigest([]byte(text)), PolicyID: "policy", Classification: "confidential", Key: model.FactKey{Scope: "scope1", Subject: "subject", Predicate: "predicate"}, Value: model.Value{Kind: model.Text, Text: &text}}
 	if err := a.Put(ctx, d); err != nil {
 		t.Fatal(err)
 	}
@@ -83,38 +83,38 @@ func TestPostgresContract(t *testing.T) {
 	if err := b.Put(ctx, d); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross-tenant write", err)
 	}
-	hits, err := a.Candidates(ctx, "bank-a", "g1", "scope1", "fact", 10)
+	hits, err := a.Candidates(ctx, "org-a", "g1", "scope1", "fact", 10)
 	if err != nil || len(hits) != 1 || hits[0].VersionID != "version" {
 		t.Fatal(hits, err)
 	}
-	hits, err = a.Candidates(ctx, "bank-a", "g1", "scope2", "fact", 10)
+	hits, err = a.Candidates(ctx, "org-a", "g1", "scope2", "fact", 10)
 	if err != nil || len(hits) != 0 {
 		t.Fatal("scope leak", hits, err)
 	}
-	hits, err = b.Candidates(ctx, "bank-b", "g1", "scope1", "fact", 10)
+	hits, err = b.Candidates(ctx, "org-b", "g1", "scope1", "fact", 10)
 	if err != nil || len(hits) != 0 {
 		t.Fatal("database isolation", hits, err)
 	}
 
 	lexical := a.Lexical()
 	for _, query := range []string{"canonical", "canonical fact"} {
-		hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope1", query, 10)
+		hits, err = lexical.Candidates(ctx, "org-a", "g1", "scope1", query, 10)
 		if err != nil || len(hits) != 1 || hits[0].VersionID != "version" {
 			t.Fatal("lexical match", hits, err)
 		}
 	}
-	hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope1", "unmatchedterm", 10)
+	hits, err = lexical.Candidates(ctx, "org-a", "g1", "scope1", "unmatchedterm", 10)
 	if err != nil || len(hits) != 0 {
 		t.Fatal("unmatched lexical query", hits, err)
 	}
-	hits, err = lexical.Candidates(ctx, "bank-a", "g1", "scope2", "fact", 10)
+	hits, err = lexical.Candidates(ctx, "org-a", "g1", "scope2", "fact", 10)
 	if err != nil || len(hits) != 0 {
 		t.Fatal("lexical scope leak", hits, err)
 	}
-	if _, err = lexical.Candidates(ctx, "bank-b", "g1", "scope1", "fact", 10); !errors.Is(err, model.ErrDenied) {
+	if _, err = lexical.Candidates(ctx, "org-b", "g1", "scope1", "fact", 10); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("lexical tenant leak", err)
 	}
-	identity, err := lexical.DescribeRetrieval(ctx, "bank-a", "g1")
+	identity, err := lexical.DescribeRetrieval(ctx, "org-a", "g1")
 	if err != nil || identity.EmbeddingID != "none" || identity.Dimensions != 0 {
 		t.Fatal(identity, err)
 	}
@@ -125,7 +125,7 @@ func TestPostgresContract(t *testing.T) {
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Candidates(ctx, "bank-a", "g1", "scope1", "fact", 10); err != nil {
+	if _, err := a.Candidates(ctx, "org-a", "g1", "scope1", "fact", 10); err != nil {
 		t.Fatal("adapter unexpectedly closed host pool", err)
 	}
 	testPagedProjectionVerification(t, ctx, b, otherAdmin)

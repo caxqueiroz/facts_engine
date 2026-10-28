@@ -12,7 +12,7 @@
   "max_backoff_seconds": 60,
   "delivery_timeout_seconds": 180,
   "extraction": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "extraction-v1",
     "scheduling": {
       "profiles": [

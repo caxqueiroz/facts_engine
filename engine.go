@@ -112,7 +112,7 @@ type FactSnapshotRequest = model.FactSnapshotRequest
 type FactSnapshot = model.FactSnapshot
 type SnapshotQuery = model.SnapshotQuery
 
-// NewWithAudit injects the bank-owned signer. Export jobs run only on explicit calls.
+// NewWithAudit injects the operator-owned signer. Export jobs run only on explicit calls.
 func NewWithAudit(ledger Ledger, auth Authorizer, evidence EvidenceStore, options model.AuditOptions) (*Engine, error) {
 	s, err := services.NewWithAudit(ledger, auth, evidence, options)
 	if err != nil {

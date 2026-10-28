@@ -20,7 +20,7 @@ func testPagedProjectionVerification(t *testing.T, ctx context.Context, index *c
 	const count = 10005
 	body := strings.Repeat("accepted synthetic text ", 320)
 	document := func(n int) model.ProjectionDocument {
-		return model.ProjectionDocument{Tenant: "bank-b", Generation: "g1", RecordID: "record", VersionID: fmt.Sprintf("v%05d", n), VersionDigest: model.Digest(n), PolicyID: "policy", Classification: "confidential", Key: model.FactKey{Scope: "case", Subject: "subject", Predicate: "predicate"}, Value: model.Value{Kind: model.Text, Text: &body}}
+		return model.ProjectionDocument{Tenant: "org-b", Generation: "g1", RecordID: "record", VersionID: fmt.Sprintf("v%05d", n), VersionDigest: model.Digest(n), PolicyID: "policy", Classification: "confidential", Key: model.FactKey{Scope: "case", Subject: "subject", Predicate: "predicate"}, Value: model.Value{Kind: model.Text, Text: &body}}
 	}
 	first := document(0)
 	serialized, _ := json.Marshal(first)
@@ -73,7 +73,7 @@ func testPagedProjectionVerification(t *testing.T, ctx context.Context, index *c
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	key := model.GenerationKey{Tenant: "bank-b", Generation: "g1"}
+	key := model.GenerationKey{Tenant: "org-b", Generation: "g1"}
 	if err = index.SetProjectionGate(ctx, key, 1, true); err != nil {
 		t.Fatal(err)
 	}

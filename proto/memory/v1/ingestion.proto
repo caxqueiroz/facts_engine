@@ -34,7 +34,7 @@ message ConversationMessage {
       "assistant",
       "system",
       "staff",
-      "bank_record"
+      "organization_record"
     ]
   }];
   google.protobuf.Timestamp source_time = 6 [(buf.validate.field).required = true];

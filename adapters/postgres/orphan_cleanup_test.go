@@ -31,7 +31,7 @@ func testOrphanCleanup(t *testing.T, ctx context.Context, normal, engine *facts.
 		}
 		refs = append(refs, ref)
 	}
-	q := model.OrphanEvidenceQuery{Scope: "case", PolicyID: "orphan-immediate", Jurisdiction: "SG", Purpose: "cleanup", Limit: 2}
+	q := model.OrphanEvidenceQuery{Scope: "case", PolicyID: "orphan-immediate", Jurisdiction: "XX", Purpose: "cleanup", Limit: 2}
 	page, err := engine.ScanOrphanEvidence(ctx, c, q)
 	if err != nil || len(page) != 2 || page[0] != refs[0] || page[1] != refs[1] {
 		t.Fatal("cleanup first page", page, err)
@@ -72,7 +72,7 @@ func testOrphanCleanup(t *testing.T, ctx context.Context, normal, engine *facts.
 	defer server.Close()
 	client := memoryv1connect.NewRetentionServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
 	ref := refs[0]
-	request := &v1.DisposeOrphanEvidenceRequest{Tenant: c.Tenant, Command: &v1.Command{Key: "cleanup-remote", Purpose: "cleanup"}, Scope: "case", PolicyId: "orphan-immediate", Jurisdiction: "SG", Reason: "expired", Object: &v1.ObjectRef{Locator: ref.Locator, Version: ref.Version, Digest: ref.Digest, Size: ref.Size}}
+	request := &v1.DisposeOrphanEvidenceRequest{Tenant: c.Tenant, Command: &v1.Command{Key: "cleanup-remote", Purpose: "cleanup"}, Scope: "case", PolicyId: "orphan-immediate", Jurisdiction: "XX", Reason: "expired", Object: &v1.ObjectRef{Locator: ref.Locator, Version: ref.Version, Digest: ref.Digest, Size: ref.Size}}
 	if result, err := grpcNormal.DisposeOrphanEvidence(ctx, request); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
 		t.Fatal("runtime remote cleanup", result, err)
 	}
@@ -102,7 +102,7 @@ func testOrphanCleanup(t *testing.T, ctx context.Context, normal, engine *facts.
 	caller := c
 	caller.Service = true
 	caller.Principal = "cleanup-worker"
-	config := workers.OrphanCleanupConfig{Tenant: c.Tenant, Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []workers.OrphanCleanupBinding{{Scope: "case", PolicyID: "orphan-immediate", Jurisdiction: "SG"}}, PageSize: 1, MaxPages: 1, IntervalMinutes: 1}
+	config := workers.OrphanCleanupConfig{Tenant: c.Tenant, Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []workers.OrphanCleanupBinding{{Scope: "case", PolicyID: "orphan-immediate", Jurisdiction: "XX"}}, PageSize: 1, MaxPages: 1, IntervalMinutes: 1}
 	worker, err := workers.NewOrphanCleanup(engine, caller, config)
 	if err != nil {
 		t.Fatal(err)

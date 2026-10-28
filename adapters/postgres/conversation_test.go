@@ -31,7 +31,7 @@ func testConversations(t *testing.T, ctx context.Context, l model.Ledger, store 
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := model.ConversationRequest{Command: model.Command{Key: "conversation-ingest", Purpose: "review"}, Scope: "case1", SourceSystem: "trusted-chat", ConversationID: "conversation1", Revision: "v1", Timezone: "Asia/Singapore", Messages: []model.ConversationMessage{
+	r := model.ConversationRequest{Command: model.Command{Key: "conversation-ingest", Purpose: "review"}, Scope: "case1", SourceSystem: "trusted-chat", ConversationID: "conversation1", Revision: "v1", Timezone: "Europe/Lisbon", Messages: []model.ConversationMessage{
 		{ID: "message1", Revision: "v1", Speaker: "customer1", SpeakerRole: "customer", SourceClass: "customer", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "conversation-policy", Object: customer},
 		{ID: "message2", Revision: "v1", Speaker: "assistant1", SpeakerRole: "assistant", SourceClass: "assistant", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "conversation-policy", Object: assistant},
 	}}
@@ -89,17 +89,17 @@ func testConversations(t *testing.T, ctx context.Context, l model.Ledger, store 
 		t.Fatal("unknown timezone accepted", err)
 	}
 	other := c
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.GetConversation(ctx, other, model.ConversationQuery{ID: record.ID, Scope: r.Scope, Purpose: r.Purpose}); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross tenant conversation", err)
 	}
-	denied, _ := facts.New(l, denyPermission{permission: "can_ingest_bank_record"}, store)
+	denied, _ := facts.New(l, denyPermission{permission: "can_ingest_organization_record"}, store)
 	invalid = r
 	invalid.Messages = append([]model.ConversationMessage(nil), r.Messages...)
 	invalid.Messages[0].SpeakerRole = "staff"
-	invalid.Messages[0].SourceClass = "bank_record"
+	invalid.Messages[0].SourceClass = "organization_record"
 	if _, err = denied.IngestConversation(ctx, c, invalid); !errors.Is(err, model.ErrDenied) {
-		t.Fatal("bank record ingestion permission bypass", err)
+		t.Fatal("organization record ingestion permission bypass", err)
 	}
 	var wg sync.WaitGroup
 	results := make(chan model.ConversationRecord, 2)
