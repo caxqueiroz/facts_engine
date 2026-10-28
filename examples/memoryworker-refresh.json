@@ -12,7 +12,7 @@
   "max_backoff_seconds": 60,
   "delivery_timeout_seconds": 120,
   "refresh": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "refresh-v1",
     "purpose": "memory-refresh",
     "bindings": [

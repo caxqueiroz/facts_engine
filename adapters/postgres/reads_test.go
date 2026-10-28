@@ -18,11 +18,11 @@ func testFactListing(t *testing.T, ctx context.Context, l model.Ledger, store *e
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := model.Caller{Tenant: "listing-bank", Principal: "proposer"}
+	c := model.Caller{Tenant: "listing-org", Principal: "proposer"}
 	reviewer := c
 	reviewer.Principal = "reviewer"
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "list-test"} }
-	_, err = engine.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: cmd("policy"), Policy: model.AcceptancePolicy{ID: "manual", Scope: "case", Mode: "manual", SourceClasses: []string{"bank_record"}}})
+	_, err = engine.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: cmd("policy"), Policy: model.AcceptancePolicy{ID: "manual", Scope: "case", Mode: "manual", SourceClasses: []string{"organization_record"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func testFactListing(t *testing.T, ctx context.Context, l model.Ledger, store *e
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = engine.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd("evidence"), Evidence: model.Evidence{ID: "evidence", Scope: "case", SourceSystem: "app", SourceObject: "source", SourceRevision: "v1", Speaker: "staff", SourceClass: "bank_record", SourceTime: time.Now(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "test", Object: ref}})
+	_, err = engine.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: cmd("evidence"), Evidence: model.Evidence{ID: "evidence", Scope: "case", SourceSystem: "app", SourceObject: "source", SourceRevision: "v1", Speaker: "staff", SourceClass: "organization_record", SourceTime: time.Now(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "test", Object: ref}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func testFactListing(t *testing.T, ctx context.Context, l model.Ledger, store *e
 		t.Fatal("cursor scope binding", err)
 	}
 	other := c
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.ListFacts(ctx, other, next); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("cursor tenant binding", err)
 	}

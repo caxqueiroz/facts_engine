@@ -38,7 +38,7 @@ func testRemoteRetention(t *testing.T, ctx context.Context, normal, engine *fact
 	client := clientFor(engine)
 	grpcClient := v1.NewRetentionServiceClient(governanceGRPC(t, engine, caller))
 	command := func(key string) *v1.Command { return &v1.Command{Key: key, Purpose: "remote-retention"} }
-	policy := &v1.RegisterRetentionPolicyRequest{Tenant: caller.Tenant, Command: command("remote-policy"), Policy: &v1.RetentionPolicy{Id: "remote-policy", Scope: "remote-retention", RecordClass: "evidence_bytes", Purpose: "remote-retention", Jurisdiction: "SG"}}
+	policy := &v1.RegisterRetentionPolicyRequest{Tenant: caller.Tenant, Command: command("remote-policy"), Policy: &v1.RetentionPolicy{Id: "remote-policy", Scope: "remote-retention", RecordClass: "evidence_bytes", Purpose: "remote-retention", Jurisdiction: "XX"}}
 	first, err := grpcClient.RegisterRetentionPolicy(ctx, policy)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func testRemoteRetention(t *testing.T, ctx context.Context, normal, engine *fact
 	if err != nil || !proto.Equal(status, grpcStatus) {
 		t.Fatal("gRPC held status differs", grpcStatus, err)
 	}
-	disposal := &v1.DisposeEvidenceRequest{Tenant: caller.Tenant, Command: command("remote-disposal"), Scope: query.Scope, EvidenceId: query.EvidenceId, PolicyId: "remote-policy", Jurisdiction: "SG", Reason: "expired"}
+	disposal := &v1.DisposeEvidenceRequest{Tenant: caller.Tenant, Command: command("remote-disposal"), Scope: query.Scope, EvidenceId: query.EvidenceId, PolicyId: "remote-policy", Jurisdiction: "XX", Reason: "expired"}
 	if _, err := client.DisposeEvidence(ctx, disposal); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatal("hold bypassed remotely", err)
 	}

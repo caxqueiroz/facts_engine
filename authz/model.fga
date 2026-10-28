@@ -32,7 +32,7 @@ type scope
     define can_read: reader and tenant_member
     define can_extract: proposer and tenant_member
     define can_ingest: proposer and tenant_member
-    define can_ingest_bank_record: administrator and tenant_member
+    define can_ingest_organization_record: administrator and tenant_member
     define can_propose: proposer and tenant_member
     define can_approve: approver and tenant_member
     define can_attest: attestor and tenant_member

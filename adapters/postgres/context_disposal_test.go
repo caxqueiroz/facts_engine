@@ -87,7 +87,7 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		if scope == "case2" {
 			dependency = model.MemoryDependency{Scope: scope, RecordID: proposed.RecordID, VersionID: proposed.VersionID, ContentDigest: proposed.ContentDigest, Label: "assertion"}
 		}
-		for _, policy := range []model.RetentionPolicy{{ID: "contexts", Scope: scope, RecordClass: "context_payload", Purpose: "context-retention", Jurisdiction: "SG"}, {ID: "young", Scope: scope, RecordClass: "context_payload", Purpose: "context-retention", Jurisdiction: "SG", MinimumAgeSeconds: 3600}} {
+		for _, policy := range []model.RetentionPolicy{{ID: "contexts", Scope: scope, RecordClass: "context_payload", Purpose: "context-retention", Jurisdiction: "XX"}, {ID: "young", Scope: scope, RecordClass: "context_payload", Purpose: "context-retention", Jurisdiction: "XX", MinimumAgeSeconds: 3600}} {
 			if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: command(scope + policy.ID), Policy: policy}); err != nil {
 				t.Fatal(err)
 			}
@@ -126,7 +126,7 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 	request := func(m model.ContextManifest) model.ContextDisposalRequest {
 		r := model.ContextDisposalRequest{Command: command("dispose-" + m.ID), ContextID: m.ID, Reason: "retention period expired"}
 		for _, scope := range model.ContextScopes(m) {
-			r.Bindings = append(r.Bindings, model.ContextRetentionBinding{Scope: scope, PolicyID: "contexts", Jurisdiction: "SG"})
+			r.Bindings = append(r.Bindings, model.ContextRetentionBinding{Scope: scope, PolicyID: "contexts", Jurisdiction: "XX"})
 		}
 		return r
 	}
@@ -149,7 +149,7 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		return model.DecisionReceipt{Command: command("record-" + m.ID), Scope: "case1", ApplicationID: "app", ExternalDecisionID: m.ID, ContextID: m.ID, SelectedItems: []model.VersionReference{ref}, UsedItems: []model.VersionReference{ref}, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: artifact, Output: artifact, DecidedAt: time.Now().UTC(), Outcome: "succeeded"}
 	}
 	for _, scope := range []string{"case1", "case2"} {
-		if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: command("decisions-" + scope), Policy: model.RetentionPolicy{ID: "decisions", Scope: scope, RecordClass: "decision_payload", Purpose: "context-retention", Jurisdiction: "SG"}}); err != nil {
+		if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: command("decisions-" + scope), Policy: model.RetentionPolicy{ID: "decisions", Scope: scope, RecordClass: "decision_payload", Purpose: "context-retention", Jurisdiction: "XX"}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -172,7 +172,7 @@ func testContextDisposal(t *testing.T, ctx context.Context, normal *facts.Engine
 		}
 		ds := model.DecisionDisposalRequest{DecisionID: decision.ID}
 		for _, scope := range decision.Scopes {
-			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "SG"})
+			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "XX"})
 		}
 		batch.Decisions = append(batch.Decisions, ds)
 

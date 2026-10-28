@@ -14,7 +14,7 @@ import (
 )
 
 func testEvidenceDerivation(t *testing.T, ctx context.Context, l model.Ledger, store *evidence.Postgres) {
-	c := model.Caller{Tenant: "derivative-bank", Principal: "author"}
+	c := model.Caller{Tenant: "derivative-org", Principal: "author"}
 	options := model.EngineOptions{RedactionPolicyVersions: []string{"approved-v1"}}
 	e, err := facts.NewWithOptions(l, allow{}, store, options)
 	if err != nil {

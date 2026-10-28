@@ -88,7 +88,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = e.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: model.Command{Key: id, Purpose: q.Purpose}, Evidence: model.Evidence{ID: id, Scope: "case1", SourceSystem: "app", SourceObject: id, SourceRevision: "v1", Speaker: "app", SourceClass: "bank_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "decision-artifacts", Object: ref}})
+		_, err = e.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: model.Command{Key: id, Purpose: q.Purpose}, Evidence: model.Evidence{ID: id, Scope: "case1", SourceSystem: "app", SourceObject: id, SourceRevision: "v1", Speaker: "app", SourceClass: "organization_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "decision-artifacts", Object: ref}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +129,7 @@ func testContexts(t *testing.T, ctx context.Context, e *facts.Engine, l *postgre
 		t.Fatal(err)
 	}
 	other := c
-	other.Tenant = "bank2"
+	other.Tenant = "org2"
 	if _, err = e.GetContextManifest(ctx, other, model.ContextQuery{ID: m.ID, Purpose: q.Purpose}); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross tenant context", err)
 	}

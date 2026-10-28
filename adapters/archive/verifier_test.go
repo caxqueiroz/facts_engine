@@ -78,7 +78,7 @@ func testObservedArchiveVerification(t *testing.T, store model.ArchiveStore, hea
 		{"valid", 3, 2, true, false},
 	} {
 		wrapped := uncheckedArchive{ArchiveStore: store, head: head, mode: test.mode}
-		err := verifier.Verify(ctx, wrapped, "bank", "stream1", head, int64(test.expected), test.limit)
+		err := verifier.Verify(ctx, wrapped, "org", "stream1", head, int64(test.expected), test.limit)
 		if (err != nil) != test.failure {
 			t.Fatal(test.mode, err)
 		}
@@ -86,14 +86,14 @@ func testObservedArchiveVerification(t *testing.T, store model.ArchiveStore, hea
 			want++
 		}
 		if test.mode == "manifest" || test.mode == "payload" || test.mode == "payload_digest" {
-			if err := archive.VerifyChain(ctx, wrapped, "bank", "stream1", head, 2, 2, keys); err == nil {
+			if err := archive.VerifyChain(ctx, wrapped, "org", "stream1", head, 2, 2, keys); err == nil {
 				t.Fatal("unchecked adapter bytes accepted")
 			}
 		}
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if err := verifier.Verify(canceled, store, "bank", "stream1", head, 2, 2); !errors.Is(err, context.Canceled) {
+	if err := verifier.Verify(canceled, store, "org", "stream1", head, 2, 2); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
 	var data metricdata.ResourceMetrics

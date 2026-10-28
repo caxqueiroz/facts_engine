@@ -7,11 +7,11 @@
   "max_connections": 4,
   "delivery_timeout_seconds": 120,
   "orphan_cleanup": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "orphan-cleanup-v1",
     "purpose": "orphan-cleanup",
     "reason": "Upload retention period expired without evidence registration",
-    "bindings": [{"scope": "case1", "policy_id": "orphan-uploads-v1", "jurisdiction": "SG"}],
+    "bindings": [{"scope": "case1", "policy_id": "orphan-uploads-v1", "jurisdiction": "XX"}],
     "page_size": 100,
     "max_pages": 10,
     "interval_minutes": 60

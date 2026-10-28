@@ -2,7 +2,7 @@
   "mode": "archive",
   "principal": "facts-archive-worker",
   "archive": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "ledger-v1",
     "directory": "/var/lib/facts-engine/archive",
     "key_id": "archive-development-v1",

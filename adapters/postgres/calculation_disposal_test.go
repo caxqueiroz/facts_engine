@@ -19,7 +19,7 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 	}
 	for _, scope := range []string{"case1", "case2"} {
 		for _, young := range []bool{false, true} {
-			p := model.RetentionPolicy{ID: "calculations", Scope: scope, RecordClass: "calculation_payload", Purpose: "snapshot-retention", Jurisdiction: "SG"}
+			p := model.RetentionPolicy{ID: "calculations", Scope: scope, RecordClass: "calculation_payload", Purpose: "snapshot-retention", Jurisdiction: "XX"}
 			if young {
 				p.ID = "calculations-young"
 				p.MinimumAgeSeconds = 3600
@@ -59,8 +59,8 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 		selection := model.CalculationDisposalRequest{CalculationID: calc.ID}
 		snapSelection := model.SnapshotDisposalRequest{SnapshotID: snapshot.ID}
 		for _, item := range snapshot.Items {
-			selection.Bindings = append(selection.Bindings, model.CalculationRetentionBinding{Scope: item.Selector.Scope, PolicyID: "calculations", Jurisdiction: "SG"})
-			snapSelection.Bindings = append(snapSelection.Bindings, model.SnapshotRetentionBinding{Scope: item.Selector.Scope, PolicyID: "snapshots", Jurisdiction: "SG"})
+			selection.Bindings = append(selection.Bindings, model.CalculationRetentionBinding{Scope: item.Selector.Scope, PolicyID: "calculations", Jurisdiction: "XX"})
+			snapSelection.Bindings = append(snapSelection.Bindings, model.SnapshotRetentionBinding{Scope: item.Selector.Scope, PolicyID: "snapshots", Jurisdiction: "XX"})
 		}
 		r := model.DisposalBatchRequest{Command: cmd("dispose-" + calc.ID), Scope: "case1", Reason: "expired", Calculations: []model.CalculationDisposalRequest{selection}, Snapshots: []model.SnapshotDisposalRequest{snapSelection}}
 		used := []model.VersionReference{}
@@ -73,7 +73,7 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 		}
 		ds := model.DecisionDisposalRequest{DecisionID: decision.ID}
 		for _, scope := range decision.Scopes {
-			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "SG"})
+			ds.Bindings = append(ds.Bindings, model.DecisionRetentionBinding{Scope: scope, PolicyID: "decisions", Jurisdiction: "XX"})
 		}
 		r.Decisions = []model.DecisionDisposalRequest{ds}
 		retained := func() {
@@ -220,6 +220,6 @@ func testCalculationDisposal(t *testing.T, ctx context.Context, normal, engine *
 	if _, err = normal.RecordDecision(ctx, c, model.DecisionReceipt{Command: cmd("decision"), Scope: "case1", ApplicationID: "app", ExternalDecisionID: "calculation-retention", SnapshotID: snapshot.ID, CalculationID: calc.ID, SelectedItems: []model.VersionReference{used}, UsedItems: []model.VersionReference{used}, MethodKind: "rule", MethodID: "rule", MethodVersion: "v1", TransformationVersion: "v1", Input: receipt.Input, Output: receipt.Output, DecidedAt: time.Now().UTC(), Outcome: "succeeded"}); err != nil {
 		t.Fatal(err)
 	}
-	reject(engine, model.DisposalBatchRequest{Command: cmd("blocked-decision"), Scope: "case1", Reason: "expired", Calculations: []model.CalculationDisposalRequest{{CalculationID: calc.ID, Bindings: []model.CalculationRetentionBinding{{Scope: "case1", PolicyID: "calculations", Jurisdiction: "SG"}}}}}, model.ErrPrecondition)
+	reject(engine, model.DisposalBatchRequest{Command: cmd("blocked-decision"), Scope: "case1", Reason: "expired", Calculations: []model.CalculationDisposalRequest{{CalculationID: calc.ID, Bindings: []model.CalculationRetentionBinding{{Scope: "case1", PolicyID: "calculations", Jurisdiction: "XX"}}}}}, model.ErrPrecondition)
 	return single
 }

@@ -17,7 +17,7 @@ import (
 
 func testConversationDisposal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, normal model.Ledger, store *evidence.Postgres) {
 	t.Helper()
-	const tenant, scope = "conversation-retention-bank", "conversation-retention-case"
+	const tenant, scope = "conversation-retention-org", "conversation-retention-case"
 	caller := model.Caller{Tenant: tenant, Principal: "retention-operator"}
 	message, err := store.Put(ctx, tenant, "conversation-disposal-source", []byte("private conversation text"))
 	if err != nil {
@@ -42,7 +42,7 @@ func testConversationDisposal(t *testing.T, ctx context.Context, admin *pgxpool.
 		t.Fatal(err)
 	}
 	engine, _ := facts.New(retentionLedger, allow{}, store)
-	policy := model.RetentionPolicy{ID: "conversation-retention", Scope: scope, RecordClass: "conversation_payload", Purpose: "retention-test", Jurisdiction: "SG"}
+	policy := model.RetentionPolicy{ID: "conversation-retention", Scope: scope, RecordClass: "conversation_payload", Purpose: "retention-test", Jurisdiction: "XX"}
 	if _, err = engine.RegisterRetentionPolicy(ctx, caller, model.RetentionPolicyRequest{Command: model.Command{Key: "conversation-retention-policy", Purpose: policy.Purpose}, Policy: policy}); err != nil {
 		t.Fatal(err)
 	}

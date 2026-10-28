@@ -51,21 +51,21 @@ func newRemoteRebuild(t *testing.T, ctx context.Context, l, registry *postgres.L
 		t.Cleanup(server.Close)
 		return memoryv1connect.NewOperationsServiceClient(connect.NewClient(connecthttp.NewTransport(server.Client(), server.URL)))
 	}
-	denied := clientFor(model.Caller{Tenant: "bank1", Principal: "reader"})
-	if _, err := denied.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: "bank1", Generation: "g1", Purpose: "review", Action: "start", MaxAttempts: 3}); connect.CodeOf(err) != connect.CodePermissionDenied {
+	denied := clientFor(model.Caller{Tenant: "org1", Principal: "reader"})
+	if _, err := denied.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: "org1", Generation: "g1", Purpose: "review", Action: "start", MaxAttempts: 3}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("rebuild operator: %v", err)
 	}
-	if _, err := denied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "bank1", Generation: "g1", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
+	if _, err := denied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "org1", Generation: "g1", Purpose: "review"}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("status operator: %v", err)
 	}
-	grpcDenied := v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "bank1", Principal: "reader"}))
-	if result, err := grpcDenied.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: "bank1", Generation: "g1", Purpose: "review", Action: "start", MaxAttempts: 3}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
+	grpcDenied := v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "org1", Principal: "reader"}))
+	if result, err := grpcDenied.RebuildIndex(ctx, &v1.RebuildIndexRequest{Tenant: "org1", Generation: "g1", Purpose: "review", Action: "start", MaxAttempts: 3}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
 		t.Fatal("gRPC rebuild permission", result, err)
 	}
-	if result, err := grpcDenied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "bank1", Generation: "g1", Purpose: "review"}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
+	if result, err := grpcDenied.GetProjectionStatus(ctx, &v1.GetProjectionStatusRequest{Tenant: "org1", Generation: "g1", Purpose: "review"}); result != nil || grpcstatus.Code(err) != codes.PermissionDenied {
 		t.Fatal("gRPC projection permission", result, err)
 	}
-	return &remoteRebuild{grpcClient: v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "bank1", Principal: "operator"})), client: clientFor(model.Caller{Tenant: "bank1", Principal: "operator"}), t: t, registry: registry}
+	return &remoteRebuild{grpcClient: v1.NewOperationsServiceClient(governanceGRPC(t, e, model.Caller{Tenant: "org1", Principal: "operator"})), client: clientFor(model.Caller{Tenant: "org1", Principal: "operator"}), t: t, registry: registry}
 }
 func (r *remoteRebuild) call(ctx context.Context, k model.GenerationKey, action string, attempts int, fence int64) (model.RebuildStatus, error) {
 	r.t.Helper()

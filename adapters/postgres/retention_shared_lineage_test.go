@@ -32,7 +32,7 @@ func testRetentionSharedLineage(t *testing.T, ctx context.Context, ledger *postg
 				t.Fatal("shared derivative registration", result, err)
 			}
 		}
-		return ref, model.EvidenceDisposalRequest{Command: cmd(prefix + "-dispose"), Scope: "case", EvidenceID: root, PolicyID: "short-lived", Jurisdiction: "SG", Reason: "expired", DerivativeEvidenceIDs: children}
+		return ref, model.EvidenceDisposalRequest{Command: cmd(prefix + "-dispose"), Scope: "case", EvidenceID: root, PolicyID: "short-lived", Jurisdiction: "XX", Reason: "expired", DerivativeEvidenceIDs: children}
 	}
 	ref, request := family("shared-lineage")
 	missing := request

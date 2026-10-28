@@ -8,7 +8,7 @@ import (
 )
 
 // Cipher encrypts retained payloads. Production implementations should use envelope
-// encryption and bank-managed versioned keys; destroying one shared key is not selective retention.
+// encryption and operator-managed versioned keys; destroying one shared key is not selective retention.
 type Cipher interface {
 	Seal(tenant string, plaintext []byte) ([]byte, error)
 	Open(tenant string, ciphertext []byte) ([]byte, error)

@@ -34,7 +34,7 @@ func seedAttestationPayloadMigration(t *testing.T, ctx context.Context, admin *p
 		if kind == "opaque" {
 			version = "a"
 		}
-		a := model.Attestation{ID: "payload-" + kind + "-attestation", Scope: "scope", RecordID: record, VersionID: version, ContentDigest: "digest", Kind: "bank_verified", EvidenceID: "attestation-evidence", Attestor: model.Caller{Tenant: "legacy", Principal: "reviewer"}}
+		a := model.Attestation{ID: "payload-" + kind + "-attestation", Scope: "scope", RecordID: record, VersionID: version, ContentDigest: "digest", Kind: "source_verified", EvidenceID: "attestation-evidence", Attestor: model.Caller{Tenant: "legacy", Principal: "reviewer"}}
 		raw, err := json.Marshal(a)
 		if err != nil {
 			t.Fatal(err)

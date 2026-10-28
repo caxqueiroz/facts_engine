@@ -82,7 +82,7 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 	}
 	for _, kind := range []string{"job", "request", "response"} {
 		for _, young := range []bool{false, true} {
-			p := model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: "extraction_" + kind + "_payload", Purpose: "retention", Jurisdiction: "SG"}
+			p := model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: "extraction_" + kind + "_payload", Purpose: "retention", Jurisdiction: "XX"}
 			if young {
 				p.ID += "-young"
 				p.MinimumAgeSeconds = 3600
@@ -93,7 +93,7 @@ func testExtractionDisposal(t *testing.T, ctx context.Context, normal *facts.Eng
 		}
 	}
 	request := func(j model.JobStatus) model.ExtractionDisposalRequest {
-		return model.ExtractionDisposalRequest{Command: cmd("dispose-" + j.ID), JobID: j.ID, Reason: "expired", Bindings: []model.ExtractionRetentionBinding{{Scope: scope, JobPolicyID: "job", RequestPolicyID: "request", ResponsePolicyID: "response", Jurisdiction: "SG"}}}
+		return model.ExtractionDisposalRequest{Command: cmd("dispose-" + j.ID), JobID: j.ID, Reason: "expired", Bindings: []model.ExtractionRetentionBinding{{Scope: scope, JobPolicyID: "job", RequestPolicyID: "request", ResponsePolicyID: "response", Jurisdiction: "XX"}}}
 	}
 	reject := func(e *facts.Engine, r model.ExtractionDisposalRequest, want error) {
 		t.Helper()
@@ -344,7 +344,7 @@ func extractionDisposalCrossScopeFixture(t *testing.T, ctx context.Context, norm
 		t.Fatal(err)
 	}
 	for _, kind := range []string{"job", "request", "response"} {
-		if _, err = retention.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(kind), Policy: model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: "extraction_" + kind + "_payload", Purpose: "retention", Jurisdiction: "SG"}}); err != nil {
+		if _, err = retention.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(kind), Policy: model.RetentionPolicy{ID: kind, Scope: scope, RecordClass: "extraction_" + kind + "_payload", Purpose: "retention", Jurisdiction: "XX"}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -368,7 +368,7 @@ func extractionDisposalCrossScopeFixture(t *testing.T, ctx context.Context, norm
 	}
 	request := model.ExtractionDisposalRequest{Command: cmd("dispose"), JobID: job.ID, Reason: "expired"}
 	for _, s := range []string{conversation.Request.Scope, scope} {
-		request.Bindings = append(request.Bindings, model.ExtractionRetentionBinding{Scope: s, JobPolicyID: "job", RequestPolicyID: "request", ResponsePolicyID: "response", Jurisdiction: "SG"})
+		request.Bindings = append(request.Bindings, model.ExtractionRetentionBinding{Scope: s, JobPolicyID: "job", RequestPolicyID: "request", ResponsePolicyID: "response", Jurisdiction: "XX"})
 	}
 	return job, request
 }

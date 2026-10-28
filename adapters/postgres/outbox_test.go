@@ -15,7 +15,7 @@ import (
 )
 
 func testOutbox(t *testing.T, ctx context.Context, l *postgres.Ledger, admin *pgxpool.Pool) {
-	tenant := "outbox-bank"
+	tenant := "outbox-org"
 	for _, id := range []string{"event-a", "event-b", "event-c"} {
 		err := l.Transact(ctx, tenant, func(tx model.Tx) error {
 			eventType := "test"
@@ -217,7 +217,7 @@ func testOutbox(t *testing.T, ctx context.Context, l *postgres.Ledger, admin *pg
 	if err != nil || a.Event.ID != "event-a" {
 		t.Fatal(a, err)
 	}
-	if _, err := l.ConsumerStatus(ctx, model.ConsumerKey{Tenant: "another-bank", Consumer: "archive"}); !errors.Is(err, model.ErrNotFound) {
+	if _, err := l.ConsumerStatus(ctx, model.ConsumerKey{Tenant: "another-org", Consumer: "archive"}); !errors.Is(err, model.ErrNotFound) {
 		t.Fatal(err)
 	}
 	if _, err := admin.Exec(ctx, `UPDATE consumer_offsets SET lease_until=clock_timestamp()-interval '1 second' WHERE tenant_id=$1 AND consumer_id=$2`, archive.Tenant, archive.Consumer); err != nil {

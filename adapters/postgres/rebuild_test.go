@@ -59,7 +59,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(4)
-	config := cortex.Config{Tenant: "bank1", Generation: "g2", EmbeddingID: "test-constant-v1", Dimensions: 3}
+	config := cortex.Config{Tenant: "org1", Generation: "g2", EmbeddingID: "test-constant-v1", Dimensions: 3}
 	if err := cortex.Provision(ctx, db, config); err != nil {
 		t.Fatal(err)
 	}
@@ -82,9 +82,9 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	}
 	actor := model.RebuildActor{Principal: "operator", Purpose: "verified_rebuild"}
 	manager := newRemoteRebuild(t, ctx, l, registry, store, routes)
-	oldKey := model.GenerationKey{Tenant: "bank1", Generation: "g1"}
-	key := model.GenerationKey{Tenant: "bank1", Generation: "g2"}
-	c := model.Caller{Tenant: "bank1", Principal: "reader"}
+	oldKey := model.GenerationKey{Tenant: "org1", Generation: "g1"}
+	key := model.GenerationKey{Tenant: "org1", Generation: "g2"}
+	c := model.Caller{Tenant: "org1", Principal: "reader"}
 	query := model.RecallRequest{Scopes: []string{"case1"}, Query: "timeline", Purpose: "review", ValidAt: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC), Limit: 20}
 	managed, err := facts.NewWithRetrieval(l, allow{}, store, model.RetrievalOptions{Index: routes, Progress: l, Registry: l})
 	if err != nil {
@@ -200,7 +200,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if _, err := manager.Activate(ctx, oldKey, verified.Fence); err != nil {
 		t.Fatal("activation response loss", err)
 	}
-	active, err := l.ActiveProjection(ctx, "bank1")
+	active, err := l.ActiveProjection(ctx, "org1")
 	if err != nil || active.Generation != "g1" || active.Epoch != 1 {
 		t.Fatal(active, err)
 	}
@@ -214,11 +214,11 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if _, err := manager.Activate(ctx, key, started.Fence); !errors.Is(err, model.ErrRevision) {
 		t.Fatal("unverified cutover", err)
 	}
-	handler, err := workers.NewProjection(registry, routes, allow{}, model.Caller{Tenant: "bank1", Principal: "projector"}, "g2")
+	handler, err := workers.NewProjection(registry, routes, allow{}, model.Caller{Tenant: "org1", Principal: "projector"}, "g2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	queueKey := model.ConsumerKey{Tenant: "bank1", Consumer: model.ProjectionConsumer("g2")}
+	queueKey := model.ConsumerKey{Tenant: "org1", Consumer: model.ProjectionConsumer("g2")}
 	worker, err := workers.NewOutbox(registry, queueKey, handler, workers.Options{Lease: time.Minute, PollInterval: time.Millisecond, MinBackoff: time.Second, MaxBackoff: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +256,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 		t.Fatal(err)
 	}
 	// A new ledger commit invalidates cutover without blocking normal writers.
-	err = l.Transact(ctx, "bank1", func(tx model.Tx) error {
+	err = l.Transact(ctx, "org1", func(tx model.Tx) error {
 		_, err := tx.Append(ctx, model.Event{ID: "during-rebuild", Type: "rebuild-test-change", Scope: "case1", Caller: c})
 		return err
 	})
@@ -283,7 +283,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	}
 	// Keep an old-generation delivery in flight while switching. Its completion
 	// must be fenced, even if external work had already begun.
-	oldDelivery, err := registry.ClaimDelivery(ctx, model.ConsumerKey{Tenant: "bank1", Consumer: model.ProjectionConsumer("g1")}, time.Minute)
+	oldDelivery, err := registry.ClaimDelivery(ctx, model.ConsumerKey{Tenant: "org1", Consumer: model.ProjectionConsumer("g1")}, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if err := <-result; !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("retired request returned across cutover", err)
 	}
-	active, err = l.ActiveProjection(ctx, "bank1")
+	active, err = l.ActiveProjection(ctx, "org1")
 	if err != nil || active.Generation != "g2" || active.Epoch != 2 {
 		t.Fatal(active, err)
 	}
@@ -359,7 +359,7 @@ func testRebuild(t *testing.T, ctx context.Context, l, registry *postgres.Ledger
 	if _, err := manager.Abandon(ctx, key, complete.Fence); !errors.Is(err, model.ErrPrecondition) {
 		t.Fatal("active generation abandoned", err)
 	}
-	unusedKey := model.GenerationKey{Tenant: "bank1", Generation: "unused"}
+	unusedKey := model.GenerationKey{Tenant: "org1", Generation: "unused"}
 	unused, err := registry.StartRebuild(ctx, unusedKey, actor, 3)
 	if err != nil {
 		t.Fatal(err)

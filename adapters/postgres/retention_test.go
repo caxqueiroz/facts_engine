@@ -52,9 +52,9 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := model.Caller{Tenant: "retention-bank", Principal: "retention-officer"}
+	c := model.Caller{Tenant: "retention-org", Principal: "retention-officer"}
 	command := func(key string) model.Command { return model.Command{Key: key, Purpose: "test-disposal"} }
-	policy := model.RetentionPolicyRequest{Command: command("retention-policy"), Policy: model.RetentionPolicy{ID: "short-lived", Scope: "case", RecordClass: "evidence_bytes", Purpose: "test-disposal", Jurisdiction: "SG", MinimumAgeSeconds: 0}}
+	policy := model.RetentionPolicyRequest{Command: command("retention-policy"), Policy: model.RetentionPolicy{ID: "short-lived", Scope: "case", RecordClass: "evidence_bytes", Purpose: "test-disposal", Jurisdiction: "XX", MinimumAgeSeconds: 0}}
 	if _, err = normal.RegisterRetentionPolicy(ctx, c, policy); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("runtime wrote retention policy", err)
 	}
@@ -70,7 +70,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: command(id), Evidence: model.Evidence{ID: id, Scope: scope, SourceSystem: "test", SourceObject: id, SourceRevision: "v1", Speaker: "staff", SourceClass: "bank_record", SourceTime: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: policy, Object: ref}})
+		_, err = normal.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: command(id), Evidence: model.Evidence{ID: id, Scope: scope, SourceSystem: "test", SourceObject: id, SourceRevision: "v1", Speaker: "staff", SourceClass: "organization_record", SourceTime: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: policy, Object: ref}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 	}
 	testRemoteRetention(t, ctx, normal, engine, ledger, store, c, register)
 	ref := register("disposable", "disposable-object", "case", "short-lived")
-	request := model.EvidenceDisposalRequest{Command: command("dispose"), Scope: "case", EvidenceID: "disposable", PolicyID: "short-lived", Jurisdiction: "SG", Reason: "schedule-expired"}
+	request := model.EvidenceDisposalRequest{Command: command("dispose"), Scope: "case", EvidenceID: "disposable", PolicyID: "short-lived", Jurisdiction: "XX", Reason: "schedule-expired"}
 	hold := model.LegalHoldRequest{Command: command("hold"), ID: "hold1", Scope: "case", Reason: "legal-review"}
 	if _, err = engine.PlaceLegalHold(ctx, c, hold); err != nil {
 		t.Fatal(err)
@@ -118,7 +118,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		t.Fatal(status, err)
 	}
 	other := c
-	other.Tenant = "other-bank"
+	other.Tenant = "other-org"
 	if _, err = engine.GetRetentionStatus(ctx, other, model.RetentionStatusQuery{Scope: "case", EvidenceID: "disposable", Purpose: "review"}); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("cross tenant disposal status", err)
 	}
@@ -145,7 +145,7 @@ func testRetention(t *testing.T, ctx context.Context, normal *facts.Engine, stor
 		t.Fatal("shared object disposed", err)
 	}
 	register("referenced", "referenced-object", "case", "short-lived")
-	_, err = normal.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: command("fact-policy"), Policy: model.AcceptancePolicy{ID: "manual", Scope: "case", Mode: "manual", SourceClasses: []string{"bank_record"}}})
+	_, err = normal.RegisterAcceptancePolicy(ctx, c, model.PolicyRequest{Command: command("fact-policy"), Policy: model.AcceptancePolicy{ID: "manual", Scope: "case", Mode: "manual", SourceClasses: []string{"organization_record"}}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,7 +24,7 @@ func cleanupWorkerFixture() (ProjectionCleanupConfig, model.Caller, []model.Proj
 	caller := model.Caller{Tenant: "tenant", Principal: "worker", Service: true}
 	requests := []model.ProjectionCleanupRequest{}
 	for _, version := range []string{"a", "b"} {
-		requests = append(requests, model.ProjectionCleanupRequest{Command: model.Command{Purpose: "retention"}, Kind: "fact", Scope: "scope", RecordID: "record", VersionID: version, Generation: "index", DisposalEventID: "disposal-" + version, Bindings: []model.VersionRetentionBinding{{Scope: "scope", PolicyID: "policy", Jurisdiction: "SG"}}})
+		requests = append(requests, model.ProjectionCleanupRequest{Command: model.Command{Purpose: "retention"}, Kind: "fact", Scope: "scope", RecordID: "record", VersionID: version, Generation: "index", DisposalEventID: "disposal-" + version, Bindings: []model.VersionRetentionBinding{{Scope: "scope", PolicyID: "policy", Jurisdiction: "XX"}}})
 	}
 	return config, caller, requests
 }

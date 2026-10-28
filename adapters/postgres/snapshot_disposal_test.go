@@ -70,7 +70,7 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 		if _, err := normal.ApproveFact(ctx, reviewer, model.Approval{Command: command(scope + "-approve"), Scope: scope, RecordID: proposed.RecordID, VersionID: proposed.VersionID, ExpectedRevision: proposed.StreamRevision}); err != nil {
 			t.Fatal(err)
 		}
-		for _, policy := range []model.RetentionPolicy{{ID: "snapshots", Scope: scope, RecordClass: "snapshot_payload", Purpose: "snapshot-retention", Jurisdiction: "SG"}, {ID: "young", Scope: scope, RecordClass: "snapshot_payload", Purpose: "snapshot-retention", Jurisdiction: "SG", MinimumAgeSeconds: 3600}} {
+		for _, policy := range []model.RetentionPolicy{{ID: "snapshots", Scope: scope, RecordClass: "snapshot_payload", Purpose: "snapshot-retention", Jurisdiction: "XX"}, {ID: "young", Scope: scope, RecordClass: "snapshot_payload", Purpose: "snapshot-retention", Jurisdiction: "XX", MinimumAgeSeconds: 3600}} {
 			if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: command(scope + policy.ID), Policy: policy}); err != nil {
 				t.Fatal(err)
 			}
@@ -95,7 +95,7 @@ func testSnapshotDisposal(t *testing.T, ctx context.Context, normal *facts.Engin
 	request := func(s model.FactSnapshot) model.SnapshotDisposalRequest {
 		r := model.SnapshotDisposalRequest{Command: command("dispose-" + s.ID), SnapshotID: s.ID, Reason: "retention period expired"}
 		for _, item := range s.Items {
-			r.Bindings = append(r.Bindings, model.SnapshotRetentionBinding{Scope: item.Selector.Scope, PolicyID: "snapshots", Jurisdiction: "SG"})
+			r.Bindings = append(r.Bindings, model.SnapshotRetentionBinding{Scope: item.Selector.Scope, PolicyID: "snapshots", Jurisdiction: "XX"})
 		}
 		return r
 	}

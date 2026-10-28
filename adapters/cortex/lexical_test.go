@@ -21,7 +21,7 @@ func TestLexicalOnlyGeneration(t *testing.T) {
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(4)
-	config := cortex.Config{Tenant: "lexical-bank", Generation: "lexical-v1", EmbeddingID: "none", Dimensions: 1}
+	config := cortex.Config{Tenant: "lexical-org", Generation: "lexical-v1", EmbeddingID: "none", Dimensions: 1}
 	if err = cortex.Provision(ctx, db, config); err != nil {
 		t.Fatal(err)
 	}

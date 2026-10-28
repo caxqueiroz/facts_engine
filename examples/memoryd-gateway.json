@@ -6,7 +6,7 @@
   "identities": [
     {
       "URI": "spiffe://example.test/facts-client",
-      "Tenant": "bank1",
+      "Tenant": "org1",
       "Principal": "facts-client"
     }
   ],
@@ -25,8 +25,8 @@
   "operations_scope": "",
   "gateways": [
     {
-      "URI": "spiffe://example.test/facts-gateway-bank1",
-      "Tenant": "bank1"
+      "URI": "spiffe://example.test/facts-gateway-org1",
+      "Tenant": "org1"
     }
   ]
 }

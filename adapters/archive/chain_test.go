@@ -58,13 +58,13 @@ func TestArchiveChainRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := map[string]ed25519.PublicKey{"key1": public}
-	c := model.Caller{Tenant: "bank", Principal: "archive-worker"}
+	c := model.Caller{Tenant: "org", Principal: "archive-worker"}
 	handler, err := workers.NewArchive(source{}, store, signer, keys, auth{}, c, "stream1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	delivery := func(revision int64) model.Delivery {
-		return model.Delivery{Key: model.ConsumerKey{Tenant: "bank", Consumer: model.ArchiveConsumer("stream1")}, Event: model.Event{ID: map[int64]string{1: "event1", 2: "event2"}[revision], Scope: "scope1", LedgerRevision: revision, Caller: c}}
+		return model.Delivery{Key: model.ConsumerKey{Tenant: "org", Consumer: model.ArchiveConsumer("stream1")}, Event: model.Event{ID: map[int64]string{1: "event1", 2: "event2"}[revision], Scope: "scope1", LedgerRevision: revision, Caller: c}}
 	}
 	if err := handler.Handle(ctx, delivery(2)); !errors.Is(err, model.ErrNotFound) {
 		t.Fatal("missing predecessor ignored", err)
@@ -73,7 +73,7 @@ func TestArchiveChainRecovery(t *testing.T) {
 	if err := denied.Handle(ctx, delivery(1)); !errors.Is(err, model.ErrDenied) {
 		t.Fatal("secondary scope disclosed", err)
 	}
-	if _, _, err := store.Load(ctx, "bank", archive.ManifestKey("stream1", 1)); !errors.Is(err, model.ErrNotFound) {
+	if _, _, err := store.Load(ctx, "org", archive.ManifestKey("stream1", 1)); !errors.Is(err, model.ErrNotFound) {
 		t.Fatal("denied manifest written", err)
 	}
 	for _, rev := range []int64{1, 1, 2, 2} {
@@ -81,19 +81,19 @@ func TestArchiveChainRecovery(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	head, raw, err := store.Load(ctx, "bank", archive.ManifestKey("stream1", 2))
+	head, raw, err := store.Load(ctx, "org", archive.ManifestKey("stream1", 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, keys); err != nil {
+	if err := archive.VerifyChain(ctx, store, "org", "stream1", head, 2, 2, keys); err != nil {
 		t.Fatal(err)
 	}
 	coverage, err := archive.NewCoverageVerifier(store, archiveProgress{ledger: 2, acknowledged: 2}, "stream1", 2, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	receipt, err := coverage.VerifyAuditCoverage(ctx, "bank", "scope1", 2)
-	if err != nil || receipt.Tenant != "bank" || receipt.Scope != "scope1" || receipt.Stream != "stream1" || receipt.ThroughRevision != 2 || receipt.HeadDigest != head.Digest || receipt.KeyID != "key1" || receipt.VerifiedAt.IsZero() {
+	receipt, err := coverage.VerifyAuditCoverage(ctx, "org", "scope1", 2)
+	if err != nil || receipt.Tenant != "org" || receipt.Scope != "scope1" || receipt.Stream != "stream1" || receipt.ThroughRevision != 2 || receipt.HeadDigest != head.Digest || receipt.KeyID != "key1" || receipt.VerifiedAt.IsZero() {
 		t.Fatal("archive coverage receipt", receipt, err)
 	}
 	encoded, err := json.Marshal(receipt)
@@ -104,27 +104,27 @@ func TestArchiveChainRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := lagging.VerifyAuditCoverage(ctx, "bank", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
+	if _, err := lagging.VerifyAuditCoverage(ctx, "org", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("archive lag claimed complete coverage", err)
 	}
 	unregistered, err := archive.NewCoverageVerifier(store, archiveProgress{err: model.ErrNotFound}, "stream1", 2, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := unregistered.VerifyAuditCoverage(ctx, "bank", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
+	if _, err := unregistered.VerifyAuditCoverage(ctx, "org", "scope1", 2); !errors.Is(err, model.ErrUnavailable) {
 		t.Fatal("unregistered archive consumer was not reported as pending", err)
 	}
 	testObservedArchiveVerification(t, store, head, keys)
-	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 3, 3, keys); err == nil {
+	if err := archive.VerifyChain(ctx, store, "org", "stream1", head, 3, 3, keys); err == nil {
 		t.Fatal("truncated chain accepted")
 	}
-	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, map[string]ed25519.PublicKey{}); err == nil {
+	if err := archive.VerifyChain(ctx, store, "org", "stream1", head, 2, 2, map[string]ed25519.PublicKey{}); err == nil {
 		t.Fatal("untrusted signer accepted")
 	}
-	if _, err := store.Read(ctx, "another-bank", head); err == nil {
+	if _, err := store.Read(ctx, "another-org", head); err == nil {
 		t.Fatal("cross-tenant decrypt")
 	}
-	if _, err := store.Put(ctx, "bank", archive.ManifestKey("stream1", 2), []byte("changed")); !errors.Is(err, model.ErrConflict) {
+	if _, err := store.Put(ctx, "org", archive.ManifestKey("stream1", 2), []byte("changed")); !errors.Is(err, model.ErrConflict) {
 		t.Fatal("immutable object overwritten", err)
 	}
 	encrypted, err := os.ReadFile(filepath.Join(dir, head.Locator))
@@ -139,20 +139,20 @@ func TestArchiveChainRecovery(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, head.Locator), altered, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, keys); err == nil {
+	if err := archive.VerifyChain(ctx, store, "org", "stream1", head, 2, 2, keys); err == nil {
 		t.Fatal("tampering accepted")
 	}
 	if err := os.WriteFile(filepath.Join(dir, head.Locator), encrypted, 0600); err != nil {
 		t.Fatal(err)
 	}
-	prev, _, err := store.Load(ctx, "bank", archive.ManifestKey("stream1", 1))
+	prev, _, err := store.Load(ctx, "org", archive.ManifestKey("stream1", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(filepath.Join(dir, prev.Locator)); err != nil {
 		t.Fatal(err)
 	}
-	if err := archive.VerifyChain(ctx, store, "bank", "stream1", head, 2, 2, keys); err == nil {
+	if err := archive.VerifyChain(ctx, store, "org", "stream1", head, 2, 2, keys); err == nil {
 		t.Fatal("missing batch accepted")
 	}
 }

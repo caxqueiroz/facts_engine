@@ -2,7 +2,7 @@
   "mode": "audit",
   "principal": "facts-audit-worker",
   "audit": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "exports-v1",
     "key_id": "audit-development-v1"
   },

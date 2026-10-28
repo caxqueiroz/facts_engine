@@ -6,7 +6,7 @@
   "identities": [
     {
       "URI": "spiffe://example.test/facts-client",
-      "Tenant": "bank1",
+      "Tenant": "org1",
       "Principal": "facts-client"
     }
   ],

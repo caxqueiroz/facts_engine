@@ -7,7 +7,7 @@
   "max_connections": 4,
   "delivery_timeout_seconds": 120,
   "projection_cleanup": {
-    "tenant": "bank1",
+    "tenant": "org1",
     "stream": "projection-cleanup-v1",
     "reason": "Complete index cleanup for an authorized version disposal",
     "page_size": 25,
@@ -15,7 +15,7 @@
     "interval_minutes": 5,
     "destinations": [
       {
-        "tenant": "bank1",
+        "tenant": "org1",
         "generation": "lexical-v1",
         "database_env": "MEMORY_CLEANUP_INDEX_URL",
         "max_connections": 4,

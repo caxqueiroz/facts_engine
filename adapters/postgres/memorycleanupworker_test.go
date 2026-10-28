@@ -39,7 +39,7 @@ func testStandaloneCleanup(t *testing.T, ctx context.Context, dsn, endpoint, sto
 		t.Fatal(err)
 	}
 	caller := model.Caller{Tenant: tenant, Principal: "cleanup-fixture"}
-	policy := model.RetentionPolicy{ID: "daemon-orphans", Scope: "case1", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "SG"}
+	policy := model.RetentionPolicy{ID: "daemon-orphans", Scope: "case1", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "XX"}
 	if _, err := engine.RegisterRetentionPolicy(ctx, caller, model.RetentionPolicyRequest{Command: model.Command{Key: "daemon-orphans", Purpose: "cleanup"}, Policy: policy}); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func testStandaloneCleanup(t *testing.T, ctx context.Context, dsn, endpoint, sto
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := workerdaemon.Config{Mode: "orphan-cleanup", Principal: "cleanup-worker", OpenFGAURL: endpoint, OpenFGAStore: storeID, OpenFGAModel: modelID, MaxConnections: 2, DeliveryTimeoutSeconds: 5, OrphanCleanup: &workers.OrphanCleanupConfig{Tenant: tenant, Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []workers.OrphanCleanupBinding{{Scope: "case1", PolicyID: policy.ID, Jurisdiction: "SG"}}, PageSize: 10, MaxPages: 2, IntervalMinutes: 1}}
+	config := workerdaemon.Config{Mode: "orphan-cleanup", Principal: "cleanup-worker", OpenFGAURL: endpoint, OpenFGAStore: storeID, OpenFGAModel: modelID, MaxConnections: 2, DeliveryTimeoutSeconds: 5, OrphanCleanup: &workers.OrphanCleanupConfig{Tenant: tenant, Stream: "cleanup", Purpose: "cleanup", Reason: "expired", Bindings: []workers.OrphanCleanupBinding{{Scope: "case1", PolicyID: policy.ID, Jurisdiction: "XX"}}, PageSize: 10, MaxPages: 2, IntervalMinutes: 1}}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	t.Setenv("MEMORY_WORKER_DATABASE_URL", databaseRole(t, dsn, "facts_runtime"))
 	if err := workerdaemon.Run(ctx, config, logger); err == nil {

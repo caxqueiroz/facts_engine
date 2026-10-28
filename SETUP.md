@@ -9,7 +9,7 @@ The engine provides the governed ledger, evidence references, fact and memory li
 - Its domain schemas, predicates, memory types, acceptance policies, source classes, reviewers, validation rules, and client-facing confirmation flow.
 - Authentication and trusted tenant/principal mapping. Embedded callers must be created by the host's authenticated boundary. Remote callers must arrive through the configured mTLS or trusted-gateway path.
 - PostgreSQL, OpenFGA, evidence and archive storage, keys, worker supervision, telemetry, backups, and shutdown.
-- Business completeness and decisions. The engine does not implement a wealth catalogue, onboarding workflow, allocation method, or risk decision.
+- Business completeness and decisions. The engine does not implement a domain catalogue, onboarding workflow, allocation method, or risk decision.
 
 Engine constructors do not migrate databases, start workers/listeners, create authorization tuples, or own injected connections.
 
@@ -18,15 +18,13 @@ Engine constructors do not migrate databases, start workers/listeners, create au
 - Go 1.26 or later; the repository has been verified with Go 1.27.2.
 - PostgreSQL 17 is used by the checked-in integration environment. Use a currently supported PostgreSQL version and test the migration plan for your deployment.
 - OpenFGA with the repository's generated model, a PostgreSQL-backed CortexDB database if vector/lexical retrieval is enabled, and an evidence store appropriate to the data policy.
-- This GitHub repository is private. The consuming developer/CI identity needs read access, and Go must bypass the public module proxy/checksum database for this module. For local use with GitHub CLI:
+- The module is public and fetched through the standard Go module proxy and checksum database; no credentials or `GOPRIVATE` setting are needed. Pin an exact version:
 
 ```sh
-export GOPRIVATE=github.com/caxqueiroz/facts_engine
-gh auth setup-git
 go get github.com/caxqueiroz/facts_engine@v0.2.0-rc.4
 ```
 
-In CI, configure an approved GitHub credential with read access to this repository and set the same `GOPRIVATE` pattern; do not put a token in the module URL or commit it. The package import path is `github.com/caxqueiroz/facts_engine`. Generated Connect and gRPC contracts are under `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
+The package import path is `github.com/caxqueiroz/facts_engine`. Generated Connect and gRPC contracts are under `github.com/caxqueiroz/facts_engine/gen/memory/v1`.
 
 ## Choose an integration mode
 
@@ -81,4 +79,4 @@ The CortexDB adapter is a rebuildable index, not the source of truth. Recall rev
 
 ## Before production
 
-This RC is not a production banking approval. Before deployment, obtain domain/application, model/provider, identity/security, retention/legal, archive/infrastructure, and operations sign-off. Configure production identity-to-tenant trust, managed keys, immutable archive and versioned evidence storage, retention coverage for exports/indexes/caches/backups, monitoring and alerts, workload capacity targets, and tested restore/RPO/RTO procedures. The complete owner/evidence list is in [spec-acceptance.md](spec-acceptance.md).
+This RC is not a production approval. Before deployment, obtain domain/application, model/provider, identity/security, retention/legal, archive/infrastructure, and operations sign-off. Configure production identity-to-tenant trust, managed keys, immutable archive and versioned evidence storage, retention coverage for exports/indexes/caches/backups, monitoring and alerts, workload capacity targets, and tested restore/RPO/RTO procedures. The complete owner/evidence list is in [spec-acceptance.md](spec-acceptance.md).

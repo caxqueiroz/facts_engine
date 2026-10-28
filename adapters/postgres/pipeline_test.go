@@ -44,7 +44,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	}
 	defer db.Close()
 	db.SetMaxOpenConns(4)
-	config := cortex.Config{Tenant: "bank1", Generation: "g1", EmbeddingID: "test-constant-v1", Dimensions: 3}
+	config := cortex.Config{Tenant: "org1", Generation: "g1", EmbeddingID: "test-constant-v1", Dimensions: 3}
 	if err := cortex.Provision(ctx, db, config); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	defer func() { _ = tracerProvider.Shutdown(context.Background()) }()
 	workerTelemetry := model.TelemetryOptions{TracerProvider: tracerProvider}
 	projector := source("facts_projector")
-	c := model.Caller{Tenant: "bank1", Principal: "index-worker"}
+	c := model.Caller{Tenant: "org1", Principal: "index-worker"}
 	handler, err := workers.NewProjectionWithTelemetry(projector, index, allow{}, c, "g1", workerTelemetry)
 	if err != nil {
 		t.Fatal(err)
@@ -246,7 +246,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal("canonical timeline absent", result)
 	}
 	// Prove stale index rows cannot override current ledger lifecycle state.
-	raw, err := index.Candidates(ctx, "bank1", "g1", "case1", "timeline", 100)
+	raw, err := index.Candidates(ctx, "org1", "g1", "case1", "timeline", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,11 +368,11 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 		t.Fatal(err)
 	}
 	keys := map[string]ed25519.PublicKey{"archive-key": public}
-	archiveHandler, err := workers.NewArchiveWithTelemetry(archiver, objects, signer, keys, allow{}, model.Caller{Tenant: "bank1", Principal: "archive-worker"}, "audit-v1", workerTelemetry)
+	archiveHandler, err := workers.NewArchiveWithTelemetry(archiver, objects, signer, keys, allow{}, model.Caller{Tenant: "org1", Principal: "archive-worker"}, "audit-v1", workerTelemetry)
 	if err != nil {
 		t.Fatal(err)
 	}
-	archiveKey := model.ConsumerKey{Tenant: "bank1", Consumer: model.ArchiveConsumer("audit-v1")}
+	archiveKey := model.ConsumerKey{Tenant: "org1", Consumer: model.ArchiveConsumer("audit-v1")}
 	if err := archiver.RegisterConsumer(ctx, archiveKey, 3); err != nil {
 		t.Fatal(err)
 	}
@@ -436,11 +436,11 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	if err != nil || progress.AcknowledgedRevision != result.LedgerRevision {
 		t.Fatal(progress, err)
 	}
-	head, _, err := objects.Load(ctx, "bank1", archive.ManifestKey("audit-v1", progress.AcknowledgedRevision))
+	head, _, err := objects.Load(ctx, "org1", archive.ManifestKey("audit-v1", progress.AcknowledgedRevision))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := archive.VerifyChain(ctx, objects, "bank1", "audit-v1", head, progress.AcknowledgedRevision, 1000, keys); err != nil {
+	if err := archive.VerifyChain(ctx, objects, "org1", "audit-v1", head, progress.AcknowledgedRevision, 1000, keys); err != nil {
 		t.Fatal(err)
 	}
 	testContextArchivePolicy(t, ctx, l, store, index, archiveWorker, c, query)
@@ -448,14 +448,14 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 	t.Run("managed rebuild and cutover", func(t *testing.T) { testRebuild(t, ctx, l, source("facts_rebuild"), store, index, db) })
 	t.Run("remote rebuild audit identity", func(t *testing.T) {
 		var encrypted []byte
-		if err := admin.QueryRow(ctx, `SELECT payload FROM projection_rebuild_events WHERE tenant_id=$1 AND generation=$2 AND operation=$3 ORDER BY fence LIMIT 1`, "bank1", "g1", "start").Scan(&encrypted); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT payload FROM projection_rebuild_events WHERE tenant_id=$1 AND generation=$2 AND operation=$3 ORDER BY fence LIMIT 1`, "org1", "g1", "start").Scan(&encrypted); err != nil {
 			t.Fatal(err)
 		}
 		cipher, err := postgres.NewAESGCM(bytes.Repeat([]byte{4}, 32))
 		if err != nil {
 			t.Fatal(err)
 		}
-		payload, err := cipher.Open("bank1", encrypted)
+		payload, err := cipher.Open("org1", encrypted)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -464,7 +464,7 @@ func testPipeline(t *testing.T, ctx context.Context, l *postgres.Ledger, store *
 			t.Fatal(err)
 		}
 		a := retained.Actor
-		if a.Caller == nil || a.Authorization == nil || a.Caller.Principal != "operator" || a.Caller.Tenant != "bank1" || a.Authorization.Request.Caller != *a.Caller || a.Authorization.Request.Scope != "projection-admin" || a.Authorization.Request.Permission != "can_operate" || !a.Authorization.Allowed || a.Authorization.ContextDigest != model.Digest(a.Authorization.Request) {
+		if a.Caller == nil || a.Authorization == nil || a.Caller.Principal != "operator" || a.Caller.Tenant != "org1" || a.Authorization.Request.Caller != *a.Caller || a.Authorization.Request.Scope != "projection-admin" || a.Authorization.Request.Permission != "can_operate" || !a.Authorization.Allowed || a.Authorization.ContextDigest != model.Digest(a.Authorization.Request) {
 			t.Fatal("missing retained operation authorization", a)
 		}
 	})

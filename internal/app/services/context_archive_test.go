@@ -33,15 +33,15 @@ func TestContextArchiveGate(t *testing.T) {
 		{name: "unavailable", err: errors.New("PRIVATE-storage-error")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			s := &Service{contextArchive: &model.ContextArchiveOptions{Stream: "bank-archive", MaxPendingRevisions: 2, Progress: contextProgressFunc(func(_ context.Context, key model.ConsumerKey) (model.OutboxProgress, error) {
-				if key.Tenant != "tenant" || key.Consumer != model.ArchiveConsumer("bank-archive") {
+			s := &Service{contextArchive: &model.ContextArchiveOptions{Stream: "org-archive", MaxPendingRevisions: 2, Progress: contextProgressFunc(func(_ context.Context, key model.ConsumerKey) (model.OutboxProgress, error) {
+				if key.Tenant != "tenant" || key.Consumer != model.ArchiveConsumer("org-archive") {
 					t.Fatal("archive binding", key)
 				}
 				return test.progress, test.err
 			})}}
 			receipt, err := s.checkContextArchive(context.Background(), "tenant", test.minimum)
 			if test.allowed {
-				if err != nil || receipt == nil || receipt.Stream != "bank-archive" || receipt.CheckedAt.IsZero() || receipt.AcknowledgedRevision != test.progress.AcknowledgedRevision {
+				if err != nil || receipt == nil || receipt.Stream != "org-archive" || receipt.CheckedAt.IsZero() || receipt.AcknowledgedRevision != test.progress.AcknowledgedRevision {
 					t.Fatal(receipt, err)
 				}
 			} else if receipt != nil || err != model.ErrUnavailable {

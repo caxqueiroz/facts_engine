@@ -15,7 +15,7 @@ func TestVersionDisposalKeepsOwningScopeAndReauthorizes(t *testing.T) {
 	for _, phase := range []string{"success", "initial", "after-disposal", "before-commit"} {
 		t.Run(phase, func(t *testing.T) {
 			s, l, a, c, _ := extractionDisposalFixture()
-			r := model.VersionDisposalRequest{Command: model.Command{Key: "dispose", Purpose: "retention"}, Kind: "memory", Scope: "z", RecordID: "record", VersionID: "version", Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}
+			r := model.VersionDisposalRequest{Command: model.Command{Key: "dispose", Purpose: "retention"}, Kind: "memory", Scope: "z", RecordID: "record", VersionID: "version", Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}
 			revoke := func() { a.denied = "a" }
 			switch phase {
 			case "initial":

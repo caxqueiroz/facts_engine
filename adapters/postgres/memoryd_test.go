@@ -216,7 +216,7 @@ func testMemoryd(t *testing.T, ctx context.Context, dsn string) {
 	if _, err := gatewayIdentity.GetScope(ctx, &v1.GetScopeRequest{Tenant: tenant, Scope: scope, Purpose: "gateway-read"}); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatal("revoked gateway user retained read access", err)
 	}
-	request.Tenant = "bank1"
+	request.Tenant = "org1"
 	if _, err := identity.PutScope(ctx, request); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("tenant mismatch: %v", err)
 	}

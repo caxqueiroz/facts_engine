@@ -15,14 +15,14 @@ import (
 func testDisposalBatch(t *testing.T, ctx context.Context, normal, engine, runner *facts.Engine, ledger *postgres.Ledger, admin *pgxpool.Pool, c model.Caller, job model.JobStatus, proposal model.ExtractedProposal, extraction model.ExtractionDisposalRequest) string {
 	t.Helper()
 	cmd := func(key string) model.Command { return model.Command{Key: "batch-" + key, Purpose: "retention"} }
-	for _, p := range []model.RetentionPolicy{{ID: "batch-fact", Scope: job.Scope, RecordClass: "fact_payload", Purpose: "retention", Jurisdiction: "SG"}, {ID: "batch-young", Scope: job.Scope, RecordClass: "fact_payload", Purpose: "retention", Jurisdiction: "SG", MinimumAgeSeconds: 3600}, {ID: "batch-snapshot", Scope: job.Scope, RecordClass: "snapshot_payload", Purpose: "retention", Jurisdiction: "SG"}} {
+	for _, p := range []model.RetentionPolicy{{ID: "batch-fact", Scope: job.Scope, RecordClass: "fact_payload", Purpose: "retention", Jurisdiction: "XX"}, {ID: "batch-young", Scope: job.Scope, RecordClass: "fact_payload", Purpose: "retention", Jurisdiction: "XX", MinimumAgeSeconds: 3600}, {ID: "batch-snapshot", Scope: job.Scope, RecordClass: "snapshot_payload", Purpose: "retention", Jurisdiction: "XX"}} {
 		if _, err := engine.RegisterRetentionPolicy(ctx, c, model.RetentionPolicyRequest{Command: cmd(p.ID), Policy: p}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	extraction.Command = model.Command{}
 	extraction.Reason = ""
-	r := model.DisposalBatchRequest{Command: cmd("dispose"), Scope: job.Scope, Reason: "expired", Extractions: []model.ExtractionDisposalRequest{extraction}, Versions: []model.VersionDisposalRequest{{Kind: "fact", Scope: job.Scope, RecordID: proposal.RecordID, VersionID: proposal.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-fact", Jurisdiction: "SG"}}}}}
+	r := model.DisposalBatchRequest{Command: cmd("dispose"), Scope: job.Scope, Reason: "expired", Extractions: []model.ExtractionDisposalRequest{extraction}, Versions: []model.VersionDisposalRequest{{Kind: "fact", Scope: job.Scope, RecordID: proposal.RecordID, VersionID: proposal.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-fact", Jurisdiction: "XX"}}}}}
 	reject := func(e *facts.Engine, r model.DisposalBatchRequest, want error) {
 		t.Helper()
 		if _, err := e.DisposeBatch(ctx, c, r); !errors.Is(err, want) {
@@ -48,7 +48,7 @@ func testDisposalBatch(t *testing.T, ctx context.Context, normal, engine, runner
 	reject(engine, partial, model.ErrPrecondition)
 	bad := r
 	bad.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
-	bad.Versions[0].Bindings = []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-young", Jurisdiction: "SG"}}
+	bad.Versions[0].Bindings = []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-young", Jurisdiction: "XX"}}
 	reject(engine, bad, model.ErrPrecondition)
 	retained()
 	if _, err := engine.PlaceLegalHold(ctx, c, model.LegalHoldRequest{Command: cmd("hold"), ID: "batch-hold", Scope: job.Scope, Reason: "review"}); err != nil {
@@ -77,10 +77,10 @@ func testDisposalBatch(t *testing.T, ctx context.Context, normal, engine, runner
 	}
 	reject(engine, r, model.ErrPrecondition)
 	retained()
-	r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: snapshot.ID, Bindings: []model.SnapshotRetentionBinding{{Scope: job.Scope, PolicyID: "batch-snapshot", Jurisdiction: "SG"}}}}
+	r.Snapshots = []model.SnapshotDisposalRequest{{SnapshotID: snapshot.ID, Bindings: []model.SnapshotRetentionBinding{{Scope: job.Scope, PolicyID: "batch-snapshot", Jurisdiction: "XX"}}}}
 	bad = r
 	bad.Versions = append([]model.VersionDisposalRequest(nil), r.Versions...)
-	bad.Versions[0].Bindings = []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-young", Jurisdiction: "SG"}}
+	bad.Versions[0].Bindings = []model.VersionRetentionBinding{{Scope: job.Scope, PolicyID: "batch-young", Jurisdiction: "XX"}}
 	reject(engine, bad, model.ErrPrecondition)
 	retained()
 	if err = ledger.Transact(ctx, c.Tenant, func(tx model.Tx) error {
@@ -154,10 +154,10 @@ func testVersionBatch(t *testing.T, ctx context.Context, normal, engine *facts.E
 		t.Fatal(err)
 	}
 	r := model.DisposalBatchRequest{Command: cmd("dispose"), Scope: "z", Reason: "expired", Versions: []model.VersionDisposalRequest{
-		{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "a", PolicyID: "fact", Jurisdiction: "SG"}}},
-		{Kind: "memory", Scope: "z", RecordID: memory.RecordID, VersionID: memory.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "memory", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "memory", Jurisdiction: "SG"}}},
+		{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "a", PolicyID: "fact", Jurisdiction: "XX"}}},
+		{Kind: "memory", Scope: "z", RecordID: memory.RecordID, VersionID: memory.VersionID, Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "memory", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "memory", Jurisdiction: "XX"}}},
 	}}
-	r.Attestations = []model.AttestationDisposalRequest{{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "SG", Purpose: "retention"}}
+	r.Attestations = []model.AttestationDisposalRequest{{Kind: "fact", Scope: "a", RecordID: fact.RecordID, VersionID: fact.VersionID, AttestationID: attestationID, PolicyID: "attestation", Jurisdiction: "XX", Purpose: "retention"}}
 	partial := r
 	partial.Versions = r.Versions[:1]
 	partial.Scope = "a"

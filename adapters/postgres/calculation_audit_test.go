@@ -30,7 +30,7 @@ func recordCalculationFixture(t *testing.T, ctx context.Context, engine *facts.E
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = engine.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: model.Command{Key: id, Purpose: "calculation"}, Evidence: model.Evidence{ID: id, Scope: "case1", SourceSystem: "external-application", SourceObject: id, SourceRevision: "v1", Speaker: "application", SourceClass: "bank_record", SourceTime: time.Now().UTC(), MediaType: "application/json", Classification: "confidential", RetentionPolicy: "calculation-artifacts", Object: ref}})
+		_, err = engine.RegisterEvidence(ctx, c, model.EvidenceRequest{Command: model.Command{Key: id, Purpose: "calculation"}, Evidence: model.Evidence{ID: id, Scope: "case1", SourceSystem: "external-application", SourceObject: id, SourceRevision: "v1", Speaker: "application", SourceClass: "organization_record", SourceTime: time.Now().UTC(), MediaType: "application/json", Classification: "confidential", RetentionPolicy: "calculation-artifacts", Object: ref}})
 		if err != nil {
 			t.Fatal(err)
 		}

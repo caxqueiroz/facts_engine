@@ -44,7 +44,7 @@ func (s corruptConfirmationRead) Read(ctx context.Context, tenant string, ref mo
 }
 func testConfirmations(t *testing.T, ctx context.Context, l *postgres.Ledger, store *evidence.Postgres) {
 	e, _ := facts.New(l, allow{}, store)
-	c := model.Caller{Tenant: "confirmation-bank", Principal: "client"}
+	c := model.Caller{Tenant: "confirmation-org", Principal: "client"}
 	svc := model.Caller{Tenant: c.Tenant, Principal: "acceptor", Service: true}
 	registerTestIdentities(t, ctx, e, c.Tenant, "case", []string{"customer"})
 	cmd := func(key string) model.Command { return model.Command{Key: key, Purpose: "confirmation-test"} }

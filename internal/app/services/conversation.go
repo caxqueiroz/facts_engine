@@ -38,7 +38,7 @@ func validConversation(r model.ConversationRequest) bool {
 				return false
 			}
 		case "staff":
-			if m.SourceClass != "staff" && m.SourceClass != "bank_record" {
+			if m.SourceClass != "staff" && m.SourceClass != "organization_record" {
 				return false
 			}
 		default:
@@ -67,8 +67,8 @@ func (s *Service) IngestConversation(ctx context.Context, c model.Caller, r mode
 		return model.ConversationRecord{}, err
 	}
 	receipts = append(receipts, d)
-	if slices.ContainsFunc(r.Messages, func(m model.ConversationMessage) bool { return m.SourceClass == "bank_record" }) {
-		d, err = s.authorize(ctx, c, r.Scope, "can_ingest_bank_record", r.Command)
+	if slices.ContainsFunc(r.Messages, func(m model.ConversationMessage) bool { return m.SourceClass == "organization_record" }) {
+		d, err = s.authorize(ctx, c, r.Scope, "can_ingest_organization_record", r.Command)
 		if err != nil {
 			return model.ConversationRecord{}, err
 		}

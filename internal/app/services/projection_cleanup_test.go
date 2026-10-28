@@ -33,7 +33,7 @@ func TestProjectionCleanupAuthorizationAndReplay(t *testing.T) {
 			s, l, a, c, _ := extractionDisposalFixture()
 			destination := &cleanupDestination{}
 			s.projectionCleanup.Destination = destination
-			r := model.ProjectionCleanupRequest{Command: model.Command{Key: "cleanup", Purpose: "retention"}, Kind: "memory", Scope: "z", RecordID: "record", VersionID: "version", DisposalEventID: "disposal", Generation: "index", Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "SG"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "SG"}}}
+			r := model.ProjectionCleanupRequest{Command: model.Command{Key: "cleanup", Purpose: "retention"}, Kind: "memory", Scope: "z", RecordID: "record", VersionID: "version", DisposalEventID: "disposal", Generation: "index", Reason: "expired", Bindings: []model.VersionRetentionBinding{{Scope: "z", PolicyID: "policy", Jurisdiction: "XX"}, {Scope: "a", PolicyID: "policy", Jurisdiction: "XX"}}}
 			revoke := func() { a.denied = "a" }
 			switch phase {
 			case "before-call":

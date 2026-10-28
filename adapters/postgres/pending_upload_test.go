@@ -23,7 +23,7 @@ func (nullUploadCipher) Seal(string, []byte) ([]byte, error) { return nil, nil }
 func testPendingUploads(t *testing.T, ctx context.Context, normal, retention *facts.Engine, store *evidence.Postgres, pool, admin *pgxpool.Pool, cipher postgres.Cipher, caller model.Caller) {
 	t.Helper()
 	client := v1.NewRetentionServiceClient(governanceGRPC(t, retention, caller))
-	policy := &v1.RegisterRetentionPolicyRequest{Tenant: caller.Tenant, Command: &v1.Command{Key: "orphan-policy", Purpose: "cleanup"}, Policy: &v1.RetentionPolicy{Id: "orphan-policy", Scope: "case", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "SG", MinimumAgeSeconds: 3600}}
+	policy := &v1.RegisterRetentionPolicyRequest{Tenant: caller.Tenant, Command: &v1.Command{Key: "orphan-policy", Purpose: "cleanup"}, Policy: &v1.RetentionPolicy{Id: "orphan-policy", Scope: "case", RecordClass: "orphan_evidence_bytes", Purpose: "cleanup", Jurisdiction: "XX", MinimumAgeSeconds: 3600}}
 	if _, err := client.RegisterRetentionPolicy(ctx, policy); err != nil {
 		t.Fatal("orphan policy over gRPC", err)
 	}
@@ -115,7 +115,7 @@ func testPendingUploads(t *testing.T, ctx context.Context, normal, retention *fa
 			t.Fatal("runtime altered upload provenance", err)
 		}
 	}
-	if _, err := normal.RegisterEvidence(ctx, caller, model.EvidenceRequest{Command: model.Command{Key: "pending-register", Purpose: "review"}, Evidence: model.Evidence{ID: "pending-registered", Scope: "case", SourceSystem: "test", SourceObject: "pending", SourceRevision: "v1", Speaker: "staff", SourceClass: "bank_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "short-lived", Object: ref}}); err != nil {
+	if _, err := normal.RegisterEvidence(ctx, caller, model.EvidenceRequest{Command: model.Command{Key: "pending-register", Purpose: "review"}, Evidence: model.Evidence{ID: "pending-registered", Scope: "case", SourceSystem: "test", SourceObject: "pending", SourceRevision: "v1", Speaker: "staff", SourceClass: "organization_record", SourceTime: time.Now().UTC(), MediaType: "text/plain", Classification: "confidential", RetentionPolicy: "short-lived", Object: ref}}); err != nil {
 		t.Fatal("pending object registration", err)
 	}
 	_, _, _, registeredAt := readMetadata(ref)
