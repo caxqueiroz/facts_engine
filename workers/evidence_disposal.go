@@ -96,13 +96,20 @@ func (h *EvidenceDisposalHandler) Handle(ctx context.Context, d model.Delivery) 
 		}
 		evidence[item.ID] = item
 	}
-	objects := map[string]model.ObjectRef{}
+	// Delete in request order (root, then derivatives) so retries replay the same sequence.
+	objects := make([]model.ObjectRef, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		item, ok := evidence[id]
 		if !ok {
 			return model.ErrPrecondition
 		}
-		objects[fmt.Sprintf("%s\x00%s", item.Object.Locator, item.Object.Version)] = item.Object
+		key := fmt.Sprintf("%s\x00%s", item.Object.Locator, item.Object.Version)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		objects = append(objects, item.Object)
 	}
 	for _, object := range objects {
 		if err := h.store.DeleteEvidenceVersion(ctx, h.tenant, object); err != nil {
